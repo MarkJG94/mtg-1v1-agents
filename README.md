@@ -26,4 +26,14 @@ TypeScript monorepo (pnpm workspaces). `packages/engine` (pure TS rules engine),
 
 ## Status
 
-Planning complete; no code yet. First milestone is the end-to-end thin slice described in the roadmap.
+Phase 1 (engine core) is implemented in `packages/engine`: turn structure, mana and the payment solver, the stack, targeting, combat, state-based actions, triggers, the layer system, replacement/prevention effects, planeswalkers, mulligans and game end, with a scenario builder, per-subsystem test suites and an invariant fuzzer. See `docs/10-roadmap.md` for the task board and `docs/adr/` for decisions that changed during implementation. Next up is Phase 2 (card scripts and the bootstrap set).
+
+## Development
+
+```
+pnpm install
+pnpm lint        # biome
+pnpm typecheck
+pnpm test        # vitest across packages (includes a short fuzz run; FUZZ_RUNS=500 for longer)
+pnpm bench       # random-agent games/sec for the engine
+```

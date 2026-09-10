@@ -6,28 +6,30 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done.
 
 ## Phase 0 — Repository and scaffolding (≈ 2 sessions)
 
-- [ ] 0.1 `git init` in the project folder; create the GitHub repo `mtg-1v1-agents`; push; branch protection on `main`.
-- [ ] 0.2 pnpm monorepo: `packages/{shared,engine,cards,agents,sim}`, `apps/{server,web}`, shared tsconfig, Biome, Vitest, tsup, Vite.
-- [ ] 0.3 GitHub Actions `ci.yml` (lint, typecheck, test, build) green on an empty tree.
+- [x] 0.1 `git init` in the project folder; create the GitHub repo `mtg-1v1-agents`; push; branch protection on `main`.
+- [~] 0.2 pnpm monorepo: `packages/{shared,engine}` exist with shared tsconfig, Biome, Vitest; `cards`, `agents`, `sim`, `apps/*`, tsup and Vite are added when their phases start.
+- [x] 0.3 GitHub Actions `ci.yml` (lint, typecheck, test, build, bench).
 - [ ] 0.4 `scripts/fetch-scryfall.ts`: download the `oracle-cards` bulk file to `data/scryfall/`, build the `cards` projection, print counts.
 - [ ] 0.5 Dockerfile + docker-compose with a `data` volume; `pnpm dev` runs server + web with HMR.
 
 ## Phase 1 — Engine core (≈ 10–14 sessions)
 
-- [ ] 1.1 State model, object ids, zones, seeded RNG, structural-sharing update helper, event emitter.
-- [ ] 1.2 Turn structure with all steps; untap/draw/cleanup; land drops; turn cap.
-- [ ] 1.3 Mana: pool, costs (incl. hybrid/phyrexian/X), payment solver, mana abilities of basic and simple nonbasic lands.
-- [ ] 1.4 Priority, stack, casting/activating, resolution, countering, fizzling, split second.
-- [ ] 1.5 Targeting and legality (`legalActions`), hexproof/shroud/protection/ward.
-- [ ] 1.6 Combat with all evergreen keywords, damage assignment, first-strike step.
-- [ ] 1.7 State-based actions, legend rule, counters, tokens.
-- [ ] 1.8 Triggered abilities (APNAP, intervening-if, LKI, delayed), static abilities.
-- [ ] 1.9 Continuous effects and the layer system with timestamps and dependency.
-- [ ] 1.10 Replacement and prevention effects.
-- [ ] 1.11 Planeswalkers.
-- [ ] 1.12 London mulligan; game end conditions; loop detection.
-- [ ] 1.13 Scenario builder for tests; unit suites for 1.2–1.12; invariant fuzzer with the `random` agent.
-- [ ] 1.14 Benchmarks; target ≤ 5 ms/game with the random agent.
+Status: implemented in `packages/engine` with 118 tests (subsystem suites per CR section, seeded random-game fuzzing with invariants, determinism/replay). Known gaps and simplifications are recorded in `docs/adr/0001-engine-core-simplifications.md`.
+
+- [x] 1.1 State model, object ids, zones, seeded RNG, structural-sharing update helper, event emitter.
+- [x] 1.2 Turn structure with all steps; untap/draw/cleanup; land drops; turn cap.
+- [x] 1.3 Mana: pool, costs (incl. hybrid/phyrexian/X), payment solver, mana abilities of basic and simple nonbasic lands.
+- [x] 1.4 Priority, stack, casting/activating, resolution, countering, fizzling, split second.
+- [x] 1.5 Targeting and legality (`legalActions`), hexproof/shroud/protection/ward.
+- [x] 1.6 Combat with all evergreen keywords, damage assignment, first-strike step.
+- [x] 1.7 State-based actions, legend rule, counters, tokens.
+- [x] 1.8 Triggered abilities (APNAP, intervening-if, LKI, delayed), static abilities.
+- [x] 1.9 Continuous effects and the layer system with timestamps and dependency.
+- [x] 1.10 Replacement and prevention effects.
+- [x] 1.11 Planeswalkers.
+- [x] 1.12 London mulligan; game end conditions; loop detection.
+- [x] 1.13 Scenario builder for tests; unit suites for 1.2–1.12; invariant fuzzer with the `random` agent.
+- [~] 1.14 Benchmarks (`pnpm bench`); currently ≈ 32 ms/game median with the random agent (≈ 870 decisions, 34 turns per game; ≈ 37 µs per decision). Target ≤ 5 ms/game not yet met; see ADR 0001 for the profile and next steps.
 
 ## Phase 2 — Cards: schema, bootstrap set, resolver (≈ 5–7 sessions)
 
