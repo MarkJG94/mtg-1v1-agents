@@ -72,6 +72,23 @@ function describe(entry: BulkEntry): string {
   return `${size}, updated ${String(entry.updated_at ?? 'unknown')}`;
 }
 
+/**
+ * Whether an existing file starts like JSON. A download left behind by an older version of this script is
+ * still compressed, and must be replaced rather than parsed.
+ */
+function looksLikeJson(path: string): boolean {
+  const fd = openSync(path, 'r');
+  const head = Buffer.alloc(64);
+  let n = 0;
+  try {
+    n = readSync(fd, head, 0, 64, 0);
+  } finally {
+    closeSync(fd);
+  }
+  const text = head.subarray(0, n).toString('utf8').trimStart();
+  return text.startsWith('[') || text.startsWith('{');
+}
+
 /** Detects the compression from the file's magic bytes rather than trusting the URL or headers. */
 function sniff(path: string): Compression {
   const fd = openSync(path, 'r');
@@ -203,7 +220,13 @@ async function download(): Promise<void> {
 
 async function main(): Promise<void> {
   mkdirSync(join(DATA_DIR, 'scryfall'), { recursive: true });
-  if (!existsSync(OUT) || flag('--force') || flag('--dump')) {
+  const stale = existsSync(OUT) && !looksLikeJson(OUT);
+  if (stale) {
+    console.warn(
+      `${OUT} is not JSON (a compressed download from an older version of this script); replacing it`,
+    );
+  }
+  if (!existsSync(OUT) || stale || flag('--force') || flag('--dump')) {
     await download();
     if (flag('--dump')) return;
   } else {

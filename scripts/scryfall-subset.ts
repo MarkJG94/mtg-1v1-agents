@@ -13,7 +13,17 @@ if (!existsSync(BULK)) {
   console.error(`${BULK} not found. Run \`pnpm fetch:scryfall\` first.`);
   process.exit(1);
 }
-const db = CardDatabase.fromBulkFile(BULK);
+const db = loadBulk();
+
+function loadBulk(): CardDatabase {
+  try {
+    return CardDatabase.fromBulkFile(BULK);
+  } catch (e) {
+    console.error(`could not read ${BULK}: ${(e as Error).message}`);
+    console.error('Re-download it with `pnpm fetch:scryfall --force`.');
+    process.exit(1);
+  }
+}
 const FIELDS: (keyof ScryfallCard)[] = [
   'oracle_id',
   'id',
