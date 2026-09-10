@@ -12,9 +12,11 @@ import {
   payMana,
 } from './costs.js';
 import type { CostDef, Effect, TargetSpec } from './definition.js';
-import { type Draft, emit, getObj, hasObj, invalidate, obj } from './draft.js';
+import { type Draft, emit, getObj, hasObj, obj } from './draft.js';
 import { type EvalCtx, evalCondition, simpleCtx } from './eval.js';
 import type { CastStage, EffectContext, Frame } from './frames.js';
+import { loseLife } from './players.js';
+import { enterPayOption } from './replacements.js';
 import type {
   Characteristics,
   Decision,
@@ -793,16 +795,79 @@ export function runResolveTop(d: Draft): void {
         const first = ctx.targets[item.targetSpecs[0]!.id]?.[0];
         if (first?.kind === 'object') attachTo = first.id;
       }
-      const opts: { controller: PlayerId; attachTo?: ObjectId } = { controller: item.controller };
-      if (attachTo !== undefined) opts.attachTo = attachTo;
-      moveObject(d, item.source.id, 'battlefield', opts);
-      if (item.effects.length > 0)
-        pushFrame(d, { k: 'effects', effects: item.effects, i: 0, ctx, stage: null });
+      enterBattlefield(
+        d,
+        item.controller,
+        item.source.id,
+        item.controller,
+        attachTo ?? null,
+        item.effects.length > 0 ? item.effects : null,
+        item.effects.length > 0 ? ctx : null,
+      );
       return;
     }
     pushFrame(d, { k: 'finishSpell', object: item.source.id });
   }
   pushFrame(d, { k: 'effects', effects: item.effects, i: 0, ctx, stage: null });
+}
+
+/**
+ * Puts a permanent onto the battlefield from the stack or a land drop, first asking its controller whether to
+ * pay an "unless you pay N life" enters-tapped cost (CR 614.1c) when one applies and can be paid.
+ */
+export function enterBattlefield(
+  d: Draft,
+  player: PlayerId,
+  object: ObjectId,
+  controller: PlayerId,
+  attachTo: ObjectId | null,
+  effects: Effect[] | null,
+  ctx: EffectContext | null,
+): void {
+  const life = enterPayOption(d, object);
+  if (life !== null && d.players[player].life > life) {
+    pushFrame(d, { k: 'enterPay', player, object, life, controller, attachTo, effects, ctx });
+    return;
+  }
+  finishEnter(d, object, controller, attachTo, effects, ctx, false);
+}
+
+function finishEnter(
+  d: Draft,
+  object: ObjectId,
+  controller: PlayerId,
+  attachTo: ObjectId | null,
+  effects: Effect[] | null,
+  ctx: EffectContext | null,
+  paidUnless: boolean,
+): void {
+  const opts: { controller: PlayerId; attachTo?: ObjectId; paidUnless: boolean } = {
+    controller,
+    paidUnless,
+  };
+  if (attachTo !== null) opts.attachTo = attachTo;
+  moveObject(d, object, 'battlefield', opts);
+  if (effects && ctx) pushFrame(d, { k: 'effects', effects, i: 0, ctx, stage: null });
+}
+
+export function runEnterPay(
+  d: Draft,
+  f: Extract<Frame, { k: 'enterPay' }>,
+  answer: DecisionAnswer | null,
+): void {
+  if (!answer) {
+    setDecision(d, {
+      kind: 'yesNo',
+      player: f.player,
+      question: `pay ${f.life} life`,
+      source: f.object,
+    });
+    return;
+  }
+  const ans = expectAnswer(answer, 'yesNo');
+  popFrame(d);
+  if (ans.yes) loseLife(d, f.player, f.life);
+  finishEnter(d, f.object, f.controller, f.attachTo, f.effects, f.ctx, ans.yes);
 }
 
 export function runFinishSpell(d: Draft, f: Extract<Frame, { k: 'finishSpell' }>): void {

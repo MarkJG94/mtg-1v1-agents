@@ -1,0 +1,16 @@
+oracleId: fixture:white-knight
+name: "White Knight"
+text: "First strike\nProtection from black"
+manaCost: '{W}{W}'
+types: [creature]
+subtypes: [Human, Knight]
+power: 2
+toughness: 2
+abilities:
+  - { kind: keyword, keyword: first strike, covers: [0] }
+  - { kind: keyword, keyword: protection, from: { color: B }, covers: [1] }
+tests:
+  - name: cannot be targeted by black spells
+    setup: { A: { battlefield: ['~'] }, B: { hand: [Doom Blade], battlefield: [Swamp, Swamp] } }
+    actions: [nextTurn]
+    expect: { '~.zone': battlefield }

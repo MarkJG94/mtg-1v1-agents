@@ -1,0 +1,10 @@
+oracleId: fixture:boggart-brute
+name: "Boggart Brute"
+text: "Menace"
+manaCost: '{2}{R}'
+types: [creature]
+subtypes: [Goblin, Warrior]
+power: 3
+toughness: 2
+abilities:
+  - { kind: keyword, keyword: menace, covers: [0] }

@@ -1,0 +1,11 @@
+oracleId: fixture:tropical-island
+name: "Tropical Island"
+text: "({T}: Add {G} or {U}.)"
+types: [land]
+subtypes: [Forest, Island]
+abilities: []
+tests:
+  - name: taps for either colour
+    setup: { A: { battlefield: ['~', Mountain], hand: [Grizzly Bears] } }
+    actions: [{ cast: Grizzly Bears }, resolveAll]
+    expect: { A.battlefield: [Grizzly Bears], '~.tapped': true }

@@ -1,0 +1,14 @@
+oracleId: fixture:divination
+name: "Divination"
+text: "Draw two cards."
+manaCost: '{2}{U}'
+types: [sorcery]
+abilities:
+
+  - { kind: spell, covers: [0], effects: [{ op: draw, count: 2 }] }
+
+tests:
+  - name: draws two
+    setup: { A: { hand: ['~'], battlefield: [Island, Island, Island], library: [Forest, Forest, Forest] } }
+    actions: [{ cast: '~' }, resolveAll]
+    expect: { A.hand.size: 2 }

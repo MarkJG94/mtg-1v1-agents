@@ -1,0 +1,14 @@
+oracleId: fixture:jackal-familiar
+name: "Jackal Familiar"
+text: "Jackal Familiar can't attack or block alone."
+manaCost: '{R}'
+types: [creature]
+subtypes: [Jackal]
+power: 2
+toughness: 2
+abilities:
+  - kind: static
+    covers: [0]
+    effect: { type: cantAttack, affects: self }
+    also: [{ type: cantBlock, affects: self }]
+    condition: { not: { controls: { type: creature, other: true } } }

@@ -1,0 +1,18 @@
+oracleId: fixture:lightning-bolt
+name: "Lightning Bolt"
+text: "Lightning Bolt deals 3 damage to any target."
+manaCost: '{R}'
+types: [instant]
+abilities:
+
+  - { kind: spell, covers: [0], targets: [{ id: t, filter: { any: true } }], effects: [{ op: damage, amount: 3, to: $t }] }
+
+tests:
+  - name: kills a 3/3
+    setup: { A: { hand: ['~'], battlefield: [Mountain] }, B: { battlefield: [Centaur Courser] } }
+    actions: [{ cast: '~', target: Centaur Courser }, resolveAll]
+    expect: { B.graveyard: [Centaur Courser] }
+  - name: burns face
+    setup: { A: { hand: ['~'], battlefield: [Mountain] } }
+    actions: [{ cast: '~', target: B }, resolveAll]
+    expect: { B.life: 17 }

@@ -1,0 +1,1824 @@
+[
+  {
+    "oracle_id": "fixture:plains",
+    "id": "print:plains",
+    "name": "Plains",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Basic Land — Plains",
+    "oracle_text": "({T}: Add {W}.)",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common"
+  },
+  {
+    "oracle_id": "fixture:island",
+    "id": "print:island",
+    "name": "Island",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Basic Land — Island",
+    "oracle_text": "({T}: Add {U}.)",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common"
+  },
+  {
+    "oracle_id": "fixture:swamp",
+    "id": "print:swamp",
+    "name": "Swamp",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Basic Land — Swamp",
+    "oracle_text": "({T}: Add {B}.)",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common"
+  },
+  {
+    "oracle_id": "fixture:mountain",
+    "id": "print:mountain",
+    "name": "Mountain",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Basic Land — Mountain",
+    "oracle_text": "({T}: Add {R}.)",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common"
+  },
+  {
+    "oracle_id": "fixture:forest",
+    "id": "print:forest",
+    "name": "Forest",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Basic Land — Forest",
+    "oracle_text": "({T}: Add {G}.)",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common"
+  },
+  {
+    "oracle_id": "fixture:tropical-island",
+    "id": "print:tropical-island",
+    "name": "Tropical Island",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Land — Forest Island",
+    "oracle_text": "({T}: Add {G} or {U}.)",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common"
+  },
+  {
+    "oracle_id": "fixture:breeding-pool",
+    "id": "print:breeding-pool",
+    "name": "Breeding Pool",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Land — Forest Island",
+    "oracle_text": "({T}: Add {G} or {U}.)\nAs Breeding Pool enters, you may pay 2 life. If you don't, it enters tapped.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common"
+  },
+  {
+    "oracle_id": "fixture:wooded-foothills",
+    "id": "print:wooded-foothills",
+    "name": "Wooded Foothills",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Land",
+    "oracle_text": "{T}, Pay 1 life, Sacrifice Wooded Foothills: Search your library for a Mountain or Forest card, put it onto the battlefield, then shuffle.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common"
+  },
+  {
+    "oracle_id": "fixture:glacial-fortress",
+    "id": "print:glacial-fortress",
+    "name": "Glacial Fortress",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Land",
+    "oracle_text": "Glacial Fortress enters tapped unless you control a Plains or an Island.\n{T}: Add {W} or {U}.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common"
+  },
+  {
+    "oracle_id": "fixture:seachrome-coast",
+    "id": "print:seachrome-coast",
+    "name": "Seachrome Coast",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Land",
+    "oracle_text": "Seachrome Coast enters tapped unless you control two or fewer other lands.\n{T}: Add {W} or {U}.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common"
+  },
+  {
+    "oracle_id": "fixture:karplusan-forest",
+    "id": "print:karplusan-forest",
+    "name": "Karplusan Forest",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Land",
+    "oracle_text": "{T}: Add {C}.\n{T}: Add {R} or {G}. Karplusan Forest deals 1 damage to you.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common"
+  },
+  {
+    "oracle_id": "fixture:wasteland",
+    "id": "print:wasteland",
+    "name": "Wasteland",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Land",
+    "oracle_text": "{T}: Add {C}.\n{T}, Sacrifice Wasteland: Destroy target nonbasic land.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common"
+  },
+  {
+    "oracle_id": "fixture:simic-guildgate",
+    "id": "print:simic-guildgate",
+    "name": "Simic Guildgate",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Land — Gate",
+    "oracle_text": "Simic Guildgate enters tapped.\n{T}: Add {G} or {U}.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common"
+  },
+  {
+    "oracle_id": "fixture:city-of-brass",
+    "id": "print:city-of-brass",
+    "name": "City of Brass",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Land",
+    "oracle_text": "Whenever City of Brass becomes tapped, it deals 1 damage to you.\n{T}: Add one mana of any color.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common"
+  },
+  {
+    "oracle_id": "fixture:urborg-tomb-of-yawgmoth",
+    "id": "print:urborg-tomb-of-yawgmoth",
+    "name": "Urborg, Tomb of Yawgmoth",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Legendary Land",
+    "oracle_text": "Each land is a Swamp in addition to its other land types.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common"
+  },
+  {
+    "oracle_id": "fixture:reliquary-tower",
+    "id": "print:reliquary-tower",
+    "name": "Reliquary Tower",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Land",
+    "oracle_text": "You have no maximum hand size.\n{T}: Add {C}.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common"
+  },
+  {
+    "oracle_id": "fixture:grizzly-bears",
+    "id": "print:grizzly-bears",
+    "name": "Grizzly Bears",
+    "cmc": 2,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Creature — Bear",
+    "oracle_text": "",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{G}",
+    "power": "2",
+    "toughness": "2"
+  },
+  {
+    "oracle_id": "fixture:hill-giant",
+    "id": "print:hill-giant",
+    "name": "Hill Giant",
+    "cmc": 4,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Creature — Giant",
+    "oracle_text": "",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{3}{R}",
+    "power": "3",
+    "toughness": "3"
+  },
+  {
+    "oracle_id": "fixture:centaur-courser",
+    "id": "print:centaur-courser",
+    "name": "Centaur Courser",
+    "cmc": 3,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Creature — Centaur",
+    "oracle_text": "",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{2}{G}",
+    "power": "3",
+    "toughness": "3"
+  },
+  {
+    "oracle_id": "fixture:craw-wurm",
+    "id": "print:craw-wurm",
+    "name": "Craw Wurm",
+    "cmc": 6,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Creature — Wurm",
+    "oracle_text": "",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{4}{G}{G}",
+    "power": "6",
+    "toughness": "4"
+  },
+  {
+    "oracle_id": "fixture:goblin-piker",
+    "id": "print:goblin-piker",
+    "name": "Goblin Piker",
+    "cmc": 2,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Creature — Goblin",
+    "oracle_text": "",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{R}",
+    "power": "2",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "fixture:wind-drake",
+    "id": "print:wind-drake",
+    "name": "Wind Drake",
+    "cmc": 3,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Creature — Drake",
+    "oracle_text": "Flying",
+    "keywords": ["Flying"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{2}{U}",
+    "power": "2",
+    "toughness": "2"
+  },
+  {
+    "oracle_id": "fixture:giant-spider",
+    "id": "print:giant-spider",
+    "name": "Giant Spider",
+    "cmc": 4,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Creature — Spider",
+    "oracle_text": "Reach",
+    "keywords": ["Reach"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{3}{G}",
+    "power": "2",
+    "toughness": "4"
+  },
+  {
+    "oracle_id": "fixture:raging-goblin",
+    "id": "print:raging-goblin",
+    "name": "Raging Goblin",
+    "cmc": 1,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Creature — Goblin",
+    "oracle_text": "Haste",
+    "keywords": ["Haste"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{R}",
+    "power": "1",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "fixture:serra-angel",
+    "id": "print:serra-angel",
+    "name": "Serra Angel",
+    "cmc": 5,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Creature — Angel",
+    "oracle_text": "Flying, vigilance",
+    "keywords": ["Flying", "Vigilance"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{3}{W}{W}",
+    "power": "4",
+    "toughness": "4"
+  },
+  {
+    "oracle_id": "fixture:vampire-nighthawk",
+    "id": "print:vampire-nighthawk",
+    "name": "Vampire Nighthawk",
+    "cmc": 3,
+    "colors": ["B"],
+    "color_identity": ["B"],
+    "type_line": "Creature — Vampire Shaman",
+    "oracle_text": "Flying\nDeathtouch\nLifelink",
+    "keywords": ["Flying", "Deathtouch", "Lifelink"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{B}{B}",
+    "power": "2",
+    "toughness": "3"
+  },
+  {
+    "oracle_id": "fixture:ambush-viper",
+    "id": "print:ambush-viper",
+    "name": "Ambush Viper",
+    "cmc": 2,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Creature — Snake",
+    "oracle_text": "Flash\nDeathtouch",
+    "keywords": ["Flash", "Deathtouch"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{G}",
+    "power": "2",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "fixture:boros-swiftblade",
+    "id": "print:boros-swiftblade",
+    "name": "Boros Swiftblade",
+    "cmc": 2,
+    "colors": ["W", "R"],
+    "color_identity": ["W", "R"],
+    "type_line": "Creature — Human Soldier",
+    "oracle_text": "Double strike",
+    "keywords": ["Double strike"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{R}{W}",
+    "power": "1",
+    "toughness": "2"
+  },
+  {
+    "oracle_id": "fixture:boggart-brute",
+    "id": "print:boggart-brute",
+    "name": "Boggart Brute",
+    "cmc": 3,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Creature — Goblin Warrior",
+    "oracle_text": "Menace",
+    "keywords": ["Menace"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{2}{R}",
+    "power": "3",
+    "toughness": "2"
+  },
+  {
+    "oracle_id": "fixture:wall-of-stone",
+    "id": "print:wall-of-stone",
+    "name": "Wall of Stone",
+    "cmc": 3,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Creature — Wall",
+    "oracle_text": "Defender",
+    "keywords": ["Defender"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{R}{R}",
+    "power": "0",
+    "toughness": "8"
+  },
+  {
+    "oracle_id": "fixture:darksteel-sentinel",
+    "id": "print:darksteel-sentinel",
+    "name": "Darksteel Sentinel",
+    "cmc": 6,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Creature — Golem",
+    "oracle_text": "Flash\nVigilance\nIndestructible",
+    "keywords": ["Flash", "Vigilance", "Indestructible"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{6}",
+    "power": "3",
+    "toughness": "3"
+  },
+  {
+    "oracle_id": "fixture:simic-sky-swallower",
+    "id": "print:simic-sky-swallower",
+    "name": "Simic Sky Swallower",
+    "cmc": 7,
+    "colors": ["U", "G"],
+    "color_identity": ["U", "G"],
+    "type_line": "Creature — Leviathan",
+    "oracle_text": "Flying, trample\nShroud",
+    "keywords": ["Flying", "Trample", "Shroud"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{5}{G}{U}",
+    "power": "6",
+    "toughness": "6"
+  },
+  {
+    "oracle_id": "fixture:white-knight",
+    "id": "print:white-knight",
+    "name": "White Knight",
+    "cmc": 2,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Creature — Human Knight",
+    "oracle_text": "First strike\nProtection from black",
+    "keywords": ["First strike", "Protection"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{W}{W}",
+    "power": "2",
+    "toughness": "2"
+  },
+  {
+    "oracle_id": "fixture:black-knight",
+    "id": "print:black-knight",
+    "name": "Black Knight",
+    "cmc": 2,
+    "colors": ["B"],
+    "color_identity": ["B"],
+    "type_line": "Creature — Human Knight",
+    "oracle_text": "First strike\nProtection from white",
+    "keywords": ["First strike", "Protection"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{B}{B}",
+    "power": "2",
+    "toughness": "2"
+  },
+  {
+    "oracle_id": "fixture:phantom-warrior",
+    "id": "print:phantom-warrior",
+    "name": "Phantom Warrior",
+    "cmc": 3,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Creature — Illusion Warrior",
+    "oracle_text": "Phantom Warrior can't be blocked.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{U}{U}",
+    "power": "2",
+    "toughness": "2"
+  },
+  {
+    "oracle_id": "fixture:invisible-stalker",
+    "id": "print:invisible-stalker",
+    "name": "Invisible Stalker",
+    "cmc": 2,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Creature — Human Rogue",
+    "oracle_text": "Hexproof\nInvisible Stalker can't be blocked.",
+    "keywords": ["Hexproof"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{U}",
+    "power": "1",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "fixture:silhana-ledgewalker",
+    "id": "print:silhana-ledgewalker",
+    "name": "Silhana Ledgewalker",
+    "cmc": 2,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Creature — Elf Rogue",
+    "oracle_text": "Hexproof\nSilhana Ledgewalker can't be blocked except by creatures with flying.",
+    "keywords": ["Hexproof"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{G}",
+    "power": "1",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "fixture:isamaru-hound-of-konda",
+    "id": "print:isamaru-hound-of-konda",
+    "name": "Isamaru, Hound of Konda",
+    "cmc": 1,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Legendary Creature — Dog",
+    "oracle_text": "",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{W}",
+    "power": "2",
+    "toughness": "2"
+  },
+  {
+    "oracle_id": "fixture:drudge-skeletons",
+    "id": "print:drudge-skeletons",
+    "name": "Drudge Skeletons",
+    "cmc": 2,
+    "colors": ["B"],
+    "color_identity": ["B"],
+    "type_line": "Creature — Skeleton",
+    "oracle_text": "{B}: Regenerate Drudge Skeletons.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{B}",
+    "power": "1",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "fixture:llanowar-elves",
+    "id": "print:llanowar-elves",
+    "name": "Llanowar Elves",
+    "cmc": 1,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Creature — Elf Druid",
+    "oracle_text": "{T}: Add {G}.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{G}",
+    "power": "1",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "fixture:prodigal-sorcerer",
+    "id": "print:prodigal-sorcerer",
+    "name": "Prodigal Sorcerer",
+    "cmc": 3,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Creature — Human Wizard",
+    "oracle_text": "{T}: Prodigal Sorcerer deals 1 damage to any target.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{2}{U}",
+    "power": "1",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "fixture:mogg-fanatic",
+    "id": "print:mogg-fanatic",
+    "name": "Mogg Fanatic",
+    "cmc": 1,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Creature — Goblin",
+    "oracle_text": "Sacrifice Mogg Fanatic: It deals 1 damage to any target.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{R}",
+    "power": "1",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "fixture:elvish-visionary",
+    "id": "print:elvish-visionary",
+    "name": "Elvish Visionary",
+    "cmc": 2,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Creature — Elf Shaman",
+    "oracle_text": "When Elvish Visionary enters, draw a card.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{G}",
+    "power": "1",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "fixture:blood-artist",
+    "id": "print:blood-artist",
+    "name": "Blood Artist",
+    "cmc": 2,
+    "colors": ["B"],
+    "color_identity": ["B"],
+    "type_line": "Creature — Vampire",
+    "oracle_text": "Whenever Blood Artist or another creature dies, target player loses 1 life and you gain 1 life.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{B}",
+    "power": "0",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "fixture:ajani-s-pridemate",
+    "id": "print:ajani-s-pridemate",
+    "name": "Ajani's Pridemate",
+    "cmc": 2,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Creature — Cat Soldier",
+    "oracle_text": "Whenever you gain life, put a +1/+1 counter on Ajani's Pridemate.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{W}",
+    "power": "2",
+    "toughness": "2"
+  },
+  {
+    "oracle_id": "fixture:grim-lavamancer",
+    "id": "print:grim-lavamancer",
+    "name": "Grim Lavamancer",
+    "cmc": 1,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Creature — Human Wizard",
+    "oracle_text": "{R}, {T}, Exile two cards from your graveyard: Grim Lavamancer deals 2 damage to any target.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{R}",
+    "power": "1",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "fixture:lone-missionary",
+    "id": "print:lone-missionary",
+    "name": "Lone Missionary",
+    "cmc": 2,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Creature — Kor Monk",
+    "oracle_text": "When Lone Missionary enters, you gain 4 life.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{W}",
+    "power": "2",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "fixture:wall-of-omens",
+    "id": "print:wall-of-omens",
+    "name": "Wall of Omens",
+    "cmc": 2,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Creature — Wall",
+    "oracle_text": "Defender\nWhen Wall of Omens enters, draw a card.",
+    "keywords": ["Defender"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{W}",
+    "power": "0",
+    "toughness": "4"
+  },
+  {
+    "oracle_id": "fixture:tarmogoyf",
+    "id": "print:tarmogoyf",
+    "name": "Tarmogoyf",
+    "cmc": 2,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Creature — Lhurgoyf",
+    "oracle_text": "Tarmogoyf's power is equal to the number of card types among cards in all graveyards and its toughness is equal to that number plus 1.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{G}",
+    "power": "*",
+    "toughness": "1+*"
+  },
+  {
+    "oracle_id": "fixture:ball-lightning",
+    "id": "print:ball-lightning",
+    "name": "Ball Lightning",
+    "cmc": 3,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Creature — Elemental",
+    "oracle_text": "Trample\nHaste\nAt the beginning of the end step, sacrifice Ball Lightning.",
+    "keywords": ["Trample", "Haste"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{R}{R}{R}",
+    "power": "6",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "fixture:jackal-familiar",
+    "id": "print:jackal-familiar",
+    "name": "Jackal Familiar",
+    "cmc": 1,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Creature — Jackal",
+    "oracle_text": "Jackal Familiar can't attack or block alone.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{R}",
+    "power": "2",
+    "toughness": "2"
+  },
+  {
+    "oracle_id": "fixture:rampaging-baloths",
+    "id": "print:rampaging-baloths",
+    "name": "Rampaging Baloths",
+    "cmc": 6,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Creature — Beast",
+    "oracle_text": "Trample\nLandfall — Whenever a land enters the battlefield under your control, you may create a 4/4 green Beast creature token.",
+    "keywords": ["Trample", "Landfall"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{4}{G}{G}",
+    "power": "6",
+    "toughness": "6"
+  },
+  {
+    "oracle_id": "fixture:lightning-bolt",
+    "id": "print:lightning-bolt",
+    "name": "Lightning Bolt",
+    "cmc": 1,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Instant",
+    "oracle_text": "Lightning Bolt deals 3 damage to any target.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{R}"
+  },
+  {
+    "oracle_id": "fixture:shock",
+    "id": "print:shock",
+    "name": "Shock",
+    "cmc": 1,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Instant",
+    "oracle_text": "Shock deals 2 damage to any target.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{R}"
+  },
+  {
+    "oracle_id": "fixture:sudden-shock",
+    "id": "print:sudden-shock",
+    "name": "Sudden Shock",
+    "cmc": 2,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Instant",
+    "oracle_text": "Split second\nSudden Shock deals 2 damage to any target.",
+    "keywords": ["Split second"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{R}"
+  },
+  {
+    "oracle_id": "fixture:blaze",
+    "id": "print:blaze",
+    "name": "Blaze",
+    "cmc": 1,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Sorcery",
+    "oracle_text": "Blaze deals X damage to any target.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{X}{R}"
+  },
+  {
+    "oracle_id": "fixture:lightning-helix",
+    "id": "print:lightning-helix",
+    "name": "Lightning Helix",
+    "cmc": 2,
+    "colors": ["W", "R"],
+    "color_identity": ["W", "R"],
+    "type_line": "Instant",
+    "oracle_text": "Lightning Helix deals 3 damage to any target and you gain 3 life.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{R}{W}"
+  },
+  {
+    "oracle_id": "fixture:giant-growth",
+    "id": "print:giant-growth",
+    "name": "Giant Growth",
+    "cmc": 1,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Instant",
+    "oracle_text": "Target creature gets +3/+3 until end of turn.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{G}"
+  },
+  {
+    "oracle_id": "fixture:counterspell",
+    "id": "print:counterspell",
+    "name": "Counterspell",
+    "cmc": 2,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Instant",
+    "oracle_text": "Counter target spell.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{U}{U}"
+  },
+  {
+    "oracle_id": "fixture:mana-leak",
+    "id": "print:mana-leak",
+    "name": "Mana Leak",
+    "cmc": 2,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Instant",
+    "oracle_text": "Counter target spell unless its controller pays {3}.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{U}"
+  },
+  {
+    "oracle_id": "fixture:abrupt-decay",
+    "id": "print:abrupt-decay",
+    "name": "Abrupt Decay",
+    "cmc": 2,
+    "colors": ["B", "G"],
+    "color_identity": ["B", "G"],
+    "type_line": "Instant",
+    "oracle_text": "This spell can't be countered.\nDestroy target nonland permanent with mana value 3 or less.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{B}{G}"
+  },
+  {
+    "oracle_id": "fixture:doom-blade",
+    "id": "print:doom-blade",
+    "name": "Doom Blade",
+    "cmc": 2,
+    "colors": ["B"],
+    "color_identity": ["B"],
+    "type_line": "Instant",
+    "oracle_text": "Destroy target nonblack creature.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{B}"
+  },
+  {
+    "oracle_id": "fixture:wrath-of-god",
+    "id": "print:wrath-of-god",
+    "name": "Wrath of God",
+    "cmc": 4,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Sorcery",
+    "oracle_text": "Destroy all creatures. They can't be regenerated.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{2}{W}{W}"
+  },
+  {
+    "oracle_id": "fixture:naturalize",
+    "id": "print:naturalize",
+    "name": "Naturalize",
+    "cmc": 2,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Instant",
+    "oracle_text": "Destroy target artifact or enchantment.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{G}"
+  },
+  {
+    "oracle_id": "fixture:divination",
+    "id": "print:divination",
+    "name": "Divination",
+    "cmc": 3,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Sorcery",
+    "oracle_text": "Draw two cards.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{2}{U}"
+  },
+  {
+    "oracle_id": "fixture:dark-ritual",
+    "id": "print:dark-ritual",
+    "name": "Dark Ritual",
+    "cmc": 1,
+    "colors": ["B"],
+    "color_identity": ["B"],
+    "type_line": "Instant",
+    "oracle_text": "Add {B}{B}{B}.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{B}"
+  },
+  {
+    "oracle_id": "fixture:unsummon",
+    "id": "print:unsummon",
+    "name": "Unsummon",
+    "cmc": 1,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Instant",
+    "oracle_text": "Return target creature to its owner's hand.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{U}"
+  },
+  {
+    "oracle_id": "fixture:mind-rot",
+    "id": "print:mind-rot",
+    "name": "Mind Rot",
+    "cmc": 3,
+    "colors": ["B"],
+    "color_identity": ["B"],
+    "type_line": "Sorcery",
+    "oracle_text": "Target player discards two cards.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{2}{B}"
+  },
+  {
+    "oracle_id": "fixture:rampant-growth",
+    "id": "print:rampant-growth",
+    "name": "Rampant Growth",
+    "cmc": 2,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Sorcery",
+    "oracle_text": "Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{G}"
+  },
+  {
+    "oracle_id": "fixture:fog",
+    "id": "print:fog",
+    "name": "Fog",
+    "cmc": 1,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Instant",
+    "oracle_text": "Prevent all combat damage that would be dealt this turn.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{G}"
+  },
+  {
+    "oracle_id": "fixture:healing-salve",
+    "id": "print:healing-salve",
+    "name": "Healing Salve",
+    "cmc": 1,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Instant",
+    "oracle_text": "Choose one —\n• Target player gains 3 life.\n• Prevent the next 3 damage that would be dealt to any target this turn.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{W}"
+  },
+  {
+    "oracle_id": "fixture:raise-the-alarm",
+    "id": "print:raise-the-alarm",
+    "name": "Raise the Alarm",
+    "cmc": 2,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Instant",
+    "oracle_text": "Create two 1/1 white Soldier creature tokens.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{W}"
+  },
+  {
+    "oracle_id": "fixture:threaten",
+    "id": "print:threaten",
+    "name": "Threaten",
+    "cmc": 3,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Sorcery",
+    "oracle_text": "Untap target creature and gain control of it until end of turn. That creature gains haste until end of turn.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{2}{R}"
+  },
+  {
+    "oracle_id": "fixture:prey-upon",
+    "id": "print:prey-upon",
+    "name": "Prey Upon",
+    "cmc": 1,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Sorcery",
+    "oracle_text": "Target creature you control fights target creature you don't control.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{G}"
+  },
+  {
+    "oracle_id": "fixture:time-walk",
+    "id": "print:time-walk",
+    "name": "Time Walk",
+    "cmc": 2,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Sorcery",
+    "oracle_text": "Take an extra turn after this one.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{U}"
+  },
+  {
+    "oracle_id": "fixture:preordain",
+    "id": "print:preordain",
+    "name": "Preordain",
+    "cmc": 1,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Sorcery",
+    "oracle_text": "Scry 2, then draw a card.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{U}"
+  },
+  {
+    "oracle_id": "fixture:sign-in-blood",
+    "id": "print:sign-in-blood",
+    "name": "Sign in Blood",
+    "cmc": 2,
+    "colors": ["B"],
+    "color_identity": ["B"],
+    "type_line": "Sorcery",
+    "oracle_text": "Target player draws two cards and loses 2 life.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{B}{B}"
+  },
+  {
+    "oracle_id": "fixture:tormenting-voice",
+    "id": "print:tormenting-voice",
+    "name": "Tormenting Voice",
+    "cmc": 2,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Sorcery",
+    "oracle_text": "As an additional cost to cast this spell, discard a card.\nDraw two cards.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{R}"
+  },
+  {
+    "oracle_id": "fixture:swords-to-plowshares",
+    "id": "print:swords-to-plowshares",
+    "name": "Swords to Plowshares",
+    "cmc": 1,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Instant",
+    "oracle_text": "Exile target creature. Its controller gains life equal to its power.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{W}"
+  },
+  {
+    "oracle_id": "fixture:pyroclasm",
+    "id": "print:pyroclasm",
+    "name": "Pyroclasm",
+    "cmc": 2,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Sorcery",
+    "oracle_text": "Pyroclasm deals 2 damage to each creature.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{R}"
+  },
+  {
+    "oracle_id": "fixture:gitaxian-probe",
+    "id": "print:gitaxian-probe",
+    "name": "Gitaxian Probe",
+    "cmc": 1,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Sorcery",
+    "oracle_text": "Look at target opponent's hand.\nDraw a card.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{U/P}"
+  },
+  {
+    "oracle_id": "fixture:duress",
+    "id": "print:duress",
+    "name": "Duress",
+    "cmc": 1,
+    "colors": ["B"],
+    "color_identity": ["B"],
+    "type_line": "Sorcery",
+    "oracle_text": "Target opponent reveals their hand. You choose a noncreature, nonland card from it. That player discards that card.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{B}"
+  },
+  {
+    "oracle_id": "fixture:glorious-anthem",
+    "id": "print:glorious-anthem",
+    "name": "Glorious Anthem",
+    "cmc": 3,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Enchantment",
+    "oracle_text": "Creatures you control get +1/+1.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{W}{W}"
+  },
+  {
+    "oracle_id": "fixture:humility",
+    "id": "print:humility",
+    "name": "Humility",
+    "cmc": 4,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Enchantment",
+    "oracle_text": "All creatures lose all abilities and have base power and toughness 1/1.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{2}{W}{W}"
+  },
+  {
+    "oracle_id": "fixture:blood-moon",
+    "id": "print:blood-moon",
+    "name": "Blood Moon",
+    "cmc": 3,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Enchantment",
+    "oracle_text": "Nonbasic lands are Mountains.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{2}{R}"
+  },
+  {
+    "oracle_id": "fixture:opalescence",
+    "id": "print:opalescence",
+    "name": "Opalescence",
+    "cmc": 4,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Enchantment",
+    "oracle_text": "Each other non-Aura enchantment is a creature in addition to its other types and has base power and toughness each equal to its mana value.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{2}{W}{W}"
+  },
+  {
+    "oracle_id": "fixture:pacifism",
+    "id": "print:pacifism",
+    "name": "Pacifism",
+    "cmc": 2,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Enchantment — Aura",
+    "oracle_text": "Enchant creature\nEnchanted creature can't attack or block.",
+    "keywords": ["Enchant"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{W}"
+  },
+  {
+    "oracle_id": "fixture:control-magic",
+    "id": "print:control-magic",
+    "name": "Control Magic",
+    "cmc": 4,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Enchantment — Aura",
+    "oracle_text": "Enchant creature\nYou control enchanted creature.",
+    "keywords": ["Enchant"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{2}{U}{U}"
+  },
+  {
+    "oracle_id": "fixture:holy-strength",
+    "id": "print:holy-strength",
+    "name": "Holy Strength",
+    "cmc": 1,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Enchantment — Aura",
+    "oracle_text": "Enchant creature\nEnchanted creature gets +1/+2.",
+    "keywords": ["Enchant"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{W}"
+  },
+  {
+    "oracle_id": "fixture:bonesplitter",
+    "id": "print:bonesplitter",
+    "name": "Bonesplitter",
+    "cmc": 1,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Artifact — Equipment",
+    "oracle_text": "Equipped creature gets +2/+0.\nEquip {1}",
+    "keywords": ["Equip"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}"
+  },
+  {
+    "oracle_id": "fixture:sol-ring",
+    "id": "print:sol-ring",
+    "name": "Sol Ring",
+    "cmc": 1,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Artifact",
+    "oracle_text": "{T}: Add {C}{C}.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}"
+  },
+  {
+    "oracle_id": "fixture:thran-dynamo",
+    "id": "print:thran-dynamo",
+    "name": "Thran Dynamo",
+    "cmc": 4,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Artifact",
+    "oracle_text": "{T}: Add {C}{C}{C}.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{4}"
+  },
+  {
+    "oracle_id": "fixture:hardened-scales",
+    "id": "print:hardened-scales",
+    "name": "Hardened Scales",
+    "cmc": 1,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Enchantment",
+    "oracle_text": "If one or more +1/+1 counters would be put on a creature you control, that many plus one +1/+1 counters are put on it instead.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{G}"
+  },
+  {
+    "oracle_id": "fixture:meekstone",
+    "id": "print:meekstone",
+    "name": "Meekstone",
+    "cmc": 1,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Artifact",
+    "oracle_text": "Creatures with power 3 or greater don't untap during their controllers' untap steps.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}"
+  },
+  {
+    "oracle_id": "fixture:sphere-of-resistance",
+    "id": "print:sphere-of-resistance",
+    "name": "Sphere of Resistance",
+    "cmc": 2,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Artifact",
+    "oracle_text": "Spells cost {1} more to cast.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{2}"
+  },
+  {
+    "oracle_id": "fixture:exploration",
+    "id": "print:exploration",
+    "name": "Exploration",
+    "cmc": 1,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Enchantment",
+    "oracle_text": "You may play an additional land on each of your turns.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{G}"
+  },
+  {
+    "oracle_id": "fixture:jace-beleren",
+    "id": "print:jace-beleren",
+    "name": "Jace Beleren",
+    "cmc": 3,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Legendary Planeswalker — Jace",
+    "oracle_text": "+2: Each player draws a card.\n−1: Target player draws a card.\n−10: Target player mills twenty cards.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{U}{U}",
+    "loyalty": "3"
+  },
+  {
+    "oracle_id": "fixture:nissa-voice-of-zendikar",
+    "id": "print:nissa-voice-of-zendikar",
+    "name": "Nissa, Voice of Zendikar",
+    "cmc": 3,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Legendary Planeswalker — Nissa",
+    "oracle_text": "+1: Create a 0/1 green Plant creature token.\n−2: Put a +1/+1 counter on each creature you control.\n−7: You gain X life and draw X cards, where X is the number of lands you control.",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "fix",
+    "rarity": "common",
+    "mana_cost": "{1}{G}{G}",
+    "loyalty": "3"
+  }
+]

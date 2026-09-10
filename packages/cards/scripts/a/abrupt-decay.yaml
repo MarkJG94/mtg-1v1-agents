@@ -1,0 +1,10 @@
+oracleId: fixture:abrupt-decay
+name: "Abrupt Decay"
+text: "This spell can't be countered.\nDestroy target nonland permanent with mana value 3 or less."
+manaCost: '{B}{G}'
+types: [instant]
+abilities:
+
+  - { kind: keyword, keyword: cant be countered, covers: [0] }
+  - { kind: spell, covers: [1], targets: [{ id: t, filter: { notType: land, mvLTE: 3 } }], effects: [{ op: destroy, target: $t }] }
+

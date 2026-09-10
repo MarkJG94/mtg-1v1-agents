@@ -7,9 +7,9 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done.
 ## Phase 0 — Repository and scaffolding (≈ 2 sessions)
 
 - [x] 0.1 `git init` in the project folder; create the GitHub repo `mtg-1v1-agents`; push; branch protection on `main`.
-- [~] 0.2 pnpm monorepo: `packages/{shared,engine}` exist with shared tsconfig, Biome, Vitest; `cards`, `agents`, `sim`, `apps/*`, tsup and Vite are added when their phases start.
+- [~] 0.2 pnpm monorepo: `packages/{shared,engine,cards}` exist with shared tsconfig, Biome, Vitest; `cards`, `agents`, `sim`, `apps/*`, tsup and Vite are added when their phases start.
 - [x] 0.3 GitHub Actions `ci.yml` (lint, typecheck, test, build, bench).
-- [ ] 0.4 `scripts/fetch-scryfall.ts`: download the `oracle-cards` bulk file to `data/scryfall/`, build the `cards` projection, print counts.
+- [x] 0.4 `scripts/fetch-scryfall.ts`: download the `oracle-cards` bulk file to `data/scryfall/`, load it into `CardDatabase`, print counts (the SQLite projection comes with Phase 5).
 - [ ] 0.5 Dockerfile + docker-compose with a `data` volume; `pnpm dev` runs server + web with HMR.
 
 ## Phase 1 — Engine core (≈ 10–14 sessions)
@@ -33,11 +33,13 @@ Status: implemented in `packages/engine` with 118 tests (subsystem suites per CR
 
 ## Phase 2 — Cards: schema, bootstrap set, resolver (≈ 5–7 sessions)
 
-- [ ] 2.1 Card-script zod schema + JSON Schema export; loader that turns a script into an engine `CardDefinition`; effect-op registry in the engine (first ~40 ops).
-- [ ] 2.2 Validator: schema, characteristic agreement with Scryfall, text coverage, executability smoke.
-- [ ] 2.3 Bootstrap hand scripts (~80 cards): basics, shocks/duals/fetches/checklands, one or two cards per effect op and per keyword, a few planeswalkers, a few layer-system cards (Blood Moon, Glorious Anthem, Humility) — chosen to exercise the engine, not to make a deck.
-- [ ] 2.4 `ScriptResolver` (hand → cached auto → auto-scripter → validate) with the `card_scripts` cache and `unsupported_requests` logging.
-- [ ] 2.5 Scenario tests per bootstrap card; differential test harness.
+Status: implemented in `packages/cards` (98 hand scripts, all `supported`; 186 tests). The Scryfall subset used by the tests is a hand-maintained fixture with placeholder oracle ids until `pnpm scryfall:subset` rewrites them from the real bulk file (the sandbox that built this phase had no access to api.scryfall.com). See ADR 0002.
+
+- [x] 2.1 Card-script zod schema + JSON Schema export (`pnpm cards:schema`); loader that turns a script into an engine `CardDefinition`; effect-op registry in the engine (`EFFECT_OPS`, 53 ops).
+- [x] 2.2 Validator: schema, characteristic agreement with Scryfall, text coverage, executability smoke (four synthetic boards × three seeds).
+- [x] 2.3 Bootstrap hand scripts (98 cards): basics, shocks/duals/fetches/checklands/fastlands/painlands, one or two cards per effect op and per keyword, two planeswalkers, layer-system cards (Blood Moon, Urborg, Glorious Anthem, Humility, Opalescence).
+- [x] 2.4 `ScriptResolver` (hand → cached auto → auto-scripter → validate) with `ScriptCache`/`UnsupportedLog` interfaces (in-memory now, SQLite in Phase 5); `scripts/fetch-scryfall.ts` (0.4) and `scripts/scryfall-subset.ts`.
+- [x] 2.5 Scenario tests per bootstrap card in the YAML `tests:` section; differential test harness (`differentialTest`).
 
 ## Phase 3 — Auto-scripter v1 (≈ 8–12 sessions, then continuous)
 

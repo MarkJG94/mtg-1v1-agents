@@ -1,0 +1,9 @@
+oracleId: fixture:centaur-courser
+name: "Centaur Courser"
+text: ""
+manaCost: '{2}{G}'
+types: [creature]
+subtypes: [Centaur]
+power: 3
+toughness: 3
+abilities: []

@@ -1,0 +1,14 @@
+oracleId: fixture:exploration
+name: "Exploration"
+text: "You may play an additional land on each of your turns."
+manaCost: '{G}'
+types: [enchantment]
+abilities:
+
+  - { kind: static, covers: [0], effect: { type: extraLandDrop, player: you, count: 1 } }
+
+tests:
+  - name: two lands a turn
+    setup: { A: { battlefield: ['~'], hand: [Forest, Forest] } }
+    actions: [{ playLand: Forest }, { playLand: Forest }]
+    expect: { A.battlefield: [Forest, Forest] }

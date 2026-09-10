@@ -1,0 +1,15 @@
+oracleId: fixture:drudge-skeletons
+name: "Drudge Skeletons"
+text: "{B}: Regenerate Drudge Skeletons."
+manaCost: '{1}{B}'
+types: [creature]
+subtypes: [Skeleton]
+power: 1
+toughness: 1
+abilities:
+  - { kind: activated, covers: [0], cost: { mana: '{B}' }, effects: [{ op: regenerate, target: '~' }] }
+tests:
+  - name: regenerates from Shock
+    setup: { A: { battlefield: ['~', Swamp] }, B: { hand: [Shock], battlefield: [Mountain] } }
+    actions: [nextTurn, { cast: Shock, target: '~' }, pass, { activate: '~' }, resolveAll]
+    expect: { '~.zone': battlefield, '~.tapped': true }

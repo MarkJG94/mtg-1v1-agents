@@ -14,13 +14,18 @@
     "test:watch": "vitest",
     "fuzz": "vitest run --project engine fuzz",
     "bench": "pnpm --filter @mtg/engine bench",
-    "build": "pnpm -r build"
+    "build": "pnpm -r build",
+    "fetch:scryfall": "node --import tsx scripts/fetch-scryfall.ts",
+    "scryfall:subset": "node --import tsx scripts/scryfall-subset.ts",
+    "cards:schema": "pnpm --filter @mtg/cards schema"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.13",
     "@types/node": "^22.20.2",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "tsx": "^4.20.0",
+    "@mtg/cards": "workspace:*"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

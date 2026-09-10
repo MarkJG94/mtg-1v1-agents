@@ -14,6 +14,7 @@ import { checkStateBasedActions, endGame } from './sba.js';
 import {
   beginActivate,
   beginCast,
+  enterBattlefield,
   expectAnswer,
   IllegalDecision,
   popFrame,
@@ -21,6 +22,7 @@ import {
   runActivate,
   runActivateManaChoice,
   runCast,
+  runEnterPay,
   runFinishSpell,
   runPutTriggers,
   runResolveTop,
@@ -259,9 +261,8 @@ function runFrame(d: Draft, f: Frame, answer: DecisionAnswer | null): void {
     case 'finishSpell':
       runFinishSpell(d, f);
       return;
-    case 'unlessPay':
-    case 'legendRule':
-      popFrame(d);
+    case 'enterPay':
+      runEnterPay(d, f, answer);
       return;
     default:
       if (runFrameForTurn(d, f, answer)) return;
@@ -358,8 +359,8 @@ function playLand(d: Draft, player: PlayerId, id: ObjectId): void {
     throw new IllegalDecision('no land drop available');
   if (!characteristics(d, id).types.includes('land')) throw new IllegalDecision('not a land');
   d.players[player].landsPlayedThisTurn++;
-  moveObject(d, id, 'battlefield', { controller: player });
   emit(d, { type: 'playLand', player, object: id });
+  enterBattlefield(d, player, id, player, null, null, null);
 }
 
 function applyPriorityAnswer(d: Draft, player: PlayerId, answer: DecisionAnswer): void {

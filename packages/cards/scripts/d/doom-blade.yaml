@@ -1,0 +1,14 @@
+oracleId: fixture:doom-blade
+name: "Doom Blade"
+text: "Destroy target nonblack creature."
+manaCost: '{1}{B}'
+types: [instant]
+abilities:
+
+  - { kind: spell, covers: [0], targets: [{ id: t, filter: { type: creature, not: { color: B } } }], effects: [{ op: destroy, target: $t }] }
+
+tests:
+  - name: destroys a creature
+    setup: { A: { hand: ['~'], battlefield: [Swamp, Swamp] }, B: { battlefield: [Hill Giant] } }
+    actions: [{ cast: '~', target: Hill Giant }, resolveAll]
+    expect: { B.graveyard: [Hill Giant] }

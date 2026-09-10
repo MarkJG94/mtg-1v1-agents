@@ -1,0 +1,14 @@
+oracleId: fixture:mind-rot
+name: "Mind Rot"
+text: "Target player discards two cards."
+manaCost: '{2}{B}'
+types: [sorcery]
+abilities:
+
+  - { kind: spell, covers: [0], targets: [{ id: p, filter: { player: any } }], effects: [{ op: discard, count: 2, player: $p }] }
+
+tests:
+  - name: opponent discards two
+    setup: { A: { hand: ['~'], battlefield: [Swamp, Swamp, Swamp] }, B: { hand: [Forest, Forest, Island] } }
+    actions: [{ cast: '~', target: B }, resolveAll]
+    expect: { B.hand.size: 1 }

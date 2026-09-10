@@ -1,0 +1,9 @@
+oracleId: fixture:hill-giant
+name: "Hill Giant"
+text: ""
+manaCost: '{3}{R}'
+types: [creature]
+subtypes: [Giant]
+power: 3
+toughness: 3
+abilities: []

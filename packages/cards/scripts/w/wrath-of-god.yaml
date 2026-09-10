@@ -1,0 +1,14 @@
+oracleId: fixture:wrath-of-god
+name: "Wrath of God"
+text: "Destroy all creatures. They can't be regenerated."
+manaCost: '{2}{W}{W}'
+types: [sorcery]
+abilities:
+
+  - { kind: spell, covers: [0, 1], effects: [{ op: destroyAll, filter: { type: creature }, noRegenerate: true }] }
+
+tests:
+  - name: sweeps both sides
+    setup: { A: { hand: ['~'], battlefield: [Plains, Plains, Plains, Plains, Grizzly Bears] }, B: { battlefield: [Hill Giant] } }
+    actions: [{ cast: '~' }, resolveAll]
+    expect: { A.graveyard: [Grizzly Bears, '~'], B.graveyard: [Hill Giant] }

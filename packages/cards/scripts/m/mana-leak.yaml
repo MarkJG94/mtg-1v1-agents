@@ -1,0 +1,12 @@
+oracleId: fixture:mana-leak
+name: "Mana Leak"
+text: "Counter target spell unless its controller pays {3}."
+manaCost: '{1}{U}'
+types: [instant]
+abilities:
+
+  - kind: spell
+    covers: [0]
+    targets: [{ id: t, filter: { spell: true } }]
+    effects: [{ op: unless, player: $t, cost: { mana: '{3}' }, effects: [{ op: counter, target: $t }] }]
+

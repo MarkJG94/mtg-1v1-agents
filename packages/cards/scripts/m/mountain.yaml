@@ -1,0 +1,7 @@
+oracleId: fixture:mountain
+name: "Mountain"
+text: "({T}: Add {R}.)"
+types: [land]
+supertypes: [basic]
+subtypes: [Mountain]
+abilities: []

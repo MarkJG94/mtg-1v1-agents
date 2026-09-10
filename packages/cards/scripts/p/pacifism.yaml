@@ -1,0 +1,16 @@
+oracleId: fixture:pacifism
+name: "Pacifism"
+text: "Enchant creature\nEnchanted creature can't attack or block."
+manaCost: '{1}{W}'
+types: [enchantment]
+subtypes: [Aura]
+abilities:
+
+  - { kind: spell, covers: [0], targets: [{ id: e, filter: { type: creature } }], effects: [] }
+  - { kind: static, covers: [1], effect: { type: cantAttack, affects: attached }, also: [{ type: cantBlock, affects: attached }] }
+
+tests:
+  - name: pacified creature cannot attack
+    setup: { A: { hand: ['~'], battlefield: [Plains, Plains] }, B: { battlefield: [Hill Giant] } }
+    actions: [{ cast: '~', target: Hill Giant }, resolveAll]
+    expect: { '~.attachedTo': Hill Giant }

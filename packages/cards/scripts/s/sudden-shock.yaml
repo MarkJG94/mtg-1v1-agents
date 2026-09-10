@@ -1,0 +1,10 @@
+oracleId: fixture:sudden-shock
+name: "Sudden Shock"
+text: "Split second\nSudden Shock deals 2 damage to any target."
+manaCost: '{1}{R}'
+types: [instant]
+abilities:
+
+  - { kind: keyword, keyword: split second, covers: [0] }
+  - { kind: spell, covers: [1], targets: [{ id: t, filter: { any: true } }], effects: [{ op: damage, amount: 2, to: $t }] }
+

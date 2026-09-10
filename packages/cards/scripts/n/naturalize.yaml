@@ -1,0 +1,9 @@
+oracleId: fixture:naturalize
+name: "Naturalize"
+text: "Destroy target artifact or enchantment."
+manaCost: '{1}{G}'
+types: [instant]
+abilities:
+
+  - { kind: spell, covers: [0], targets: [{ id: t, filter: { type: [artifact, enchantment] } }], effects: [{ op: destroy, target: $t }] }
+

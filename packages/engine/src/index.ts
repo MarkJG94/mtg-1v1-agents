@@ -46,5 +46,6 @@ export {
   type PaymentPlan,
   solvePayment,
 } from './mana/solver.js';
+export * from './registry.js';
 export { nextInt, nextU32, Rng, type RngState, seedRng, shuffle } from './rng.js';
 export * from './state.js';

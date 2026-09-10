@@ -26,7 +26,11 @@ TypeScript monorepo (pnpm workspaces). `packages/engine` (pure TS rules engine),
 
 ## Status
 
-Phase 1 (engine core) is implemented in `packages/engine`: turn structure, mana and the payment solver, the stack, targeting, combat, state-based actions, triggers, the layer system, replacement/prevention effects, planeswalkers, mulligans and game end, with a scenario builder, per-subsystem test suites and an invariant fuzzer. See `docs/10-roadmap.md` for the task board and `docs/adr/` for decisions that changed during implementation. Next up is Phase 2 (card scripts and the bootstrap set).
+Phase 1 (engine core) is implemented in `packages/engine`: turn structure, mana and the payment solver, the stack, targeting, combat, state-based actions, triggers, the layer system, replacement/prevention effects, planeswalkers, mulligans and game end, with a scenario builder, per-subsystem test suites and an invariant fuzzer.
+
+Phase 2 (cards) is implemented in `packages/cards`: the card-script schema (zod + exported JSON Schema), the validator (characteristic agreement with Scryfall, oracle-text coverage, executability smoke games), 98 hand-written bootstrap scripts with their own YAML scenario tests, the `ScriptResolver`, and a differential harness for comparing two scripts of one card.
+
+See `docs/10-roadmap.md` for the task board and `docs/adr/` for decisions that changed during implementation. Next up is Phase 3 (the oracle-text auto-scripter).
 
 ## Development
 
@@ -36,4 +40,9 @@ pnpm lint        # biome
 pnpm typecheck
 pnpm test        # vitest across packages (includes a short fuzz run; FUZZ_RUNS=500 for longer)
 pnpm bench       # random-agent games/sec for the engine
+pnpm cards:schema      # regenerate packages/cards/card-script.schema.json for YAML editor completion
+pnpm fetch:scryfall    # download the Scryfall oracle-cards bulk file to data/scryfall/
+pnpm scryfall:subset   # refresh the test fixture and script oracle ids from the bulk file
 ```
+
+Card scripts live in `packages/cards/scripts/<letter>/<slug>.yaml`; every script must validate as `supported` against its Scryfall entry and pass its own `tests:` (see `docs/03-card-scripts.md`).

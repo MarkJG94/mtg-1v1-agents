@@ -1,0 +1,17 @@
+oracleId: fixture:vampire-nighthawk
+name: "Vampire Nighthawk"
+text: "Flying\nDeathtouch\nLifelink"
+manaCost: '{1}{B}{B}'
+types: [creature]
+subtypes: [Vampire, Shaman]
+power: 2
+toughness: 3
+abilities:
+  - { kind: keyword, keyword: flying, covers: [0] }
+  - { kind: keyword, keyword: deathtouch, covers: [1] }
+  - { kind: keyword, keyword: lifelink, covers: [2] }
+tests:
+  - name: lifelink on combat damage
+    setup: { A: { battlefield: ['~'] } }
+    actions: [{ attack: ['~'] }, finishCombat]
+    expect: { B.life: 18, A.life: 22 }

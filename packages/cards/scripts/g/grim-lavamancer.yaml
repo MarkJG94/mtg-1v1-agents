@@ -1,0 +1,19 @@
+oracleId: fixture:grim-lavamancer
+name: "Grim Lavamancer"
+text: "{R}, {T}, Exile two cards from your graveyard: Grim Lavamancer deals 2 damage to any target."
+manaCost: '{R}'
+types: [creature]
+subtypes: [Human, Wizard]
+power: 1
+toughness: 1
+abilities:
+  - kind: activated
+    covers: [0]
+    cost: { mana: '{R}', tap: true, exileFromGraveyard: { count: 2 } }
+    targets: [{ id: t, filter: { any: true } }]
+    effects: [{ op: damage, amount: 2, to: $t }]
+tests:
+  - name: exiles two cards to deal 2
+    setup: { A: { battlefield: ['~', Mountain], graveyard: [Shock, Shock] } }
+    actions: [{ activate: '~', target: B, choose: [Shock, Shock#1] }, resolveAll]
+    expect: { B.life: 18, A.exile: [Shock, Shock] }

@@ -1,0 +1,12 @@
+oracleId: fixture:simic-sky-swallower
+name: "Simic Sky Swallower"
+text: "Flying, trample\nShroud"
+manaCost: '{5}{G}{U}'
+types: [creature]
+subtypes: [Leviathan]
+power: 6
+toughness: 6
+abilities:
+  - { kind: keyword, keyword: flying, covers: [0] }
+  - { kind: keyword, keyword: trample, covers: [0] }
+  - { kind: keyword, keyword: shroud, covers: [1] }

@@ -1,0 +1,14 @@
+oracleId: fixture:blood-moon
+name: "Blood Moon"
+text: "Nonbasic lands are Mountains."
+manaCost: '{2}{R}'
+types: [enchantment]
+abilities:
+
+  - { kind: static, covers: [0], effect: { type: setTypes, affects: { type: land, not: { supertype: basic } }, types: [land], subtypes: [Mountain] } }
+
+tests:
+  - name: nonbasics become Mountains
+    setup: { A: { battlefield: ['~', Tropical Island, Forest] } }
+    actions: []
+    expect: { Tropical Island.subtypes: [Mountain], Forest.subtypes: [Forest] }

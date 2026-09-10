@@ -1,0 +1,15 @@
+oracleId: fixture:phantom-warrior
+name: "Phantom Warrior"
+text: "Phantom Warrior can't be blocked."
+manaCost: '{1}{U}{U}'
+types: [creature]
+subtypes: [Illusion, Warrior]
+power: 2
+toughness: 2
+abilities:
+  - { kind: static, covers: [0], effect: { type: cantBeBlocked, affects: self } }
+tests:
+  - name: unblockable
+    setup: { A: { battlefield: ['~'] }, B: { battlefield: [Giant Spider] } }
+    actions: [{ attack: ['~'] }, finishCombat]
+    expect: { B.life: 18 }

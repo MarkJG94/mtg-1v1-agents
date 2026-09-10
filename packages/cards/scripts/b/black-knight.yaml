@@ -1,0 +1,11 @@
+oracleId: fixture:black-knight
+name: "Black Knight"
+text: "First strike\nProtection from white"
+manaCost: '{B}{B}'
+types: [creature]
+subtypes: [Human, Knight]
+power: 2
+toughness: 2
+abilities:
+  - { kind: keyword, keyword: first strike, covers: [0] }
+  - { kind: keyword, keyword: protection, from: { color: W }, covers: [1] }

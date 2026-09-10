@@ -1,0 +1,13 @@
+oracleId: fixture:simic-guildgate
+name: "Simic Guildgate"
+text: "Simic Guildgate enters tapped.\n{T}: Add {G} or {U}."
+types: [land]
+subtypes: [Gate]
+abilities:
+  - { kind: replacement, covers: [0], replaces: { event: etb, filter: self, tapped: true } }
+  - { kind: mana, covers: [1], cost: { tap: true }, choice: ['{G}', '{U}'] }
+tests:
+  - name: enters tapped
+    setup: { A: { hand: ['~'] } }
+    actions: [{ playLand: '~' }]
+    expect: { '~.tapped': true }

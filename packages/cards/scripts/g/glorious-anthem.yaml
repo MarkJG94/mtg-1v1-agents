@@ -1,0 +1,14 @@
+oracleId: fixture:glorious-anthem
+name: "Glorious Anthem"
+text: "Creatures you control get +1/+1."
+manaCost: '{1}{W}{W}'
+types: [enchantment]
+abilities:
+
+  - { kind: static, covers: [0], effect: { type: pt, affects: { type: creature, controller: you }, power: 1, toughness: 1 } }
+
+tests:
+  - name: anthem
+    setup: { A: { battlefield: ['~', Grizzly Bears] }, B: { battlefield: [Grizzly Bears] } }
+    actions: []
+    expect: { Grizzly Bears.power: 3, 'Grizzly Bears#1.power': 2 }

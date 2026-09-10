@@ -1,0 +1,17 @@
+oracleId: fixture:darksteel-sentinel
+name: "Darksteel Sentinel"
+text: "Flash\nVigilance\nIndestructible"
+manaCost: '{6}'
+types: [creature]
+subtypes: [Golem]
+power: 3
+toughness: 3
+abilities:
+  - { kind: keyword, keyword: flash, covers: [0] }
+  - { kind: keyword, keyword: vigilance, covers: [1] }
+  - { kind: keyword, keyword: indestructible, covers: [2] }
+tests:
+  - name: survives Doom Blade
+    setup: { A: { battlefield: ['~'] }, B: { hand: [Doom Blade], battlefield: [Swamp, Swamp] } }
+    actions: [nextTurn, { cast: Doom Blade, target: '~' }, resolveAll]
+    expect: { '~.zone': battlefield }

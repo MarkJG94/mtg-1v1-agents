@@ -1,0 +1,17 @@
+oracleId: fixture:humility
+name: "Humility"
+text: "All creatures lose all abilities and have base power and toughness 1/1."
+manaCost: '{2}{W}{W}'
+types: [enchantment]
+abilities:
+
+  - kind: static
+    covers: [0]
+    effect: { type: loseAbility, affects: { type: creature }, keyword: all }
+    also: [{ type: setPT, affects: { type: creature }, power: 1, toughness: 1 }]
+
+tests:
+  - name: angels become 1/1 without flying
+    setup: { A: { battlefield: ['~', Serra Angel] } }
+    actions: []
+    expect: { Serra Angel.power: 1, Serra Angel.keywords: [] }

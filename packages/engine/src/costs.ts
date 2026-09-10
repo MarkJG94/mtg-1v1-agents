@@ -77,7 +77,8 @@ export function canPayCost(d: Draft, cost: CostDef, ctx: CostContext): boolean {
     const n = typeof cost.discard === 'number' ? cost.discard : cost.discard.count;
     const filter = typeof cost.discard === 'number' ? undefined : cost.discard.filter;
     const hand = d.zones[player].hand.filter(
-      (id) => !filter || matchesObject(d, filter, id, simpleCtx(d, player, source)),
+      (id) =>
+        id !== source && (!filter || matchesObject(d, filter, id, simpleCtx(d, player, source))),
     );
     if (hand.length < n) return false;
   }

@@ -62,6 +62,8 @@ export interface MoveOptions {
   attachTo?: ObjectId;
   /** Enters attacking (tokens created attacking). */
   attacking?: boolean;
+  /** The controller paid the "unless you pay" cost of an enters-tapped replacement. */
+  paidUnless?: boolean;
 }
 
 function removeFromZone(d: Draft, o: GameObject): void {
@@ -179,7 +181,10 @@ export function moveObjects(
     }
 
     if (dest === 'battlefield') {
-      const mods = etbModifiers(d, id, { tapped: opts.tapped ?? false });
+      const mods = etbModifiers(d, id, {
+        tapped: opts.tapped ?? false,
+        paidUnless: opts.paidUnless ?? false,
+      });
       o.tapped = mods.tapped;
       o.sick = true;
       o.enteredThisTurn = true;

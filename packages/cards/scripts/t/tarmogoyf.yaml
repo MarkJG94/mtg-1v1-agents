@@ -1,0 +1,15 @@
+oracleId: fixture:tarmogoyf
+name: "Tarmogoyf"
+text: "Tarmogoyf's power is equal to the number of card types among cards in all graveyards and its toughness is equal to that number plus 1."
+manaCost: '{1}{G}'
+types: [creature]
+subtypes: [Lhurgoyf]
+power: { countTypes: inAllGraveyards }
+toughness: { add: [{ countTypes: inAllGraveyards }, 1] }
+abilities:
+  - { kind: static, covers: [0], effect: { type: setPT, affects: self, cda: true, power: { countTypes: inAllGraveyards }, toughness: { add: [{ countTypes: inAllGraveyards }, 1] } } }
+tests:
+  - name: counts card types in all graveyards
+    setup: { A: { battlefield: ['~'], graveyard: [Shock] }, B: { graveyard: [Grizzly Bears, Forest] } }
+    actions: []
+    expect: { '~.power': 3, '~.toughness': 4 }

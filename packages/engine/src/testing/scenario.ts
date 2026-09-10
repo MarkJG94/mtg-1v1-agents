@@ -442,6 +442,8 @@ export class Scenario {
         return { kind: 'yesNo', yes: true };
       case 'chooseObjects':
         return { kind: 'chooseObjects', objects: dec.options.slice(0, dec.min) };
+      case 'chooseCardsFromLibrary':
+        return { kind: 'chooseCardsFromLibrary', cards: dec.options.slice(0, dec.max) };
       case 'mulligan':
         return { kind: 'mulligan', keep: true };
       default:

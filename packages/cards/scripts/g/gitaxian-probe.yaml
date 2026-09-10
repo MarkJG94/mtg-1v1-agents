@@ -1,0 +1,14 @@
+oracleId: fixture:gitaxian-probe
+name: "Gitaxian Probe"
+text: "Look at target opponent's hand.\nDraw a card."
+manaCost: '{U/P}'
+types: [sorcery]
+abilities:
+
+  - { kind: spell, covers: [0, 1], targets: [{ id: p, filter: { player: opponent } }], effects: [{ op: reveal, hand: $p }, { op: draw, count: 1 }] }
+
+tests:
+  - name: castable for 2 life
+    setup: { A: { hand: ['~'], library: [Forest, Forest] } }
+    actions: [{ cast: '~', target: B }, resolveAll]
+    expect: { A.life: 18, A.hand.size: 1 }

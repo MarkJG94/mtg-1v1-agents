@@ -1,0 +1,14 @@
+oracleId: fixture:blaze
+name: "Blaze"
+text: "Blaze deals X damage to any target."
+manaCost: '{X}{R}'
+types: [sorcery]
+abilities:
+
+  - { kind: spell, covers: [0], targets: [{ id: t, filter: { any: true } }], effects: [{ op: damage, amount: x, to: $t }] }
+
+tests:
+  - name: X damage
+    setup: { A: { hand: ['~'], battlefield: [Mountain, Mountain, Mountain, Mountain] } }
+    actions: [{ cast: '~', target: B, x: 3 }, resolveAll]
+    expect: { B.life: 17 }

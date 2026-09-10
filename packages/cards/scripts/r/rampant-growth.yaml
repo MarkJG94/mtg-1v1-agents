@@ -1,0 +1,14 @@
+oracleId: fixture:rampant-growth
+name: "Rampant Growth"
+text: "Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle."
+manaCost: '{1}{G}'
+types: [sorcery]
+abilities:
+
+  - { kind: spell, covers: [0], effects: [{ op: search, filter: { type: land, supertype: basic }, count: 1, to: battlefield, tapped: true }] }
+
+tests:
+  - name: fetches a tapped basic
+    setup: { A: { hand: ['~'], battlefield: [Forest, Forest], library: [Mountain, Wasteland] } }
+    actions: [{ cast: '~' }, resolveAll]
+    expect: { A.battlefield: [Mountain], Mountain.tapped: true }

@@ -1,5 +1,5 @@
 import type { ObjectId, PlayerId } from '@mtg/shared';
-import type { CostDef, Effect, TargetSpec } from './definition.js';
+import type { Effect, TargetSpec } from './definition.js';
 import type { Characteristics, ObjectRef, TargetRef, TriggerInstance } from './state.js';
 
 export interface EffectContext {
@@ -68,16 +68,17 @@ export type Frame =
   | { k: 'advanceStep' }
   | { k: 'beginStep' }
   | { k: 'finishSpell'; object: ObjectId }
+  /** "As ~ enters, you may pay N life. If you don't, it enters tapped." asked before the permanent enters. */
   | {
-      k: 'unlessPay';
+      k: 'enterPay';
       player: PlayerId;
-      cost: CostDef;
-      source: ObjectId;
-      effects: Effect[];
-      ctx: EffectContext;
-      stage: 'ask' | 'pay';
-    }
-  | { k: 'legendRule'; player: PlayerId; objects: ObjectId[] };
+      object: ObjectId;
+      life: number;
+      controller: PlayerId;
+      attachTo: ObjectId | null;
+      effects: Effect[] | null;
+      ctx: EffectContext | null;
+    };
 
 export type CastStage =
   | 'modes'

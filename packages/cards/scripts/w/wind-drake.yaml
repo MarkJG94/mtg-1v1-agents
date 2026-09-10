@@ -1,0 +1,15 @@
+oracleId: fixture:wind-drake
+name: "Wind Drake"
+text: "Flying"
+manaCost: '{2}{U}'
+types: [creature]
+subtypes: [Drake]
+power: 2
+toughness: 2
+abilities:
+  - { kind: keyword, keyword: flying, covers: [0] }
+tests:
+  - name: only fliers or reach can block it
+    setup: { A: { battlefield: ['~'] }, B: { battlefield: [Grizzly Bears] } }
+    actions: [{ attack: ['~'] }, finishCombat]
+    expect: { B.life: 18 }

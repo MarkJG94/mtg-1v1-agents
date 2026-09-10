@@ -1,0 +1,9 @@
+oracleId: fixture:goblin-piker
+name: "Goblin Piker"
+text: ""
+manaCost: '{1}{R}'
+types: [creature]
+subtypes: [Goblin]
+power: 2
+toughness: 1
+abilities: []

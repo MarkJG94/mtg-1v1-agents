@@ -1,0 +1,14 @@
+oracleId: fixture:sign-in-blood
+name: "Sign in Blood"
+text: "Target player draws two cards and loses 2 life."
+manaCost: '{B}{B}'
+types: [sorcery]
+abilities:
+
+  - { kind: spell, covers: [0], targets: [{ id: p, filter: { player: any } }], effects: [{ op: draw, count: 2, player: $p }, { op: loseLife, amount: 2, player: $p }] }
+
+tests:
+  - name: draw two lose two
+    setup: { A: { hand: ['~'], battlefield: [Swamp, Swamp], library: [Forest, Forest, Forest] } }
+    actions: [{ cast: '~', target: A }, resolveAll]
+    expect: { A.hand.size: 2, A.life: 18 }

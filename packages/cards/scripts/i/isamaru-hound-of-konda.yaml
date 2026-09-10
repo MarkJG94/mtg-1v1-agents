@@ -1,0 +1,15 @@
+oracleId: fixture:isamaru-hound-of-konda
+name: "Isamaru, Hound of Konda"
+text: ""
+manaCost: '{W}'
+types: [creature]
+supertypes: [legendary]
+subtypes: [Dog]
+power: 2
+toughness: 2
+abilities: []
+tests:
+  - name: legend rule
+    setup: { A: { battlefield: ['~', Plains], hand: ['~'] } }
+    actions: [{ cast: '~' }, resolveAll]
+    expect: { A.graveyard: ['~'] }

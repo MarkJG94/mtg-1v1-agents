@@ -1,0 +1,14 @@
+oracleId: fixture:sol-ring
+name: "Sol Ring"
+text: "{T}: Add {C}{C}."
+manaCost: '{1}'
+types: [artifact]
+abilities:
+
+  - { kind: mana, covers: [0], cost: { tap: true }, produces: '{C}{C}' }
+
+tests:
+  - name: two colourless
+    setup: { A: { battlefield: ['~', Mountain, Mountain], hand: [Hill Giant] } }
+    actions: [{ cast: Hill Giant }, resolveAll]
+    expect: { A.battlefield: [Hill Giant], '~.tapped': true }

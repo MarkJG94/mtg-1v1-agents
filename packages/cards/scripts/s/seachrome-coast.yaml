@@ -1,0 +1,19 @@
+oracleId: fixture:seachrome-coast
+name: "Seachrome Coast"
+text: "Seachrome Coast enters tapped unless you control two or fewer other lands.\n{T}: Add {W} or {U}."
+types: [land]
+abilities:
+  - kind: replacement
+    covers: [0]
+    replaces: { event: etb, filter: self, tapped: true }
+    condition: { compare: { count: { type: land, controller: you, other: true } }, op: '>', to: 2 }
+  - { kind: mana, covers: [1], cost: { tap: true }, choice: ['{W}', '{U}'] }
+tests:
+  - name: untapped early
+    setup: { A: { hand: ['~'], battlefield: [Plains, Plains] } }
+    actions: [{ playLand: '~' }]
+    expect: { '~.tapped': false }
+  - name: tapped late
+    setup: { A: { hand: ['~'], battlefield: [Plains, Plains, Plains] } }
+    actions: [{ playLand: '~' }]
+    expect: { '~.tapped': true }

@@ -1,0 +1,14 @@
+oracleId: fixture:dark-ritual
+name: "Dark Ritual"
+text: "Add {B}{B}{B}."
+manaCost: '{B}'
+types: [instant]
+abilities:
+
+  - { kind: spell, covers: [0], effects: [{ op: addMana, mana: '{B}{B}{B}' }] }
+
+tests:
+  - name: ramps into a three-drop
+    setup: { A: { hand: ['~', Vampire Nighthawk], battlefield: [Swamp] } }
+    actions: [{ cast: '~' }, resolveAll, { cast: Vampire Nighthawk }, resolveAll]
+    expect: { A.battlefield: [Vampire Nighthawk] }

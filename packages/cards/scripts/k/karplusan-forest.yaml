@@ -1,0 +1,7 @@
+oracleId: fixture:karplusan-forest
+name: "Karplusan Forest"
+text: "{T}: Add {C}.\n{T}: Add {R} or {G}. Karplusan Forest deals 1 damage to you."
+types: [land]
+abilities:
+  - { kind: mana, covers: [0], cost: { tap: true }, produces: '{C}' }
+  - { kind: mana, covers: [1, 2], cost: { tap: true, life: 1 }, choice: ['{R}', '{G}'] }

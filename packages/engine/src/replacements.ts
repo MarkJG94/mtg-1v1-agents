@@ -70,12 +70,16 @@ export interface EtbModifiers {
 }
 
 /** Applies "enters tapped" / "enters with counters" replacements (CR 614.1c). */
-export function etbModifiers(d: Draft, object: ObjectId, base: { tapped: boolean }): EtbModifiers {
+export function etbModifiers(
+  d: Draft,
+  object: ObjectId,
+  base: { tapped: boolean; paidUnless: boolean },
+): EtbModifiers {
   const mods: EtbModifiers = { tapped: base.tapped, counters: {} };
   for (const r of activeReplacements(d, 'etb', object)) {
     if (r.def.event !== 'etb') continue;
     if (!replacementAppliesToObject(d, r, r.def.filter, object)) continue;
-    if (r.def.tapped) mods.tapped = true;
+    if (r.def.tapped && !(r.def.unlessPay && base.paidUnless)) mods.tapped = true;
     if (r.def.withCounters) {
       const ctx = simpleCtx(d, r.controller, object);
       ctx.x = getObj(d, object).x;
@@ -85,6 +89,16 @@ export function etbModifiers(d: Draft, object: ObjectId, base: { tapped: boolean
     }
   }
   return mods;
+}
+
+/** Life the controller may pay to stop an "enters tapped unless" replacement of the object itself, if any. */
+export function enterPayOption(d: Draft, object: ObjectId): number | null {
+  for (const r of activeReplacements(d, 'etb', object)) {
+    if (r.def.event !== 'etb' || !r.def.unlessPay || !r.def.tapped) continue;
+    if (!replacementAppliesToObject(d, r, r.def.filter, object)) continue;
+    return r.def.unlessPay.life;
+  }
+  return null;
 }
 
 /** Destination override when a creature would die ("if ~ would die, exile it instead"). */

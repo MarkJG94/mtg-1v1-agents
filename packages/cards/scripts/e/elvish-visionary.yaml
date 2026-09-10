@@ -1,0 +1,15 @@
+oracleId: fixture:elvish-visionary
+name: "Elvish Visionary"
+text: "When Elvish Visionary enters, draw a card."
+manaCost: '{1}{G}'
+types: [creature]
+subtypes: [Elf, Shaman]
+power: 1
+toughness: 1
+abilities:
+  - { kind: triggered, covers: [0], trigger: { on: etb }, effects: [{ op: draw, count: 1 }] }
+tests:
+  - name: draws on entering
+    setup: { A: { hand: ['~'], battlefield: [Forest, Forest], library: [Island, Island] } }
+    actions: [{ cast: '~' }, resolveAll]
+    expect: { A.hand: [Island], A.hand.size: 1 }

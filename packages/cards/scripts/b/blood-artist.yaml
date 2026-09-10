@@ -1,0 +1,19 @@
+oracleId: fixture:blood-artist
+name: "Blood Artist"
+text: "Whenever Blood Artist or another creature dies, target player loses 1 life and you gain 1 life."
+manaCost: '{1}{B}'
+types: [creature]
+subtypes: [Vampire]
+power: 0
+toughness: 1
+abilities:
+  - kind: triggered
+    covers: [0]
+    trigger: { on: dies, filter: { type: creature } }
+    targets: [{ id: p, filter: { player: any } }]
+    effects: [{ op: loseLife, amount: 1, player: $p }, { op: gainLife, amount: 1 }]
+tests:
+  - name: drains when a creature dies
+    setup: { A: { battlefield: ['~', Mountain], hand: [Shock] }, B: { battlefield: [Goblin Piker] } }
+    actions: [{ cast: Shock, target: Goblin Piker }, passBoth, { answer: { kind: chooseTargets, targets: [[{ kind: player, player: B }]] } }, resolveAll]
+    expect: { B.life: 19, A.life: 21 }

@@ -1,0 +1,9 @@
+oracleId: fixture:shock
+name: "Shock"
+text: "Shock deals 2 damage to any target."
+manaCost: '{R}'
+types: [instant]
+abilities:
+
+  - { kind: spell, covers: [0], targets: [{ id: t, filter: { any: true } }], effects: [{ op: damage, amount: 2, to: $t }] }
+

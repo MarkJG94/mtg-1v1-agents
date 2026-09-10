@@ -1,0 +1,7 @@
+oracleId: fixture:forest
+name: "Forest"
+text: "({T}: Add {G}.)"
+types: [land]
+supertypes: [basic]
+subtypes: [Forest]
+abilities: []

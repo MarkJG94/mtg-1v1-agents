@@ -1,0 +1,11 @@
+oracleId: fixture:ambush-viper
+name: "Ambush Viper"
+text: "Flash\nDeathtouch"
+manaCost: '{1}{G}'
+types: [creature]
+subtypes: [Snake]
+power: 2
+toughness: 1
+abilities:
+  - { kind: keyword, keyword: flash, covers: [0] }
+  - { kind: keyword, keyword: deathtouch, covers: [1] }
