@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { CardDatabase, HAND_SCRIPTS_DIR, loadHandScriptFiles, type ScryfallCard } from '@mtg/cards';
 
 /**
@@ -7,7 +8,12 @@ import { CardDatabase, HAND_SCRIPTS_DIR, loadHandScriptFiles, type ScryfallCard 
  * `pnpm fetch:scryfall` to have run.
  */
 const DATA_DIR = process.env.DATA_DIR ?? 'data';
-const db = CardDatabase.fromBulkFile(`${DATA_DIR}/scryfall/oracle-cards.json`);
+const BULK = join(DATA_DIR, 'scryfall', 'oracle-cards.json');
+if (!existsSync(BULK)) {
+  console.error(`${BULK} not found. Run \`pnpm fetch:scryfall\` first.`);
+  process.exit(1);
+}
+const db = CardDatabase.fromBulkFile(BULK);
 const FIELDS: (keyof ScryfallCard)[] = [
   'oracle_id',
   'id',
@@ -52,7 +58,7 @@ for (const f of loadHandScriptFiles(HAND_SCRIPTS_DIR)) {
   }
 }
 writeFileSync(
-  `${HAND_SCRIPTS_DIR}/../test/fixtures/scryfall-subset.json`,
+  join(HAND_SCRIPTS_DIR, '..', 'test', 'fixtures', 'scryfall-subset.json'),
   `${JSON.stringify(subset, null, 2)}\n`,
 );
 console.log(`fixture: ${subset.length} cards; rewrote ${rewritten} oracle ids`);
