@@ -188,7 +188,7 @@ export function classify(sentence: string, card: CardShape): SentenceKind {
   if (LOYALTY.test(t)) return 'loyalty';
   if (/^enchant\s/i.test(t)) return 'enchant';
   if (/^equip\s/i.test(t)) return 'equip';
-  if (/^as an additional cost to cast this spell,/i.test(t)) return 'additionalCost';
+  if (/^as an additional cost to cast (this spell|~),/i.test(t)) return 'additionalCost';
   if (parseKeywordLine(t) !== null) return 'keyword';
   if (/^(when|whenever|at the beginning)\b/i.test(stripAbilityWord(t))) return 'triggered';
   if (/:/.test(t)) return 'activated';
@@ -342,6 +342,17 @@ function parseTrigger(s: Scanner): TriggerDef | null {
     }
     if (!s.eat('when') && !s.eat('whenever')) return null;
     if (s.eat('you gain life')) return { on: 'lifeGain', who: 'you' };
+    const caster = s.attempt(() => {
+      if (s.eat('you cast')) return 'you' as const;
+      if (s.eat('an opponent casts')) return 'opponent' as const;
+      if (s.eat('a player casts')) return 'any' as const;
+      return null;
+    });
+    if (caster) {
+      const spell = parseObjectPhrase(s);
+      if (!spell || spell.targeted) return null;
+      return { on: 'cast', filter: { ...spell.filter, spell: true }, who: caster };
+    }
     if (
       s.eat('a land enters the battlefield under your control') ||
       s.eat('a land you control enters')
@@ -360,7 +371,16 @@ function parseTrigger(s: Scanner): TriggerDef | null {
       return obj ? obj.filter : null;
     });
     const filter: Filter | 'self' = wider ?? subject;
-    if (s.eat('enters the battlefield') || s.eat('enters')) return { on: 'etb', filter };
+    if (s.eat('enters the battlefield') || s.eat('enters')) {
+      // "…enters the battlefield under your control" narrows who controls it; it is not noise to drop.
+      if (filter !== 'self') {
+        if (s.eat('under your control'))
+          return { on: 'etb', filter: { ...filter, controller: 'you' } };
+        if (s.eat("under an opponent's control"))
+          return { on: 'etb', filter: { ...filter, controller: 'opponent' } };
+      }
+      return { on: 'etb', filter };
+    }
     if (s.eat('dies')) return { on: 'dies', filter };
     if (s.eat('leaves the battlefield')) return { on: 'ltb', filter };
     if (s.eat('attacks')) return { on: 'attacks', filter };
@@ -370,6 +390,9 @@ function parseTrigger(s: Scanner): TriggerDef | null {
     if (s.eat('is put into a graveyard from the battlefield')) return { on: 'dies', filter };
     if (s.eat('deals combat damage to a player'))
       return { on: 'dealsDamage', filter, combat: true, toPlayer: true };
+    if (s.eat('deals combat damage')) return { on: 'dealsDamage', filter, combat: true };
+    if (s.eat('deals damage to a player') || s.eat('deals damage to an opponent'))
+      return { on: 'dealsDamage', filter, toPlayer: true };
     if (s.eat('deals damage')) return { on: 'dealsDamage', filter };
     if (s.eat('is dealt damage')) return { on: 'dealtDamage', filter };
     if (s.eat('is sacrificed')) return { on: 'sacrificed', filter };
@@ -451,8 +474,12 @@ export function parseEquip(sentence: string): ParseResult<AbilityDef> {
 /** "As an additional cost to cast this spell, discard a card." */
 export function parseAdditionalCost(sentence: string): ParseResult<CostDef> {
   const s = Scanner.of(sentence);
-  if (!s.eat('as an additional cost to cast this spell') || !s.eat(','))
+  if (
+    !s.eat('as an additional cost to cast ~') &&
+    !s.eat('as an additional cost to cast this spell')
+  )
     return fail(`additional cost: ${sentence}`);
+  if (!s.eat(',')) return fail(`additional cost: ${s.remainder()}`);
   const cost = parseCost(s);
   if (!cost || !s.finish()) return fail(`additional cost: ${s.remainder() || sentence}`);
   return { value: cost, failure: null };

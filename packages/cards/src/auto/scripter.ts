@@ -21,7 +21,7 @@ import { applyNoRegenerate, Bindings, parseEffects } from './effects.js';
 import { foldText, Scanner } from './scan.js';
 
 /** Bumping this invalidates every cached auto script (docs/03 §Sources of truth). */
-export const AUTO_SCRIPTER_VERSION = 2;
+export const AUTO_SCRIPTER_VERSION = 3;
 
 export interface SentenceFailure {
   index: number;
@@ -163,7 +163,7 @@ export function scriptCard(card: ScryfallCard): ScriptAttempt {
         failures.push({ index: i, kind, sentence, reason });
       };
 
-      // "Activate only as a sorcery." qualifies the ability above it rather than standing on its own.
+      // These two qualify the ability above them rather than standing on their own.
       if (/^activate only as a sorcery\.?$/i.test(folded)) {
         const last = abilities[abilities.length - 1];
         if (last?.kind === 'activated') {
@@ -171,7 +171,20 @@ export function scriptCard(card: ScryfallCard): ScriptAttempt {
           last.covers = [...(last.covers ?? []), i];
           return;
         }
-        record('timing restriction with no activated ability above it');
+        // When the ability above already failed, its reason is the useful one; do not add a second.
+        if (failures.length === 0) record('timing restriction with no activated ability above it');
+        return;
+      }
+
+      if (/^this ability triggers only once each turn\.?$/i.test(folded)) {
+        const last = abilities[abilities.length - 1];
+        if (last?.kind === 'triggered') {
+          last.oncePerTurn = true;
+          last.covers = [...(last.covers ?? []), i];
+          return;
+        }
+        if (failures.length === 0)
+          record('"only once each turn" with no triggered ability above it');
         return;
       }
 

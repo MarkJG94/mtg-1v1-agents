@@ -118,3 +118,34 @@ Parser version 2 changes:
    speculatively consumed the unknown word and rewound was hiding the very word the report needed to name.
 
 `AUTO_SCRIPTER_VERSION` is 2, which invalidates every cached auto script.
+
+
+## Addendum — the second run (parser version 3)
+
+Version 2 scored **17.8%** (5 488 of 30 816), up from 12.8%, and returned 88 of the 98 hand scripts to
+`supported`. The next round of patterns split into three kinds.
+
+**A regression the report caught.** Normalising "this spell" to `~` broke the classifier rule for
+`As an additional cost to cast this spell, …`, which still matched on the pre-normalised spelling — 243
+cards lost to a fix made two hours earlier. The classifier and the parser now accept both spellings. This
+is the argument for running the report after every grammar change rather than trusting the corpora: the
+fixtures were all green while a quarter of a percent of Magic quietly stopped parsing.
+
+**Trigger clauses that were parsed but not finished** (`trigger: missing comma in …`, 649 cards across
+three patterns). The event matched a prefix and the qualifier after it was left on the cursor. Added, each
+as an exact reading rather than a discarded qualifier: `enters the battlefield under your control` (and
+under an opponent's), `deals damage to a player`/`to an opponent`, `deals combat damage`, and the whole
+`Whenever you cast …` / `an opponent casts …` family (216 cards), which had no rule at all.
+
+**Templates with a cheap exact reading**: `This ability triggers only once each turn.` sets `oncePerTurn`
+on the ability above it (113); a trailing `, where X is the number of …` substitutes into the `x` the
+clauses already emitted (112); the search template's `reveal it, put it into your hand` step failed only
+because the comma is its own token (101); and `Return ~ from your graveyard to the battlefield` names its
+origin before its destination (97).
+
+Left unread on purpose, because each needs engine work rather than grammar: kicker, cycling, flashback and
+devoid (646 across four patterns), characteristic-defining power/toughness (219), copy effects with new
+targets (104), and modal *abilities* — `modes` exists only on `kind: spell`, so "At the beginning of your
+end step, choose one —" cannot be represented at all (119).
+
+`AUTO_SCRIPTER_VERSION` is 3.

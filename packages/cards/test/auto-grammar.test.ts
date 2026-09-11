@@ -313,6 +313,42 @@ describe('ability grammars', () => {
     });
   });
 
+  it('reads a cast trigger', () => {
+    expect(parseTriggered('Whenever you cast a noncreature spell, draw a card.').value).toEqual({
+      kind: 'triggered',
+      trigger: { on: 'cast', filter: { notType: 'creature', spell: true }, who: 'you' },
+      effects: [{ op: 'draw', count: 1 }],
+    });
+  });
+
+  it('keeps the controller named by "under your control"', () => {
+    expect(
+      parseTriggered('Whenever a creature enters the battlefield under your control, draw a card.')
+        .value,
+    ).toEqual({
+      kind: 'triggered',
+      trigger: { on: 'etb', filter: { type: 'creature', controller: 'you' } },
+      effects: [{ op: 'draw', count: 1 }],
+    });
+  });
+
+  it('reads damage-to-a-player triggers', () => {
+    expect(parseTriggered('Whenever ~ deals damage to an opponent, draw a card.').value).toEqual({
+      kind: 'triggered',
+      trigger: { on: 'dealsDamage', filter: 'self', toPlayer: true },
+      effects: [{ op: 'draw', count: 1 }],
+    });
+  });
+
+  it('reads an additional cost after the self reference is normalised', () => {
+    expect(
+      classify('As an additional cost to cast ~, discard a card.', {
+        types: ['sorcery'],
+        keywords: [],
+      }),
+    ).toBe('additionalCost');
+  });
+
   it("reads a trigger on an opponent's step", () => {
     expect(
       parseTriggered("At the beginning of each opponent's upkeep, you gain 1 life.").value,
@@ -371,6 +407,26 @@ describe('whole-card assembly', () => {
         cost: { mana: '{2}', tap: true },
         effects: [{ op: 'draw', count: 1 }],
         timing: 'sorcery',
+        covers: [0, 1],
+      },
+    ]);
+  });
+
+  it('hangs "only once each turn" on the trigger above it', () => {
+    const r = scriptCard(
+      synthetic(
+        'Creature \u2014 Bird',
+        'Whenever ~ attacks, draw a card.\nThis ability triggers only once each turn.',
+        { power: '1', toughness: '1' },
+      ),
+    );
+    expect(r.reasons).toEqual([]);
+    expect(r.script?.abilities).toEqual([
+      {
+        kind: 'triggered',
+        trigger: { on: 'attacks', filter: 'self' },
+        effects: [{ op: 'draw', count: 1 }],
+        oncePerTurn: true,
         covers: [0, 1],
       },
     ]);

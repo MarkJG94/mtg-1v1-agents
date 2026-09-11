@@ -141,12 +141,29 @@ export function parsePlayerRef(s: Scanner, b: Bindings): PlayerRef | null {
 
 /** "equal to the number of creatures you control" — the only comparative quantity the v1 grammar reads. */
 export function parseEqualTo(s: Scanner): Quantity | null {
+  return s.attempt<Quantity>(() => (s.eat('equal to') ? parseNumberOf(s) : null));
+}
+
+/** "the number of creatures you control". */
+function parseNumberOf(s: Scanner): Quantity | null {
   return s.attempt<Quantity>(() => {
-    if (!s.eat('equal to the number of')) return null;
+    if (!s.eat('the number of')) return null;
     const obj = parseObjectPhrase(s);
-    if (!obj) return null;
-    return { count: obj.filter };
+    return obj ? { count: obj.filter } : null;
   });
+}
+
+/** Replaces the `x` placeholder with the quantity a trailing "where X is …" clause defines. */
+function substituteX(value: unknown, q: Quantity): unknown {
+  if (value === 'x') return q;
+  if (Array.isArray(value)) return value.map((v) => substituteX(v, q));
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>))
+      out[k] = k === 'op' || k === 'as' || k === 'name' ? v : substituteX(v, q);
+    return out;
+  }
+  return value;
 }
 
 /** "a +1/+1 counter", "two -1/-1 counters", "three charge counters". */
@@ -441,10 +458,14 @@ const bounceClause: Clause = (s, b) => {
   if (!s.eat('return')) return null;
   const t = parseObjectRef(s, b);
   if (t === null) return null;
+  // "Return ~ from your graveyard to the battlefield" names the origin before the destination.
+  s.eat('from your graveyard');
   if (s.eat("to its owner's hand") || s.eat("to their owners' hands"))
     return [{ op: 'bounce', target: t }];
-  // "Return target creature card from your graveyard to your hand" is a zone change, not a bounce.
+  // A card coming back from a graveyard is a zone change, not a bounce.
   if (s.eat('to your hand')) return [{ op: 'moveZone', target: t, to: 'hand' }];
+  if (s.eat('to the battlefield under your control') || s.eat('to the battlefield'))
+    return [{ op: 'moveZone', target: t, to: 'battlefield' }];
   return null;
 };
 
@@ -538,17 +559,21 @@ const searchClause: Clause = (s) => {
   if (!s.eat('search your library for')) return null;
   const obj = parseObjectPhrase(s);
   if (!obj) return null;
+  // The comma is its own token, so each optional step of the template is eaten separately.
+  s.eat(',');
+  s.eat('reveal it');
+  s.eat('reveal that card');
   s.eat(',');
   let to: 'hand' | 'battlefield' | 'libraryTop' | 'graveyard' = 'hand';
   let tapped = false;
   if (s.eat('put that card onto the battlefield') || s.eat('put it onto the battlefield')) {
     to = 'battlefield';
     tapped = s.eat('tapped');
-  } else if (s.eat('put that card into your hand') || s.eat('reveal it, put it into your hand')) {
+  } else if (s.eat('put that card into your hand') || s.eat('put it into your hand')) {
     to = 'hand';
   }
   s.eat(',');
-  const shuffles = s.eat('then shuffle') || s.eat('then shuffle your library');
+  const shuffles = s.eat('then shuffle your library') || s.eat('then shuffle');
   const search: Effect = {
     op: 'search',
     filter: obj.filter,
@@ -661,6 +686,10 @@ export function parseClause(s: Scanner, b: Bindings): Effect[] | null {
   return null;
 }
 
+function finishEffects(out: Effect[], lead: DurationDef | null): Effect[] {
+  return lead ? out.map((e) => withDuration(e, lead)) : out;
+}
+
 /** Ops that take a duration; a leading "Until end of turn," supplies it when the clause did not. */
 function withDuration(effect: Effect, duration: DurationDef): Effect {
   switch (effect.op) {
@@ -697,7 +726,18 @@ export function parseEffects(s: Scanner, b: Bindings): Effect[] | null {
     const c = parseClause(s, b);
     if (!c) return null;
     out.push(...c);
-    if (s.atEnd()) return lead ? out.map((e) => withDuration(e, lead)) : out;
+    if (s.atEnd()) return finishEffects(out, lead);
+    // "…, where X is the number of lands you control" defines the X the clauses above already used.
+    const whereX = s.attempt(() => {
+      if (!s.eat(',') || !s.eat('where x is')) return null;
+      const q = parseNumberOf(s);
+      return q !== null && s.atEnd() ? q : null;
+    });
+    if (whereX !== null)
+      return finishEffects(
+        out.map((e) => substituteX(e, whereX) as Effect),
+        lead,
+      );
     if (s.eat(', then') || s.eat('and then') || s.eat('then') || s.eat('and') || s.eat(','))
       continue;
     return null;
