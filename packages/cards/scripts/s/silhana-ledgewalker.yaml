@@ -1,0 +1,11 @@
+oracleId: fixture:silhana-ledgewalker
+name: "Silhana Ledgewalker"
+text: "Hexproof\nSilhana Ledgewalker can't be blocked except by creatures with flying."
+manaCost: '{1}{G}'
+types: [creature]
+subtypes: [Elf, Rogue]
+power: 1
+toughness: 1
+abilities:
+  - { kind: keyword, keyword: hexproof, covers: [0] }
+  - { kind: static, covers: [1], effect: { type: cantBeBlockedBy, affects: self, by: { lacksKeyword: flying } } }

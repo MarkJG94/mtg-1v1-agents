@@ -1,0 +1,19 @@
+oracleId: fixture:healing-salve
+name: "Healing Salve"
+text: "Choose one \u2014\n\u2022 Target player gains 3 life.\n\u2022 Prevent the next 3 damage that would be dealt to any target this turn."
+manaCost: '{W}'
+types: [instant]
+abilities:
+
+  - kind: spell
+    covers: [0, 1, 2]
+    effects: []
+    modes:
+      - { label: gain 3 life, targets: [{ id: p, filter: { player: any } }], effects: [{ op: gainLife, amount: 3, player: $p }] }
+      - { label: prevent 3, targets: [{ id: t, filter: { any: true } }], effects: [{ op: preventDamage, target: $t, amount: 3 }] }
+
+tests:
+  - name: mode one gains life
+    setup: { A: { hand: ['~'], battlefield: [Plains] } }
+    actions: [{ cast: '~', mode: 0, target: A }, resolveAll]
+    expect: { A.life: 23 }

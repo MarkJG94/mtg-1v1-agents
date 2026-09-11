@@ -1,0 +1,15 @@
+oracleId: fixture:wooded-foothills
+name: "Wooded Foothills"
+text: "{T}, Pay 1 life, Sacrifice Wooded Foothills: Search your library for a Mountain or Forest card, put it onto the battlefield, then shuffle."
+types: [land]
+abilities:
+  - kind: activated
+    covers: [0]
+    cost: { tap: true, life: 1, sacrifice: self }
+    effects:
+      - { op: search, filter: { type: land, subtype: [Mountain, Forest] }, count: 1, to: battlefield }
+tests:
+  - name: fetches a Forest
+    setup: { A: { battlefield: ['~'], library: [Forest, Island] } }
+    actions: [{ activate: '~' }, resolveAll]
+    expect: { A.battlefield: [Forest], '~.zone': graveyard, A.life: 19 }

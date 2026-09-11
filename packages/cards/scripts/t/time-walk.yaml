@@ -1,0 +1,9 @@
+oracleId: fixture:time-walk
+name: "Time Walk"
+text: "Take an extra turn after this one."
+manaCost: '{1}{U}'
+types: [sorcery]
+abilities:
+
+  - { kind: spell, covers: [0], effects: [{ op: extraTurn }] }
+

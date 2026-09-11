@@ -1,0 +1,7 @@
+oracleId: fixture:island
+name: "Island"
+text: "({T}: Add {U}.)"
+types: [land]
+supertypes: [basic]
+subtypes: [Island]
+abilities: []

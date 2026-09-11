@@ -1,0 +1,14 @@
+oracleId: fixture:sphere-of-resistance
+name: "Sphere of Resistance"
+text: "Spells cost {1} more to cast."
+manaCost: '{2}'
+types: [artifact]
+abilities:
+
+  - { kind: static, covers: [0], effect: { type: costIncrease, affects: { notType: land }, amount: 1 } }
+
+tests:
+  - name: taxes spells
+    setup: { A: { battlefield: ['~', Mountain], hand: [Shock] } }
+    actions: []
+    expect: { A.hand: [Shock] }

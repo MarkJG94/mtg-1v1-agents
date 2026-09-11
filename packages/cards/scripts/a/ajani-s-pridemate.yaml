@@ -1,0 +1,15 @@
+oracleId: fixture:ajani-s-pridemate
+name: "Ajani's Pridemate"
+text: "Whenever you gain life, put a +1/+1 counter on Ajani's Pridemate."
+manaCost: '{1}{W}'
+types: [creature]
+subtypes: [Cat, Soldier]
+power: 2
+toughness: 2
+abilities:
+  - { kind: triggered, covers: [0], trigger: { on: lifeGain }, effects: [{ op: addCounters, target: '~', counter: '+1/+1', count: 1 }] }
+tests:
+  - name: grows on life gain
+    setup: { A: { battlefield: ['~', Plains, Plains], hand: [Lone Missionary] } }
+    actions: [{ cast: Lone Missionary }, resolveAll]
+    expect: { '~.power': 3, A.life: 24 }

@@ -1,0 +1,11 @@
+oracleId: fixture:wall-of-omens
+name: "Wall of Omens"
+text: "Defender\nWhen Wall of Omens enters, draw a card."
+manaCost: '{1}{W}'
+types: [creature]
+subtypes: [Wall]
+power: 0
+toughness: 4
+abilities:
+  - { kind: keyword, keyword: defender, covers: [0] }
+  - { kind: triggered, covers: [1], trigger: { on: etb }, effects: [{ op: draw, count: 1 }] }

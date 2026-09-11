@@ -1,0 +1,15 @@
+oracleId: fixture:raging-goblin
+name: "Raging Goblin"
+text: "Haste"
+manaCost: '{R}'
+types: [creature]
+subtypes: [Goblin]
+power: 1
+toughness: 1
+abilities:
+  - { kind: keyword, keyword: haste, covers: [0] }
+tests:
+  - name: attacks the turn it is cast
+    setup: { A: { hand: ['~'], battlefield: [Mountain] } }
+    actions: [{ cast: '~' }, resolveAll, { attack: ['~'] }, finishCombat]
+    expect: { B.life: 19 }

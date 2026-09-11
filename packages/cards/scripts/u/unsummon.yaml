@@ -1,0 +1,14 @@
+oracleId: fixture:unsummon
+name: "Unsummon"
+text: "Return target creature to its owner's hand."
+manaCost: '{U}'
+types: [instant]
+abilities:
+
+  - { kind: spell, covers: [0], targets: [{ id: t, filter: { type: creature } }], effects: [{ op: bounce, target: $t }] }
+
+tests:
+  - name: bounces
+    setup: { A: { hand: ['~'], battlefield: [Island] }, B: { battlefield: [Hill Giant] } }
+    actions: [{ cast: '~', target: Hill Giant }, resolveAll]
+    expect: { B.hand: [Hill Giant] }

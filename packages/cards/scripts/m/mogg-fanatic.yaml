@@ -1,0 +1,15 @@
+oracleId: fixture:mogg-fanatic
+name: "Mogg Fanatic"
+text: "Sacrifice Mogg Fanatic: It deals 1 damage to any target."
+manaCost: '{R}'
+types: [creature]
+subtypes: [Goblin]
+power: 1
+toughness: 1
+abilities:
+  - { kind: activated, covers: [0], cost: { sacrifice: self }, targets: [{ id: t, filter: { any: true } }], effects: [{ op: damage, amount: 1, to: $t }] }
+tests:
+  - name: sacrifices to ping
+    setup: { A: { battlefield: ['~'] }, B: { battlefield: [Goblin Piker] } }
+    actions: [{ activate: '~', target: Goblin Piker }, resolveAll]
+    expect: { '~.zone': graveyard, Goblin Piker.zone: graveyard }

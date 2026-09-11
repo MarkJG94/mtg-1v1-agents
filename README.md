@@ -26,4 +26,26 @@ TypeScript monorepo (pnpm workspaces). `packages/engine` (pure TS rules engine),
 
 ## Status
 
-Planning complete; no code yet. First milestone is the end-to-end thin slice described in the roadmap.
+Phase 1 (engine core) is implemented in `packages/engine`: turn structure, mana and the payment solver, the stack, targeting, combat, state-based actions, triggers, the layer system, replacement/prevention effects, planeswalkers, mulligans and game end, with a scenario builder, per-subsystem test suites and an invariant fuzzer.
+
+Phase 2 (cards) is implemented in `packages/cards`: the card-script schema (zod + exported JSON Schema), the validator (characteristic agreement with Scryfall, oracle-text coverage, executability smoke games), 98 hand-written bootstrap scripts with their own YAML scenario tests, the `ScriptResolver`, and a differential harness for comparing two scripts of one card.
+
+Phase 3 (the auto-scripter) is implemented in `packages/cards/src/auto`: oracle text is normalised, each sentence is classified and parsed by a token scanner over Magic's templating vocabulary, and the result is emitted as a card script and put through the same validator as a hand script. A card the grammar cannot read comes back with the rule that gave up and the text it stopped on, and `pnpm cards:coverage` turns those into a ranked list of the templates worth writing next.
+
+See `docs/10-roadmap.md` for the task board and `docs/adr/` for decisions that changed during implementation. Next up is Phase 4 (the playing agents).
+
+## Development
+
+```
+pnpm install
+pnpm lint        # biome
+pnpm typecheck
+pnpm test        # vitest across packages (includes a short fuzz run; FUZZ_RUNS=500 for longer)
+pnpm bench       # random-agent games/sec for the engine
+pnpm cards:schema      # regenerate packages/cards/card-script.schema.json for YAML editor completion
+pnpm fetch:scryfall    # download the Scryfall oracle-cards bulk file to data/scryfall/
+pnpm scryfall:subset   # refresh the test fixture and script oracle ids from the bulk file
+pnpm cards:coverage    # auto-scripter coverage over the bulk file -> data/coverage/report.{json,md}
+```
+
+Card scripts live in `packages/cards/scripts/<letter>/<slug>.yaml`; every script must validate as `supported` against its Scryfall entry and pass its own `tests:` (see `docs/03-card-scripts.md`).

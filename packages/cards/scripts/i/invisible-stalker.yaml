@@ -1,0 +1,11 @@
+oracleId: fixture:invisible-stalker
+name: "Invisible Stalker"
+text: "Hexproof\nInvisible Stalker can't be blocked."
+manaCost: '{1}{U}'
+types: [creature]
+subtypes: [Human, Rogue]
+power: 1
+toughness: 1
+abilities:
+  - { kind: keyword, keyword: hexproof, covers: [0] }
+  - { kind: static, covers: [1], effect: { type: cantBeBlocked, affects: self } }

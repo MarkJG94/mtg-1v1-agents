@@ -1,0 +1,16 @@
+oracleId: fixture:breeding-pool
+name: "Breeding Pool"
+text: "({T}: Add {G} or {U}.)\nAs Breeding Pool enters, you may pay 2 life. If you don't, it enters tapped."
+types: [land]
+subtypes: [Forest, Island]
+abilities:
+  - { kind: replacement, covers: [0, 1], replaces: { event: etb, filter: self, tapped: true, unlessPay: { life: 2 } } }
+tests:
+  - name: pay 2 life to enter untapped
+    setup: { A: { hand: ['~'] } }
+    actions: [{ playLand: '~' }, { answer: { kind: yesNo, yes: true } }]
+    expect: { '~.tapped': false, A.life: 18 }
+  - name: enters tapped otherwise
+    setup: { A: { hand: ['~'] } }
+    actions: [{ playLand: '~' }, { answer: { kind: yesNo, yes: false } }]
+    expect: { '~.tapped': true, A.life: 20 }

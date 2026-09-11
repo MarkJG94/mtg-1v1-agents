@@ -1,0 +1,14 @@
+oracleId: fixture:counterspell
+name: "Counterspell"
+text: "Counter target spell."
+manaCost: '{U}{U}'
+types: [instant]
+abilities:
+
+  - { kind: spell, covers: [0], targets: [{ id: t, filter: { spell: true } }], effects: [{ op: counter, target: $t }] }
+
+tests:
+  - name: counters a creature spell
+    setup: { A: { hand: [Grizzly Bears], battlefield: [Forest, Forest] }, B: { hand: ['~'], battlefield: [Island, Island] } }
+    actions: [{ cast: Grizzly Bears }, pass, { cast: '~', target: 'spell:Grizzly Bears' }, resolveAll]
+    expect: { A.graveyard: [Grizzly Bears], A.battlefield: [Forest, Forest] }

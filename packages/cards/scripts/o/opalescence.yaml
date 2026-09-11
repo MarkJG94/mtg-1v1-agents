@@ -1,0 +1,17 @@
+oracleId: fixture:opalescence
+name: "Opalescence"
+text: "Each other non-Aura enchantment is a creature in addition to its other types and has base power and toughness each equal to its mana value."
+manaCost: '{2}{W}{W}'
+types: [enchantment]
+abilities:
+
+  - kind: static
+    covers: [0]
+    effect: { type: addType, affects: { type: enchantment, other: true, not: { subtype: Aura } }, types: [creature] }
+    also: [{ type: setPT, affects: { type: enchantment, other: true, not: { subtype: Aura } }, power: { manaValue: self }, toughness: { manaValue: self } }]
+
+tests:
+  - name: animates anthems
+    setup: { A: { battlefield: ['~', Glorious Anthem] } }
+    actions: []
+    expect: { Glorious Anthem.types: [creature, enchantment], Glorious Anthem.power: 4 }

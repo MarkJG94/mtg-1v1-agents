@@ -1,0 +1,14 @@
+oracleId: fixture:lightning-helix
+name: "Lightning Helix"
+text: "Lightning Helix deals 3 damage to any target and you gain 3 life."
+manaCost: '{R}{W}'
+types: [instant]
+abilities:
+
+  - { kind: spell, covers: [0], targets: [{ id: t, filter: { any: true } }], effects: [{ op: damage, amount: 3, to: $t }, { op: gainLife, amount: 3 }] }
+
+tests:
+  - name: drains
+    setup: { A: { hand: ['~'], battlefield: [Mountain, Plains] } }
+    actions: [{ cast: '~', target: B }, resolveAll]
+    expect: { B.life: 17, A.life: 23 }

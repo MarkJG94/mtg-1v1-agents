@@ -1,0 +1,14 @@
+oracleId: fixture:tormenting-voice
+name: "Tormenting Voice"
+text: "As an additional cost to cast this spell, discard a card.\nDraw two cards."
+manaCost: '{1}{R}'
+types: [sorcery]
+abilities:
+
+  - { kind: spell, covers: [0, 1], additionalCost: { discard: 1 }, effects: [{ op: draw, count: 2 }] }
+
+tests:
+  - name: discards then draws two
+    setup: { A: { hand: ['~', Forest], battlefield: [Mountain, Mountain], library: [Island, Island, Island] } }
+    actions: [{ cast: '~', choose: [Forest] }, resolveAll]
+    expect: { A.graveyard: [Forest, '~'], A.hand.size: 2 }

@@ -1,0 +1,14 @@
+oracleId: fixture:prey-upon
+name: "Prey Upon"
+text: "Target creature you control fights target creature you don't control."
+manaCost: '{G}'
+types: [sorcery]
+abilities:
+
+  - { kind: spell, covers: [0], targets: [{ id: a, filter: { type: creature, controller: you } }, { id: b, filter: { type: creature, controller: opponent } }], effects: [{ op: fight, a: $a, b: $b }] }
+
+tests:
+  - name: fight
+    setup: { A: { hand: ['~'], battlefield: [Forest, Hill Giant] }, B: { battlefield: [Grizzly Bears] } }
+    actions: [{ cast: '~', targets: [Hill Giant, Grizzly Bears] }, resolveAll]
+    expect: { B.graveyard: [Grizzly Bears], Hill Giant.damage: 2 }

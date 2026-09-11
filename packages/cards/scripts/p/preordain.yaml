@@ -1,0 +1,9 @@
+oracleId: fixture:preordain
+name: "Preordain"
+text: "Scry 2, then draw a card."
+manaCost: '{U}'
+types: [sorcery]
+abilities:
+
+  - { kind: spell, covers: [0], effects: [{ op: scry, count: 2 }, { op: draw, count: 1 }] }
+

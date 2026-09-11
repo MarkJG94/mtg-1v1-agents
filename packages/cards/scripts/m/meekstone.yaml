@@ -1,0 +1,14 @@
+oracleId: fixture:meekstone
+name: "Meekstone"
+text: "Creatures with power 3 or greater don't untap during their controllers' untap steps."
+manaCost: '{1}'
+types: [artifact]
+abilities:
+
+  - { kind: static, covers: [0], effect: { type: doesntUntap, affects: { type: creature, powerGTE: 3 } } }
+
+tests:
+  - name: big creatures stay tapped
+    setup: { A: { battlefield: ['~', { name: Hill Giant, tapped: true }, { name: Grizzly Bears, tapped: true }] } }
+    actions: [nextTurn, nextTurn]
+    expect: { Hill Giant.tapped: true, Grizzly Bears.tapped: false }

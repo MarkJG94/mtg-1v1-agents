@@ -1,0 +1,17 @@
+oracleId: fixture:jace-beleren
+name: "Jace Beleren"
+text: "+2: Each player draws a card.\n\u22121: Target player draws a card.\n\u221210: Target player mills twenty cards."
+manaCost: '{1}{U}{U}'
+types: [planeswalker]
+supertypes: [legendary]
+subtypes: [Jace]
+loyalty: 3
+abilities:
+  - { kind: loyalty, covers: [0], cost: 2, effects: [{ op: forEachPlayer, as: p, effects: [{ op: draw, count: 1, player: p }] }] }
+  - { kind: loyalty, covers: [1], cost: -1, targets: [{ id: p, filter: { player: any } }], effects: [{ op: draw, count: 1, player: $p }] }
+  - { kind: loyalty, covers: [2], cost: -10, targets: [{ id: p, filter: { player: any } }], effects: [{ op: mill, count: 20, player: $p }] }
+tests:
+  - name: plus two draws for both
+    setup: { A: { battlefield: ['~'], library: [Forest, Forest] }, B: { library: [Island, Island] } }
+    actions: [{ activate: '~', ability: 0 }, resolveAll]
+    expect: { A.hand.size: 1, B.hand.size: 1, '~.counters.loyalty': 5 }

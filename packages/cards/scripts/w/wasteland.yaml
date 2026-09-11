@@ -1,0 +1,16 @@
+oracleId: fixture:wasteland
+name: "Wasteland"
+text: "{T}: Add {C}.\n{T}, Sacrifice Wasteland: Destroy target nonbasic land."
+types: [land]
+abilities:
+  - { kind: mana, covers: [0], cost: { tap: true }, produces: '{C}' }
+  - kind: activated
+    covers: [1]
+    cost: { tap: true, sacrifice: self }
+    targets: [{ id: t, filter: { type: land, not: { supertype: basic } } }]
+    effects: [{ op: destroy, target: $t }]
+tests:
+  - name: destroys a nonbasic land
+    setup: { A: { battlefield: ['~'] }, B: { battlefield: [Tropical Island, Forest] } }
+    actions: [{ activate: '~', ability: 1, target: Tropical Island }, resolveAll]
+    expect: { B.graveyard: [Tropical Island], B.battlefield: [Forest], '~.zone': graveyard }

@@ -1,0 +1,20 @@
+oracleId: fixture:threaten
+name: "Threaten"
+text: "Untap target creature and gain control of it until end of turn. That creature gains haste until end of turn."
+manaCost: '{2}{R}'
+types: [sorcery]
+abilities:
+
+  - kind: spell
+    covers: [0, 1]
+    targets: [{ id: t, filter: { type: creature } }]
+    effects:
+      - { op: untap, target: $t }
+      - { op: gainControl, target: $t, duration: untilEndOfTurn }
+      - { op: grantAbility, target: $t, ability: { kind: keyword, keyword: haste } }
+
+tests:
+  - name: steals for a turn
+    setup: { A: { hand: ['~'], battlefield: [Mountain, Mountain, Mountain] }, B: { battlefield: [Hill Giant] } }
+    actions: [{ cast: '~', target: Hill Giant }, resolveAll, { attack: [Hill Giant] }, finishCombat, nextTurn]
+    expect: { B.life: 17, Hill Giant.controller: B }

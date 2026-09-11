@@ -1,0 +1,16 @@
+oracleId: fixture:control-magic
+name: "Control Magic"
+text: "Enchant creature\nYou control enchanted creature."
+manaCost: '{2}{U}{U}'
+types: [enchantment]
+subtypes: [Aura]
+abilities:
+
+  - { kind: spell, covers: [0], targets: [{ id: e, filter: { type: creature } }], effects: [] }
+  - { kind: static, covers: [1], effect: { type: control, affects: attached, controller: you } }
+
+tests:
+  - name: steals
+    setup: { A: { hand: ['~'], battlefield: [Island, Island, Island, Island] }, B: { battlefield: [Serra Angel] } }
+    actions: [{ cast: '~', target: Serra Angel }, resolveAll]
+    expect: { Serra Angel.controller: A, A.battlefield: [Serra Angel] }

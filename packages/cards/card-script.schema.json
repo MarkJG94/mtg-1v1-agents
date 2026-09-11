@@ -1,0 +1,3660 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "oracleId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "manaCost": {
+      "type": "string"
+    },
+    "colors": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["W", "U", "B", "R", "G"]
+      }
+    },
+    "supertypes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["legendary", "basic", "snow"]
+      }
+    },
+    "types": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "creature",
+          "instant",
+          "sorcery",
+          "artifact",
+          "enchantment",
+          "land",
+          "planeswalker",
+          "kindred"
+        ]
+      }
+    },
+    "subtypes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "power": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/__schema0"
+        }
+      ]
+    },
+    "toughness": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/__schema0"
+        }
+      ]
+    },
+    "loyalty": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "text": {
+      "type": "string"
+    },
+    "abilities": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema2"
+      }
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "setup": {
+            "type": "object",
+            "properties": {
+              "A": {
+                "type": "object",
+                "properties": {
+                  "hand": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "battlefield": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "tapped": {
+                              "type": "boolean"
+                            },
+                            "counters": {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "attachedTo": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["name"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "graveyard": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "library": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "life": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
+              "B": {
+                "type": "object",
+                "properties": {
+                  "hand": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "battlefield": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "tapped": {
+                              "type": "boolean"
+                            },
+                            "counters": {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "attachedTo": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["name"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "graveyard": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "library": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "life": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": ["resolveAll", "pass", "passBoth", "finishCombat", "nextTurn"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "cast": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ]
+                    },
+                    "targets": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "x": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "mode": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "choose": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": ["cast"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "activate": {
+                      "type": "string"
+                    },
+                    "ability": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "target": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ]
+                    },
+                    "targets": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "x": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "choose": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": ["activate"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "activateMana": {
+                      "type": "string"
+                    },
+                    "ability": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "option": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["activateMana"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "playLand": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["playLand"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "attack": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "prefixItems": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ],
+                            "items": false,
+                            "minItems": 2,
+                            "maxItems": 2
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["attack"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "block": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "prefixItems": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ],
+                        "items": false,
+                        "minItems": 2,
+                        "maxItems": 2
+                      }
+                    }
+                  },
+                  "required": ["block"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "toStep": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["toStep"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "answer": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["answer"],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "expect": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": ["name", "setup", "actions", "expect"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["oracleId", "name", "types", "text", "abilities"],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        {
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "count": {
+              "$ref": "#/$defs/__schema1"
+            },
+            "zone": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "library",
+                    "hand",
+                    "battlefield",
+                    "graveyard",
+                    "exile",
+                    "stack",
+                    "command"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "const": "any"
+                }
+              ]
+            }
+          },
+          "required": ["count"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "countTypes": {
+              "type": "string",
+              "const": "inAllGraveyards"
+            }
+          },
+          "required": ["countTypes"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "add": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          },
+          "required": ["add"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "sub": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "$ref": "#/$defs/__schema0"
+                },
+                {
+                  "$ref": "#/$defs/__schema0"
+                }
+              ],
+              "items": false,
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "required": ["sub"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "mul": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "$ref": "#/$defs/__schema0"
+                },
+                {
+                  "$ref": "#/$defs/__schema0"
+                }
+              ],
+              "items": false,
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "required": ["mul"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "max": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          },
+          "required": ["max"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "min": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          },
+          "required": ["min"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "negate": {
+              "$ref": "#/$defs/__schema0"
+            }
+          },
+          "required": ["negate"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "lifeTotal": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["lifeTotal"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cardsInHand": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["cardsInHand"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cardsInGraveyard": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["cardsInGraveyard"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "power": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["power"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "toughness": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["toughness"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "manaValue": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["manaValue"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "counters": {
+              "type": "string",
+              "minLength": 1
+            },
+            "counter": {
+              "type": "string"
+            }
+          },
+          "required": ["counters", "counter"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "devotion": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["W", "U", "B", "R", "G"]
+              }
+            },
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["devotion"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "lands": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["lands"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "damageDealt": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": ["damageDealt"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "bound": {
+              "type": "string"
+            }
+          },
+          "required": ["bound"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "__schema1": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "creature",
+                "instant",
+                "sorcery",
+                "artifact",
+                "enchantment",
+                "land",
+                "planeswalker",
+                "kindred"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "creature",
+                  "instant",
+                  "sorcery",
+                  "artifact",
+                  "enchantment",
+                  "land",
+                  "planeswalker",
+                  "kindred"
+                ]
+              }
+            }
+          ]
+        },
+        "notType": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "creature",
+                "instant",
+                "sorcery",
+                "artifact",
+                "enchantment",
+                "land",
+                "planeswalker",
+                "kindred"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "creature",
+                  "instant",
+                  "sorcery",
+                  "artifact",
+                  "enchantment",
+                  "land",
+                  "planeswalker",
+                  "kindred"
+                ]
+              }
+            }
+          ]
+        },
+        "subtype": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "supertype": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": ["legendary", "basic", "snow"]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["legendary", "basic", "snow"]
+              }
+            }
+          ]
+        },
+        "color": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": ["W", "U", "B", "R", "G"]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["W", "U", "B", "R", "G"]
+              }
+            }
+          ]
+        },
+        "colorless": {
+          "type": "boolean"
+        },
+        "multicolored": {
+          "type": "boolean"
+        },
+        "controller": {
+          "type": "string",
+          "enum": ["you", "opponent", "any"]
+        },
+        "owner": {
+          "type": "string",
+          "enum": ["you", "opponent", "any"]
+        },
+        "zone": {
+          "type": "string",
+          "enum": ["library", "hand", "battlefield", "graveyard", "exile", "stack", "command"]
+        },
+        "tapped": {
+          "type": "boolean"
+        },
+        "untapped": {
+          "type": "boolean"
+        },
+        "mvLTE": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "mvGTE": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "mvEQ": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "powerGTE": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "powerLTE": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "toughnessGTE": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "toughnessLTE": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "hasKeyword": {
+          "type": "string",
+          "enum": [
+            "flying",
+            "first strike",
+            "double strike",
+            "deathtouch",
+            "haste",
+            "hexproof",
+            "indestructible",
+            "lifelink",
+            "menace",
+            "reach",
+            "trample",
+            "vigilance",
+            "defender",
+            "flash",
+            "shroud",
+            "split second",
+            "cant be countered"
+          ]
+        },
+        "lacksKeyword": {
+          "type": "string",
+          "enum": [
+            "flying",
+            "first strike",
+            "double strike",
+            "deathtouch",
+            "haste",
+            "hexproof",
+            "indestructible",
+            "lifelink",
+            "menace",
+            "reach",
+            "trample",
+            "vigilance",
+            "defender",
+            "flash",
+            "shroud",
+            "split second",
+            "cant be countered"
+          ]
+        },
+        "isToken": {
+          "type": "boolean"
+        },
+        "nonToken": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "attacking": {
+          "type": "boolean"
+        },
+        "blocking": {
+          "type": "boolean"
+        },
+        "blocked": {
+          "type": "boolean"
+        },
+        "other": {
+          "type": "boolean"
+        },
+        "player": {
+          "type": "string",
+          "enum": ["you", "opponent", "any"]
+        },
+        "spell": {
+          "type": "boolean"
+        },
+        "ability": {
+          "type": "boolean"
+        },
+        "any": {
+          "type": "boolean"
+        },
+        "anyPermanent": {
+          "type": "boolean"
+        },
+        "attachedTo": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "hasCounter": {
+          "type": "string"
+        },
+        "damaged": {
+          "type": "boolean"
+        },
+        "enteredThisTurn": {
+          "type": "boolean"
+        },
+        "not": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "and": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema1"
+          }
+        },
+        "or": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema1"
+          }
+        },
+        "self": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "__schema2": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "keyword"
+            },
+            "keyword": {
+              "type": "string",
+              "enum": [
+                "flying",
+                "first strike",
+                "double strike",
+                "deathtouch",
+                "haste",
+                "hexproof",
+                "indestructible",
+                "lifelink",
+                "menace",
+                "reach",
+                "trample",
+                "vigilance",
+                "defender",
+                "flash",
+                "shroud",
+                "split second",
+                "cant be countered",
+                "protection",
+                "ward"
+              ]
+            },
+            "from": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "color": {
+                      "type": "string",
+                      "enum": ["W", "U", "B", "R", "G"]
+                    }
+                  },
+                  "required": ["color"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "creature",
+                        "instant",
+                        "sorcery",
+                        "artifact",
+                        "enchantment",
+                        "land",
+                        "planeswalker",
+                        "kindred"
+                      ]
+                    }
+                  },
+                  "required": ["type"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "everything": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": ["everything"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "colored": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": ["colored"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "filter": {
+                      "$ref": "#/$defs/__schema1"
+                    }
+                  },
+                  "required": ["filter"],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "cost": {
+              "type": "object",
+              "properties": {
+                "mana": {
+                  "type": "string"
+                },
+                "tap": {
+                  "type": "boolean"
+                },
+                "untap": {
+                  "type": "boolean"
+                },
+                "life": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "sacrifice": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "self"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema1"
+                    }
+                  ]
+                },
+                "discard": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "filter": {
+                          "$ref": "#/$defs/__schema1"
+                        },
+                        "count": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": ["count"],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "exileFromGraveyard": {
+                  "type": "object",
+                  "properties": {
+                    "filter": {
+                      "$ref": "#/$defs/__schema1"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["count"],
+                  "additionalProperties": false
+                },
+                "removeCounters": {
+                  "type": "object",
+                  "properties": {
+                    "counter": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["counter", "count"],
+                  "additionalProperties": false
+                },
+                "tapOther": {
+                  "type": "object",
+                  "properties": {
+                    "filter": {
+                      "$ref": "#/$defs/__schema1"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["filter", "count"],
+                  "additionalProperties": false
+                },
+                "x": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "covers": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          "required": ["kind", "keyword"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "spell"
+            },
+            "targets": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filter": {
+                    "$ref": "#/$defs/__schema1"
+                  },
+                  "count": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "upTo": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["upTo"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "string",
+                        "const": "any"
+                      }
+                    ]
+                  },
+                  "optional": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["id", "filter"],
+                "additionalProperties": false
+              }
+            },
+            "effects": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema3"
+              }
+            },
+            "modes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "targets": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "filter": {
+                          "$ref": "#/$defs/__schema1"
+                        },
+                        "count": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "upTo": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": ["upTo"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "string",
+                              "const": "any"
+                            }
+                          ]
+                        },
+                        "optional": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": ["id", "filter"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "effects": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/__schema3"
+                    }
+                  }
+                },
+                "required": ["label", "effects"],
+                "additionalProperties": false
+              }
+            },
+            "additionalCost": {
+              "type": "object",
+              "properties": {
+                "mana": {
+                  "type": "string"
+                },
+                "tap": {
+                  "type": "boolean"
+                },
+                "untap": {
+                  "type": "boolean"
+                },
+                "life": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "sacrifice": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "self"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema1"
+                    }
+                  ]
+                },
+                "discard": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "filter": {
+                          "$ref": "#/$defs/__schema1"
+                        },
+                        "count": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": ["count"],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "exileFromGraveyard": {
+                  "type": "object",
+                  "properties": {
+                    "filter": {
+                      "$ref": "#/$defs/__schema1"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["count"],
+                  "additionalProperties": false
+                },
+                "removeCounters": {
+                  "type": "object",
+                  "properties": {
+                    "counter": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["counter", "count"],
+                  "additionalProperties": false
+                },
+                "tapOther": {
+                  "type": "object",
+                  "properties": {
+                    "filter": {
+                      "$ref": "#/$defs/__schema1"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["filter", "count"],
+                  "additionalProperties": false
+                },
+                "x": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "alternativeCost": {
+              "type": "object",
+              "properties": {
+                "mana": {
+                  "type": "string"
+                },
+                "tap": {
+                  "type": "boolean"
+                },
+                "untap": {
+                  "type": "boolean"
+                },
+                "life": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "sacrifice": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "self"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema1"
+                    }
+                  ]
+                },
+                "discard": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "filter": {
+                          "$ref": "#/$defs/__schema1"
+                        },
+                        "count": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": ["count"],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "exileFromGraveyard": {
+                  "type": "object",
+                  "properties": {
+                    "filter": {
+                      "$ref": "#/$defs/__schema1"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["count"],
+                  "additionalProperties": false
+                },
+                "removeCounters": {
+                  "type": "object",
+                  "properties": {
+                    "counter": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["counter", "count"],
+                  "additionalProperties": false
+                },
+                "tapOther": {
+                  "type": "object",
+                  "properties": {
+                    "filter": {
+                      "$ref": "#/$defs/__schema1"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["filter", "count"],
+                  "additionalProperties": false
+                },
+                "x": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "covers": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          "required": ["kind", "effects"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "activated"
+            },
+            "cost": {
+              "type": "object",
+              "properties": {
+                "mana": {
+                  "type": "string"
+                },
+                "tap": {
+                  "type": "boolean"
+                },
+                "untap": {
+                  "type": "boolean"
+                },
+                "life": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "sacrifice": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "self"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema1"
+                    }
+                  ]
+                },
+                "discard": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "filter": {
+                          "$ref": "#/$defs/__schema1"
+                        },
+                        "count": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": ["count"],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "exileFromGraveyard": {
+                  "type": "object",
+                  "properties": {
+                    "filter": {
+                      "$ref": "#/$defs/__schema1"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["count"],
+                  "additionalProperties": false
+                },
+                "removeCounters": {
+                  "type": "object",
+                  "properties": {
+                    "counter": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["counter", "count"],
+                  "additionalProperties": false
+                },
+                "tapOther": {
+                  "type": "object",
+                  "properties": {
+                    "filter": {
+                      "$ref": "#/$defs/__schema1"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["filter", "count"],
+                  "additionalProperties": false
+                },
+                "x": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "targets": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filter": {
+                    "$ref": "#/$defs/__schema1"
+                  },
+                  "count": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "upTo": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["upTo"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "string",
+                        "const": "any"
+                      }
+                    ]
+                  },
+                  "optional": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["id", "filter"],
+                "additionalProperties": false
+              }
+            },
+            "effects": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema3"
+              }
+            },
+            "timing": {
+              "type": "string",
+              "enum": ["instant", "sorcery"]
+            },
+            "zone": {
+              "type": "string",
+              "enum": ["library", "hand", "battlefield", "graveyard", "exile", "stack", "command"]
+            },
+            "oncePerTurn": {
+              "type": "boolean"
+            },
+            "condition": {
+              "$ref": "#/$defs/__schema4"
+            },
+            "covers": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          "required": ["kind", "cost", "effects"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "mana"
+            },
+            "cost": {
+              "type": "object",
+              "properties": {
+                "mana": {
+                  "type": "string"
+                },
+                "tap": {
+                  "type": "boolean"
+                },
+                "untap": {
+                  "type": "boolean"
+                },
+                "life": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "sacrifice": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "self"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema1"
+                    }
+                  ]
+                },
+                "discard": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "filter": {
+                          "$ref": "#/$defs/__schema1"
+                        },
+                        "count": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": ["count"],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "exileFromGraveyard": {
+                  "type": "object",
+                  "properties": {
+                    "filter": {
+                      "$ref": "#/$defs/__schema1"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["count"],
+                  "additionalProperties": false
+                },
+                "removeCounters": {
+                  "type": "object",
+                  "properties": {
+                    "counter": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["counter", "count"],
+                  "additionalProperties": false
+                },
+                "tapOther": {
+                  "type": "object",
+                  "properties": {
+                    "filter": {
+                      "$ref": "#/$defs/__schema1"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["filter", "count"],
+                  "additionalProperties": false
+                },
+                "x": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "produces": {
+              "type": "string"
+            },
+            "choice": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "anyColor": {
+              "type": "boolean"
+            },
+            "condition": {
+              "$ref": "#/$defs/__schema4"
+            },
+            "covers": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          "required": ["kind", "cost"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "triggered"
+            },
+            "trigger": {
+              "type": "object",
+              "properties": {
+                "on": {
+                  "type": "string",
+                  "enum": [
+                    "etb",
+                    "ltb",
+                    "dies",
+                    "cast",
+                    "attacks",
+                    "blocks",
+                    "becomesBlocked",
+                    "dealsDamage",
+                    "dealtDamage",
+                    "upkeep",
+                    "draw",
+                    "endStep",
+                    "beginCombat",
+                    "landfall",
+                    "counterPlaced",
+                    "sacrificed",
+                    "tapped",
+                    "lifeGain",
+                    "discard",
+                    "nextEndStep",
+                    "nextUpkeep"
+                  ]
+                },
+                "filter": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "self"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema1"
+                    }
+                  ]
+                },
+                "who": {
+                  "type": "string",
+                  "enum": ["you", "opponent", "any"]
+                },
+                "combat": {
+                  "type": "boolean"
+                },
+                "toPlayer": {
+                  "type": "boolean"
+                }
+              },
+              "required": ["on"],
+              "additionalProperties": false
+            },
+            "condition": {
+              "$ref": "#/$defs/__schema4"
+            },
+            "targets": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filter": {
+                    "$ref": "#/$defs/__schema1"
+                  },
+                  "count": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "upTo": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["upTo"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "string",
+                        "const": "any"
+                      }
+                    ]
+                  },
+                  "optional": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["id", "filter"],
+                "additionalProperties": false
+              }
+            },
+            "effects": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema3"
+              }
+            },
+            "optional": {
+              "type": "boolean"
+            },
+            "oncePerTurn": {
+              "type": "boolean"
+            },
+            "covers": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          "required": ["kind", "trigger", "effects"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "static"
+            },
+            "effect": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "pt",
+                    "setPT",
+                    "switchPT",
+                    "addAbility",
+                    "loseAbility",
+                    "addType",
+                    "setTypes",
+                    "removeType",
+                    "setColor",
+                    "addColor",
+                    "control",
+                    "cantAttack",
+                    "cantBlock",
+                    "cantBeBlocked",
+                    "cantBeBlockedBy",
+                    "doesntUntap",
+                    "mustAttack",
+                    "costReduction",
+                    "costIncrease",
+                    "cantCast",
+                    "cantActivate",
+                    "maxHandSize",
+                    "extraLandDrop",
+                    "playerCantGainLife",
+                    "noMaxLoyaltyActivations",
+                    "preventDamage",
+                    "cantBeTargeted"
+                  ]
+                },
+                "affects": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "const": "self"
+                        },
+                        {
+                          "type": "string",
+                          "const": "attached"
+                        },
+                        {
+                          "$ref": "#/$defs/__schema1"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "const": "you"
+                    }
+                  ]
+                },
+                "power": {
+                  "$ref": "#/$defs/__schema0"
+                },
+                "toughness": {
+                  "$ref": "#/$defs/__schema0"
+                },
+                "cda": {
+                  "type": "boolean"
+                },
+                "ability": {
+                  "$ref": "#/$defs/__schema2"
+                },
+                "keyword": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "flying",
+                        "first strike",
+                        "double strike",
+                        "deathtouch",
+                        "haste",
+                        "hexproof",
+                        "indestructible",
+                        "lifelink",
+                        "menace",
+                        "reach",
+                        "trample",
+                        "vigilance",
+                        "defender",
+                        "flash",
+                        "shroud",
+                        "split second",
+                        "cant be countered"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "const": "all"
+                    }
+                  ]
+                },
+                "types": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "creature",
+                      "instant",
+                      "sorcery",
+                      "artifact",
+                      "enchantment",
+                      "land",
+                      "planeswalker",
+                      "kindred"
+                    ]
+                  }
+                },
+                "subtypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "colors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["W", "U", "B", "R", "G"]
+                  }
+                },
+                "controller": {
+                  "type": "string",
+                  "const": "you"
+                },
+                "by": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/__schema1"
+                    },
+                    {
+                      "type": "string",
+                      "enum": ["opponents", "any"]
+                    }
+                  ]
+                },
+                "amount": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    {
+                      "type": "string",
+                      "const": "all"
+                    }
+                  ]
+                },
+                "who": {
+                  "type": "string",
+                  "enum": ["you", "opponent", "any"]
+                },
+                "abilities": {
+                  "type": "string",
+                  "enum": ["all", "nonMana"]
+                },
+                "player": {
+                  "type": "string",
+                  "enum": ["you", "opponent", "any"]
+                },
+                "size": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "string",
+                      "const": "unlimited"
+                    }
+                  ]
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "combat": {
+                  "type": "boolean"
+                },
+                "noncombat": {
+                  "type": "boolean"
+                }
+              },
+              "required": ["type"],
+              "additionalProperties": false
+            },
+            "also": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "pt",
+                      "setPT",
+                      "switchPT",
+                      "addAbility",
+                      "loseAbility",
+                      "addType",
+                      "setTypes",
+                      "removeType",
+                      "setColor",
+                      "addColor",
+                      "control",
+                      "cantAttack",
+                      "cantBlock",
+                      "cantBeBlocked",
+                      "cantBeBlockedBy",
+                      "doesntUntap",
+                      "mustAttack",
+                      "costReduction",
+                      "costIncrease",
+                      "cantCast",
+                      "cantActivate",
+                      "maxHandSize",
+                      "extraLandDrop",
+                      "playerCantGainLife",
+                      "noMaxLoyaltyActivations",
+                      "preventDamage",
+                      "cantBeTargeted"
+                    ]
+                  },
+                  "affects": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "const": "self"
+                          },
+                          {
+                            "type": "string",
+                            "const": "attached"
+                          },
+                          {
+                            "$ref": "#/$defs/__schema1"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "const": "you"
+                      }
+                    ]
+                  },
+                  "power": {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  "toughness": {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  "cda": {
+                    "type": "boolean"
+                  },
+                  "ability": {
+                    "$ref": "#/$defs/__schema2"
+                  },
+                  "keyword": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "flying",
+                          "first strike",
+                          "double strike",
+                          "deathtouch",
+                          "haste",
+                          "hexproof",
+                          "indestructible",
+                          "lifelink",
+                          "menace",
+                          "reach",
+                          "trample",
+                          "vigilance",
+                          "defender",
+                          "flash",
+                          "shroud",
+                          "split second",
+                          "cant be countered"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "const": "all"
+                      }
+                    ]
+                  },
+                  "types": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "creature",
+                        "instant",
+                        "sorcery",
+                        "artifact",
+                        "enchantment",
+                        "land",
+                        "planeswalker",
+                        "kindred"
+                      ]
+                    }
+                  },
+                  "subtypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "colors": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["W", "U", "B", "R", "G"]
+                    }
+                  },
+                  "controller": {
+                    "type": "string",
+                    "const": "you"
+                  },
+                  "by": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/__schema1"
+                      },
+                      {
+                        "type": "string",
+                        "enum": ["opponents", "any"]
+                      }
+                    ]
+                  },
+                  "amount": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      {
+                        "type": "string",
+                        "const": "all"
+                      }
+                    ]
+                  },
+                  "who": {
+                    "type": "string",
+                    "enum": ["you", "opponent", "any"]
+                  },
+                  "abilities": {
+                    "type": "string",
+                    "enum": ["all", "nonMana"]
+                  },
+                  "player": {
+                    "type": "string",
+                    "enum": ["you", "opponent", "any"]
+                  },
+                  "size": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "string",
+                        "const": "unlimited"
+                      }
+                    ]
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "combat": {
+                    "type": "boolean"
+                  },
+                  "noncombat": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["type"],
+                "additionalProperties": false
+              }
+            },
+            "condition": {
+              "$ref": "#/$defs/__schema4"
+            },
+            "covers": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          "required": ["kind", "effect"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "loyalty"
+            },
+            "cost": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "targets": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filter": {
+                    "$ref": "#/$defs/__schema1"
+                  },
+                  "count": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "upTo": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["upTo"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "string",
+                        "const": "any"
+                      }
+                    ]
+                  },
+                  "optional": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["id", "filter"],
+                "additionalProperties": false
+              }
+            },
+            "effects": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema3"
+              }
+            },
+            "covers": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          "required": ["kind", "cost", "effects"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "replacement"
+            },
+            "replaces": {
+              "type": "object",
+              "properties": {
+                "event": {
+                  "type": "string",
+                  "enum": [
+                    "etb",
+                    "dies",
+                    "damage",
+                    "draw",
+                    "lifeGain",
+                    "counterPlaced",
+                    "tokenCreated"
+                  ]
+                },
+                "filter": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "self"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema1"
+                    }
+                  ]
+                },
+                "tapped": {
+                  "type": "boolean",
+                  "const": true
+                },
+                "withCounters": {
+                  "type": "object",
+                  "properties": {
+                    "counter": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  },
+                  "required": ["counter", "count"],
+                  "additionalProperties": false
+                },
+                "unlessPay": {
+                  "type": "object",
+                  "properties": {
+                    "life": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["life"],
+                  "additionalProperties": false
+                },
+                "instead": {
+                  "type": "string",
+                  "enum": ["exile", "libraryBottom", "libraryTop", "hand"]
+                },
+                "to": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "you"
+                    },
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "const": "self"
+                        },
+                        {
+                          "$ref": "#/$defs/__schema1"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "prevent": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "all"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                },
+                "combat": {
+                  "type": "boolean"
+                },
+                "noncombat": {
+                  "type": "boolean"
+                },
+                "from": {
+                  "$ref": "#/$defs/__schema1"
+                },
+                "double": {
+                  "type": "boolean",
+                  "const": true
+                },
+                "extra": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                },
+                "who": {
+                  "type": "string",
+                  "enum": ["you", "opponent", "any"]
+                },
+                "skip": {
+                  "type": "boolean",
+                  "const": true
+                },
+                "multiplier": {
+                  "type": "number"
+                }
+              },
+              "required": ["event"],
+              "additionalProperties": false
+            },
+            "condition": {
+              "$ref": "#/$defs/__schema4"
+            },
+            "covers": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          "required": ["kind", "replaces"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "__schema3": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": [
+            "damage",
+            "gainLife",
+            "loseLife",
+            "setLife",
+            "draw",
+            "discard",
+            "mill",
+            "counter",
+            "destroy",
+            "destroyAll",
+            "exileAll",
+            "bounceAll",
+            "sacrificeAll",
+            "damageEach",
+            "exile",
+            "moveZone",
+            "bounce",
+            "sacrifice",
+            "tap",
+            "untap",
+            "createToken",
+            "addCounters",
+            "removeCounters",
+            "pump",
+            "grantAbility",
+            "loseAbilities",
+            "setPT",
+            "gainControl",
+            "search",
+            "shuffle",
+            "scry",
+            "surveil",
+            "addMana",
+            "preventDamage",
+            "regenerate",
+            "fight",
+            "attach",
+            "extraTurn",
+            "sequence",
+            "forEach",
+            "forEachPlayer",
+            "if",
+            "may",
+            "unless",
+            "delayedTrigger",
+            "createEffect",
+            "choose",
+            "winGame",
+            "loseGame",
+            "bind",
+            "reveal",
+            "putOnTopOfLibrary",
+            "noop",
+            "copySpell",
+            "transformTargetsTo"
+          ]
+        },
+        "amount": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/__schema0"
+            },
+            {
+              "type": "string",
+              "const": "all"
+            }
+          ]
+        },
+        "to": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            {
+              "type": "string",
+              "enum": ["hand", "graveyard", "libraryTop", "libraryBottom", "battlefield", "exile"]
+            }
+          ]
+        },
+        "from": {
+          "type": "string",
+          "minLength": 1
+        },
+        "divided": {
+          "type": "boolean"
+        },
+        "player": {
+          "type": "string",
+          "minLength": 1
+        },
+        "count": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/__schema0"
+            },
+            {
+              "type": "string",
+              "const": "hand"
+            }
+          ]
+        },
+        "random": {
+          "type": "boolean"
+        },
+        "filter": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "chooser": {
+          "type": "string",
+          "const": "controller"
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unlessPay": {
+          "type": "string"
+        },
+        "noRegenerate": {
+          "type": "boolean"
+        },
+        "zone": {
+          "type": "string",
+          "enum": ["library", "hand", "battlefield", "graveyard", "exile", "stack", "command"]
+        },
+        "players": {
+          "type": "string",
+          "enum": ["you", "opponent", "any"]
+        },
+        "tapped": {
+          "type": "boolean"
+        },
+        "controller": {
+          "type": "string",
+          "minLength": 1
+        },
+        "token": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "types": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "creature",
+                  "instant",
+                  "sorcery",
+                  "artifact",
+                  "enchantment",
+                  "land",
+                  "planeswalker",
+                  "kindred"
+                ]
+              }
+            },
+            "subtypes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "supertypes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["legendary", "basic", "snow"]
+              }
+            },
+            "colors": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["W", "U", "B", "R", "G"]
+              }
+            },
+            "power": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "toughness": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "abilities": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema2"
+              }
+            }
+          },
+          "required": ["name", "types"],
+          "additionalProperties": false
+        },
+        "attacking": {
+          "type": "boolean"
+        },
+        "counter": {
+          "type": "string"
+        },
+        "power": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "toughness": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "duration": {
+          "type": "string",
+          "enum": [
+            "untilEndOfTurn",
+            "permanent",
+            "untilYourNextTurn",
+            "whileSourceOnBattlefield",
+            "untilSourceLeaves"
+          ]
+        },
+        "ability": {
+          "$ref": "#/$defs/__schema2"
+        },
+        "reveal": {
+          "type": "boolean"
+        },
+        "mana": {
+          "type": "string"
+        },
+        "combat": {
+          "type": "boolean"
+        },
+        "a": {
+          "type": "string",
+          "minLength": 1
+        },
+        "b": {
+          "type": "string",
+          "minLength": 1
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema3"
+          }
+        },
+        "as": {
+          "type": "string"
+        },
+        "order": {
+          "type": "string",
+          "const": "apnap"
+        },
+        "condition": {
+          "$ref": "#/$defs/__schema4"
+        },
+        "then": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema3"
+          }
+        },
+        "else": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema3"
+          }
+        },
+        "cost": {
+          "type": "object",
+          "properties": {
+            "mana": {
+              "type": "string"
+            },
+            "tap": {
+              "type": "boolean"
+            },
+            "untap": {
+              "type": "boolean"
+            },
+            "life": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "sacrifice": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "self"
+                },
+                {
+                  "$ref": "#/$defs/__schema1"
+                }
+              ]
+            },
+            "discard": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "filter": {
+                      "$ref": "#/$defs/__schema1"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["count"],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "exileFromGraveyard": {
+              "type": "object",
+              "properties": {
+                "filter": {
+                  "$ref": "#/$defs/__schema1"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["count"],
+              "additionalProperties": false
+            },
+            "removeCounters": {
+              "type": "object",
+              "properties": {
+                "counter": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["counter", "count"],
+              "additionalProperties": false
+            },
+            "tapOther": {
+              "type": "object",
+              "properties": {
+                "filter": {
+                  "$ref": "#/$defs/__schema1"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["filter", "count"],
+              "additionalProperties": false
+            },
+            "x": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "trigger": {
+          "type": "object",
+          "properties": {
+            "on": {
+              "type": "string",
+              "enum": [
+                "etb",
+                "ltb",
+                "dies",
+                "cast",
+                "attacks",
+                "blocks",
+                "becomesBlocked",
+                "dealsDamage",
+                "dealtDamage",
+                "upkeep",
+                "draw",
+                "endStep",
+                "beginCombat",
+                "landfall",
+                "counterPlaced",
+                "sacrificed",
+                "tapped",
+                "lifeGain",
+                "discard",
+                "nextEndStep",
+                "nextUpkeep"
+              ]
+            },
+            "filter": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "self"
+                },
+                {
+                  "$ref": "#/$defs/__schema1"
+                }
+              ]
+            },
+            "who": {
+              "type": "string",
+              "enum": ["you", "opponent", "any"]
+            },
+            "combat": {
+              "type": "boolean"
+            },
+            "toPlayer": {
+              "type": "boolean"
+            }
+          },
+          "required": ["on"],
+          "additionalProperties": false
+        },
+        "bind": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "effect": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "pt",
+                "setPT",
+                "switchPT",
+                "addAbility",
+                "loseAbility",
+                "addType",
+                "setTypes",
+                "removeType",
+                "setColor",
+                "addColor",
+                "control",
+                "cantAttack",
+                "cantBlock",
+                "cantBeBlocked",
+                "cantBeBlockedBy",
+                "doesntUntap",
+                "mustAttack",
+                "costReduction",
+                "costIncrease",
+                "cantCast",
+                "cantActivate",
+                "maxHandSize",
+                "extraLandDrop",
+                "playerCantGainLife",
+                "noMaxLoyaltyActivations",
+                "preventDamage",
+                "cantBeTargeted"
+              ]
+            },
+            "affects": {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "self"
+                    },
+                    {
+                      "type": "string",
+                      "const": "attached"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema1"
+                    }
+                  ]
+                },
+                {
+                  "type": "string",
+                  "const": "you"
+                }
+              ]
+            },
+            "power": {
+              "$ref": "#/$defs/__schema0"
+            },
+            "toughness": {
+              "$ref": "#/$defs/__schema0"
+            },
+            "cda": {
+              "type": "boolean"
+            },
+            "ability": {
+              "$ref": "#/$defs/__schema2"
+            },
+            "keyword": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "flying",
+                    "first strike",
+                    "double strike",
+                    "deathtouch",
+                    "haste",
+                    "hexproof",
+                    "indestructible",
+                    "lifelink",
+                    "menace",
+                    "reach",
+                    "trample",
+                    "vigilance",
+                    "defender",
+                    "flash",
+                    "shroud",
+                    "split second",
+                    "cant be countered"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "const": "all"
+                }
+              ]
+            },
+            "types": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "creature",
+                  "instant",
+                  "sorcery",
+                  "artifact",
+                  "enchantment",
+                  "land",
+                  "planeswalker",
+                  "kindred"
+                ]
+              }
+            },
+            "subtypes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "colors": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["W", "U", "B", "R", "G"]
+              }
+            },
+            "controller": {
+              "type": "string",
+              "const": "you"
+            },
+            "by": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/__schema1"
+                },
+                {
+                  "type": "string",
+                  "enum": ["opponents", "any"]
+                }
+              ]
+            },
+            "amount": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/__schema0"
+                },
+                {
+                  "type": "string",
+                  "const": "all"
+                }
+              ]
+            },
+            "who": {
+              "type": "string",
+              "enum": ["you", "opponent", "any"]
+            },
+            "abilities": {
+              "type": "string",
+              "enum": ["all", "nonMana"]
+            },
+            "player": {
+              "type": "string",
+              "enum": ["you", "opponent", "any"]
+            },
+            "size": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "string",
+                  "const": "unlimited"
+                }
+              ]
+            },
+            "count": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "combat": {
+              "type": "boolean"
+            },
+            "noncombat": {
+              "type": "boolean"
+            }
+          },
+          "required": ["type"],
+          "additionalProperties": false
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "effects": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/__schema3"
+                }
+              }
+            },
+            "required": ["label", "effects"],
+            "additionalProperties": false
+          }
+        },
+        "newTargets": {
+          "type": "boolean"
+        },
+        "value": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "newTarget": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hand": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["op"],
+      "additionalProperties": false
+    },
+    "__schema4": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "compare": {
+              "$ref": "#/$defs/__schema0"
+            },
+            "op": {
+              "type": "string",
+              "enum": ["<", "<=", "=", ">=", ">", "!="]
+            },
+            "to": {
+              "$ref": "#/$defs/__schema0"
+            }
+          },
+          "required": ["compare", "op", "to"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "controls": {
+              "$ref": "#/$defs/__schema1"
+            },
+            "player": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": ["controls"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "exists": {
+              "$ref": "#/$defs/__schema1"
+            },
+            "zone": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "library",
+                    "hand",
+                    "battlefield",
+                    "graveyard",
+                    "exile",
+                    "stack",
+                    "command"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "const": "any"
+                }
+              ]
+            },
+            "count": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": ["exists"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "isYourTurn": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": ["isYourTurn"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "isTapped": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["isTapped"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "isAttacking": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["isAttacking"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "hasKeyword": {
+              "type": "string",
+              "minLength": 1
+            },
+            "keyword": {
+              "type": "string",
+              "enum": [
+                "flying",
+                "first strike",
+                "double strike",
+                "deathtouch",
+                "haste",
+                "hexproof",
+                "indestructible",
+                "lifelink",
+                "menace",
+                "reach",
+                "trample",
+                "vigilance",
+                "defender",
+                "flash",
+                "shroud",
+                "split second",
+                "cant be countered"
+              ]
+            }
+          },
+          "required": ["hasKeyword", "keyword"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "matches": {
+              "type": "string",
+              "minLength": 1
+            },
+            "filter": {
+              "$ref": "#/$defs/__schema1"
+            }
+          },
+          "required": ["matches", "filter"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "onBattlefield": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["onBattlefield"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "inZone": {
+              "type": "string",
+              "minLength": 1
+            },
+            "zone": {
+              "type": "string",
+              "enum": ["library", "hand", "battlefield", "graveyard", "exile", "stack", "command"]
+            }
+          },
+          "required": ["inZone", "zone"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "landsPlayedThisTurn": {
+              "type": "object",
+              "properties": {
+                "op": {
+                  "type": "string",
+                  "enum": ["<", ">=", "="]
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["op", "count"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["landsPlayedThisTurn"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "step": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": ["step"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "not": {
+              "$ref": "#/$defs/__schema4"
+            }
+          },
+          "required": ["not"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "and": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema4"
+              }
+            }
+          },
+          "required": ["and"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "or": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema4"
+              }
+            }
+          },
+          "required": ["or"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "lifeGainedThisTurn": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["lifeGainedThisTurn"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "spellsCastThisTurn": {
+              "type": "object",
+              "properties": {
+                "player": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [">=", "<"]
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["op", "count"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["spellsCastThisTurn"],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

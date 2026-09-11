@@ -1,0 +1,9 @@
+oracleId: fixture:thran-dynamo
+name: "Thran Dynamo"
+text: "{T}: Add {C}{C}{C}."
+manaCost: '{4}'
+types: [artifact]
+abilities:
+
+  - { kind: mana, covers: [0], cost: { tap: true }, produces: '{C}{C}{C}' }
+

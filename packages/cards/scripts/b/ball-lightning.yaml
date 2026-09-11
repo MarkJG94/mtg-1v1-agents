@@ -1,0 +1,17 @@
+oracleId: fixture:ball-lightning
+name: "Ball Lightning"
+text: "Trample\nHaste\nAt the beginning of the end step, sacrifice Ball Lightning."
+manaCost: '{R}{R}{R}'
+types: [creature]
+subtypes: [Elemental]
+power: 6
+toughness: 1
+abilities:
+  - { kind: keyword, keyword: trample, covers: [0] }
+  - { kind: keyword, keyword: haste, covers: [1] }
+  - { kind: triggered, covers: [2], trigger: { on: endStep, who: any }, effects: [{ op: sacrifice, target: '~' }] }
+tests:
+  - name: hits for 6 and dies at end of turn
+    setup: { A: { hand: ['~'], battlefield: [Mountain, Mountain, Mountain] } }
+    actions: [{ cast: '~' }, resolveAll, { attack: ['~'] }, finishCombat, { toStep: end }, resolveAll]
+    expect: { B.life: 14, '~.zone': graveyard }

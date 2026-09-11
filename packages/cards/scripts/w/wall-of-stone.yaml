@@ -1,0 +1,10 @@
+oracleId: fixture:wall-of-stone
+name: "Wall of Stone"
+text: "Defender"
+manaCost: '{1}{R}{R}'
+types: [creature]
+subtypes: [Wall]
+power: 0
+toughness: 8
+abilities:
+  - { kind: keyword, keyword: defender, covers: [0] }

@@ -1,0 +1,20 @@
+oracleId: fixture:rampaging-baloths
+name: "Rampaging Baloths"
+text: "Trample\nLandfall \u2014 Whenever a land enters the battlefield under your control, you may create a 4/4 green Beast creature token."
+manaCost: '{4}{G}{G}'
+types: [creature]
+subtypes: [Beast]
+power: 6
+toughness: 6
+abilities:
+  - { kind: keyword, keyword: trample, covers: [0] }
+  - kind: triggered
+    covers: [1]
+    trigger: { on: landfall }
+    optional: true
+    effects: [{ op: createToken, token: { name: Beast, types: [creature], subtypes: [Beast], colors: [G], power: 4, toughness: 4 } }]
+tests:
+  - name: landfall makes a Beast
+    setup: { A: { battlefield: ['~'], hand: [Forest] } }
+    actions: [{ playLand: Forest }, passBoth, { answer: { kind: yesNo, yes: true } }]
+    expect: { A.battlefield: [Beast] }

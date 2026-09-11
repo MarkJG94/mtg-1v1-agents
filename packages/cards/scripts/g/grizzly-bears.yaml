@@ -1,0 +1,14 @@
+oracleId: fixture:grizzly-bears
+name: "Grizzly Bears"
+text: ""
+manaCost: '{1}{G}'
+types: [creature]
+subtypes: [Bear]
+power: 2
+toughness: 2
+abilities: []
+tests:
+  - name: cast and attack
+    setup: { A: { hand: ['~'], battlefield: [Forest, Forest] } }
+    actions: [{ cast: '~' }, resolveAll, nextTurn, nextTurn, { attack: ['~'] }, finishCombat]
+    expect: { B.life: 18 }

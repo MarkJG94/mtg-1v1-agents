@@ -1,0 +1,16 @@
+oracleId: fixture:serra-angel
+name: "Serra Angel"
+text: "Flying, vigilance"
+manaCost: '{3}{W}{W}'
+types: [creature]
+subtypes: [Angel]
+power: 4
+toughness: 4
+abilities:
+  - { kind: keyword, keyword: flying, covers: [0] }
+  - { kind: keyword, keyword: vigilance, covers: [0] }
+tests:
+  - name: does not tap to attack
+    setup: { A: { battlefield: ['~'] } }
+    actions: [{ attack: ['~'] }, finishCombat]
+    expect: { B.life: 16, '~.tapped': false }

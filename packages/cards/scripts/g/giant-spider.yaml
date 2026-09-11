@@ -1,0 +1,10 @@
+oracleId: fixture:giant-spider
+name: "Giant Spider"
+text: "Reach"
+manaCost: '{3}{G}'
+types: [creature]
+subtypes: [Spider]
+power: 2
+toughness: 4
+abilities:
+  - { kind: keyword, keyword: reach, covers: [0] }

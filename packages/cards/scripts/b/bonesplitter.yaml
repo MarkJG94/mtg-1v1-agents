@@ -1,0 +1,21 @@
+oracleId: fixture:bonesplitter
+name: "Bonesplitter"
+text: "Equipped creature gets +2/+0.\nEquip {1}"
+manaCost: '{1}'
+types: [artifact]
+subtypes: [Equipment]
+abilities:
+
+  - { kind: static, covers: [0], effect: { type: pt, affects: attached, power: 2, toughness: 0 } }
+  - kind: activated
+    covers: [1]
+    cost: { mana: '{1}' }
+    timing: sorcery
+    targets: [{ id: c, filter: { type: creature, controller: you } }]
+    effects: [{ op: attach, target: '~', to: $c }]
+
+tests:
+  - name: equip
+    setup: { A: { battlefield: ['~', Grizzly Bears, Plains] } }
+    actions: [{ activate: '~', ability: 1, target: Grizzly Bears }, resolveAll]
+    expect: { Grizzly Bears.power: 4 }

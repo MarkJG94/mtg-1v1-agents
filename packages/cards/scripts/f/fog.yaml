@@ -1,0 +1,19 @@
+oracleId: fixture:fog
+name: "Fog"
+text: "Prevent all combat damage that would be dealt this turn."
+manaCost: '{G}'
+types: [instant]
+abilities:
+
+  - kind: spell
+    covers: [0]
+    effects:
+      - { op: createEffect, effect: { type: preventDamage, affects: { anyPermanent: true }, amount: all, combat: true }, duration: untilEndOfTurn }
+      - { op: createEffect, effect: { type: preventDamage, affects: you, amount: all, combat: true }, duration: untilEndOfTurn }
+      - { op: forEachPlayer, as: p, effects: [{ op: createEffect, effect: { type: preventDamage, affects: you, amount: all, combat: true }, duration: untilEndOfTurn }] }
+
+tests:
+  - name: no combat damage
+    setup: { A: { battlefield: [Hill Giant] }, B: { hand: ['~'], battlefield: [Forest] } }
+    actions: [{ attack: [Hill Giant] }, pass, { cast: '~' }, resolveAll, finishCombat]
+    expect: { B.life: 20 }

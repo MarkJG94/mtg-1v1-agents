@@ -1,0 +1,15 @@
+oracleId: fixture:llanowar-elves
+name: "Llanowar Elves"
+text: "{T}: Add {G}."
+manaCost: '{G}'
+types: [creature]
+subtypes: [Elf, Druid]
+power: 1
+toughness: 1
+abilities:
+  - { kind: mana, covers: [0], cost: { tap: true }, produces: '{G}' }
+tests:
+  - name: taps for mana once unsick
+    setup: { A: { battlefield: ['~', Forest], hand: [Grizzly Bears] } }
+    actions: [{ cast: Grizzly Bears }, resolveAll]
+    expect: { A.battlefield: [Grizzly Bears], '~.tapped': true }

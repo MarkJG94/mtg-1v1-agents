@@ -1,0 +1,12 @@
+oracleId: fixture:urborg-tomb-of-yawgmoth
+name: "Urborg, Tomb of Yawgmoth"
+text: "Each land is a Swamp in addition to its other land types."
+types: [land]
+supertypes: [legendary]
+abilities:
+  - { kind: static, covers: [0], effect: { type: addType, affects: { type: land }, subtypes: [Swamp] } }
+tests:
+  - name: every land is a Swamp
+    setup: { A: { battlefield: ['~', Forest] } }
+    actions: []
+    expect: { Forest.subtypes: [Forest, Swamp], '~.subtypes': [Swamp] }

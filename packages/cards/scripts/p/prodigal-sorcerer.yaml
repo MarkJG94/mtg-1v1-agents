@@ -1,0 +1,15 @@
+oracleId: fixture:prodigal-sorcerer
+name: "Prodigal Sorcerer"
+text: "{T}: Prodigal Sorcerer deals 1 damage to any target."
+manaCost: '{2}{U}'
+types: [creature]
+subtypes: [Human, Wizard]
+power: 1
+toughness: 1
+abilities:
+  - { kind: activated, covers: [0], cost: { tap: true }, targets: [{ id: t, filter: { any: true } }], effects: [{ op: damage, amount: 1, to: $t }] }
+tests:
+  - name: pings a player
+    setup: { A: { battlefield: ['~'] } }
+    actions: [{ activate: '~', target: B }, resolveAll]
+    expect: { B.life: 19 }

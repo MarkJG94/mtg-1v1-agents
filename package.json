@@ -1,0 +1,37 @@
+{
+  "name": "mtg-1v1-agents",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "typecheck": "pnpm -r --parallel typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "fuzz": "vitest run --project engine fuzz",
+    "bench": "pnpm --filter @mtg/engine bench",
+    "build": "pnpm -r build",
+    "fetch:scryfall": "node --import tsx scripts/fetch-scryfall.ts",
+    "scryfall:subset": "node --import tsx scripts/scryfall-subset.ts",
+    "cards:schema": "pnpm --filter @mtg/cards schema",
+    "cards:coverage": "node --import tsx scripts/cards-coverage.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.13",
+    "@types/node": "^22.20.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11",
+    "tsx": "^4.20.0",
+    "@mtg/cards": "workspace:*"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "@biomejs/biome"
+    ]
+  }
+}

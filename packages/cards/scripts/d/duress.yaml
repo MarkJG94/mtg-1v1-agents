@@ -1,0 +1,19 @@
+oracleId: fixture:duress
+name: "Duress"
+text: "Target opponent reveals their hand. You choose a noncreature, nonland card from it. That player discards that card."
+manaCost: '{B}'
+types: [sorcery]
+abilities:
+
+  - kind: spell
+    covers: [0, 1, 2]
+    targets: [{ id: p, filter: { player: opponent } }]
+    effects:
+      - { op: reveal, hand: $p }
+      - { op: discard, count: 1, player: $p, filter: { notType: [creature, land] }, chooser: controller }
+
+tests:
+  - name: takes a spell, not a creature
+    setup: { A: { hand: ['~'], battlefield: [Swamp] }, B: { hand: [Grizzly Bears, Shock] } }
+    actions: [{ cast: '~', target: B }, resolveAll]
+    expect: { B.graveyard: [Shock], B.hand: [Grizzly Bears] }

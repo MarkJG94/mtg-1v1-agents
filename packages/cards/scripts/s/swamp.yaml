@@ -1,0 +1,7 @@
+oracleId: fixture:swamp
+name: "Swamp"
+text: "({T}: Add {B}.)"
+types: [land]
+supertypes: [basic]
+subtypes: [Swamp]
+abilities: []

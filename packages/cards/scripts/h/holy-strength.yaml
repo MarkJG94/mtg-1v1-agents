@@ -1,0 +1,16 @@
+oracleId: fixture:holy-strength
+name: "Holy Strength"
+text: "Enchant creature\nEnchanted creature gets +1/+2."
+manaCost: '{W}'
+types: [enchantment]
+subtypes: [Aura]
+abilities:
+
+  - { kind: spell, covers: [0], targets: [{ id: e, filter: { type: creature } }], effects: [] }
+  - { kind: static, covers: [1], effect: { type: pt, affects: attached, power: 1, toughness: 2 } }
+
+tests:
+  - name: buffs the enchanted creature
+    setup: { A: { hand: ['~'], battlefield: [Plains, Grizzly Bears] } }
+    actions: [{ cast: '~', target: Grizzly Bears }, resolveAll]
+    expect: { Grizzly Bears.power: 3, Grizzly Bears.toughness: 4 }

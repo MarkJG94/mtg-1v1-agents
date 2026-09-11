@@ -1,0 +1,21 @@
+oracleId: fixture:nissa-voice-of-zendikar
+name: "Nissa, Voice of Zendikar"
+text: "+1: Create a 0/1 green Plant creature token.\n\u22122: Put a +1/+1 counter on each creature you control.\n\u22127: You gain X life and draw X cards, where X is the number of lands you control."
+manaCost: '{1}{G}{G}'
+types: [planeswalker]
+supertypes: [legendary]
+subtypes: [Nissa]
+loyalty: 3
+abilities:
+  - { kind: loyalty, covers: [0], cost: 1, effects: [{ op: createToken, token: { name: Plant, types: [creature], subtypes: [Plant], colors: [G], power: 0, toughness: 1 } }] }
+  - { kind: loyalty, covers: [1], cost: -2, effects: [{ op: forEach, filter: { type: creature, controller: you }, as: c, effects: [{ op: addCounters, target: c, counter: '+1/+1', count: 1 }] }] }
+  - { kind: loyalty, covers: [2], cost: -7, effects: [{ op: gainLife, amount: { lands: controller } }, { op: draw, count: { lands: controller } }] }
+tests:
+  - name: plant token
+    setup: { A: { battlefield: ['~'] } }
+    actions: [{ activate: '~', ability: 0 }, resolveAll]
+    expect: { A.battlefield: [Plant], '~.counters.loyalty': 4 }
+  - name: counters on the team
+    setup: { A: { battlefield: ['~', Grizzly Bears, Goblin Piker] } }
+    actions: [{ activate: '~', ability: 1 }, resolveAll]
+    expect: { Grizzly Bears.power: 3, Goblin Piker.power: 3 }

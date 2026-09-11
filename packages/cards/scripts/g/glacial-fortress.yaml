@@ -1,0 +1,19 @@
+oracleId: fixture:glacial-fortress
+name: "Glacial Fortress"
+text: "Glacial Fortress enters tapped unless you control a Plains or an Island.\n{T}: Add {W} or {U}."
+types: [land]
+abilities:
+  - kind: replacement
+    covers: [0]
+    replaces: { event: etb, filter: self, tapped: true }
+    condition: { not: { controls: { type: land, subtype: [Plains, Island] } } }
+  - { kind: mana, covers: [1], cost: { tap: true }, choice: ['{W}', '{U}'] }
+tests:
+  - name: untapped with a Plains
+    setup: { A: { hand: ['~'], battlefield: [Plains] } }
+    actions: [{ playLand: '~' }]
+    expect: { '~.tapped': false }
+  - name: tapped without one
+    setup: { A: { hand: ['~'], battlefield: [Forest] } }
+    actions: [{ playLand: '~' }]
+    expect: { '~.tapped': true }

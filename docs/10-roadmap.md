@@ -6,45 +6,51 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done.
 
 ## Phase 0 — Repository and scaffolding (≈ 2 sessions)
 
-- [ ] 0.1 `git init` in the project folder; create the GitHub repo `mtg-1v1-agents`; push; branch protection on `main`.
-- [ ] 0.2 pnpm monorepo: `packages/{shared,engine,cards,agents,sim}`, `apps/{server,web}`, shared tsconfig, Biome, Vitest, tsup, Vite.
-- [ ] 0.3 GitHub Actions `ci.yml` (lint, typecheck, test, build) green on an empty tree.
-- [ ] 0.4 `scripts/fetch-scryfall.ts`: download the `oracle-cards` bulk file to `data/scryfall/`, build the `cards` projection, print counts.
+- [x] 0.1 `git init` in the project folder; create the GitHub repo `mtg-1v1-agents`; push; branch protection on `main`.
+- [~] 0.2 pnpm monorepo: `packages/{shared,engine,cards}` exist with shared tsconfig, Biome, Vitest; `cards`, `agents`, `sim`, `apps/*`, tsup and Vite are added when their phases start.
+- [x] 0.3 GitHub Actions `ci.yml` (lint, typecheck, test, build, bench).
+- [x] 0.4 `scripts/fetch-scryfall.ts`: download the `oracle-cards` bulk file to `data/scryfall/`, load it into `CardDatabase`, print counts (the SQLite projection comes with Phase 5).
 - [ ] 0.5 Dockerfile + docker-compose with a `data` volume; `pnpm dev` runs server + web with HMR.
 
 ## Phase 1 — Engine core (≈ 10–14 sessions)
 
-- [ ] 1.1 State model, object ids, zones, seeded RNG, structural-sharing update helper, event emitter.
-- [ ] 1.2 Turn structure with all steps; untap/draw/cleanup; land drops; turn cap.
-- [ ] 1.3 Mana: pool, costs (incl. hybrid/phyrexian/X), payment solver, mana abilities of basic and simple nonbasic lands.
-- [ ] 1.4 Priority, stack, casting/activating, resolution, countering, fizzling, split second.
-- [ ] 1.5 Targeting and legality (`legalActions`), hexproof/shroud/protection/ward.
-- [ ] 1.6 Combat with all evergreen keywords, damage assignment, first-strike step.
-- [ ] 1.7 State-based actions, legend rule, counters, tokens.
-- [ ] 1.8 Triggered abilities (APNAP, intervening-if, LKI, delayed), static abilities.
-- [ ] 1.9 Continuous effects and the layer system with timestamps and dependency.
-- [ ] 1.10 Replacement and prevention effects.
-- [ ] 1.11 Planeswalkers.
-- [ ] 1.12 London mulligan; game end conditions; loop detection.
-- [ ] 1.13 Scenario builder for tests; unit suites for 1.2–1.12; invariant fuzzer with the `random` agent.
-- [ ] 1.14 Benchmarks; target ≤ 5 ms/game with the random agent.
+Status: implemented in `packages/engine` with 118 tests (subsystem suites per CR section, seeded random-game fuzzing with invariants, determinism/replay). Known gaps and simplifications are recorded in `docs/adr/0001-engine-core-simplifications.md`.
+
+- [x] 1.1 State model, object ids, zones, seeded RNG, structural-sharing update helper, event emitter.
+- [x] 1.2 Turn structure with all steps; untap/draw/cleanup; land drops; turn cap.
+- [x] 1.3 Mana: pool, costs (incl. hybrid/phyrexian/X), payment solver, mana abilities of basic and simple nonbasic lands.
+- [x] 1.4 Priority, stack, casting/activating, resolution, countering, fizzling, split second.
+- [x] 1.5 Targeting and legality (`legalActions`), hexproof/shroud/protection/ward.
+- [x] 1.6 Combat with all evergreen keywords, damage assignment, first-strike step.
+- [x] 1.7 State-based actions, legend rule, counters, tokens.
+- [x] 1.8 Triggered abilities (APNAP, intervening-if, LKI, delayed), static abilities.
+- [x] 1.9 Continuous effects and the layer system with timestamps and dependency.
+- [x] 1.10 Replacement and prevention effects.
+- [x] 1.11 Planeswalkers.
+- [x] 1.12 London mulligan; game end conditions; loop detection.
+- [x] 1.13 Scenario builder for tests; unit suites for 1.2–1.12; invariant fuzzer with the `random` agent.
+- [~] 1.14 Benchmarks (`pnpm bench`); currently ≈ 32 ms/game median with the random agent (≈ 870 decisions, 34 turns per game; ≈ 37 µs per decision). Target ≤ 5 ms/game not yet met; see ADR 0001 for the profile and next steps.
 
 ## Phase 2 — Cards: schema, bootstrap set, resolver (≈ 5–7 sessions)
 
-- [ ] 2.1 Card-script zod schema + JSON Schema export; loader that turns a script into an engine `CardDefinition`; effect-op registry in the engine (first ~40 ops).
-- [ ] 2.2 Validator: schema, characteristic agreement with Scryfall, text coverage, executability smoke.
-- [ ] 2.3 Bootstrap hand scripts (~80 cards): basics, shocks/duals/fetches/checklands, one or two cards per effect op and per keyword, a few planeswalkers, a few layer-system cards (Blood Moon, Glorious Anthem, Humility) — chosen to exercise the engine, not to make a deck.
-- [ ] 2.4 `ScriptResolver` (hand → cached auto → auto-scripter → validate) with the `card_scripts` cache and `unsupported_requests` logging.
-- [ ] 2.5 Scenario tests per bootstrap card; differential test harness.
+Status: implemented in `packages/cards` (98 hand scripts, all `supported`; 186 tests). The Scryfall subset used by the tests is a hand-maintained fixture with placeholder oracle ids until `pnpm scryfall:subset` rewrites them from the real bulk file (the sandbox that built this phase had no access to api.scryfall.com). See ADR 0002.
+
+- [x] 2.1 Card-script zod schema + JSON Schema export (`pnpm cards:schema`); loader that turns a script into an engine `CardDefinition`; effect-op registry in the engine (`EFFECT_OPS`, 53 ops).
+- [x] 2.2 Validator: schema, characteristic agreement with Scryfall, text coverage, executability smoke (four synthetic boards × three seeds).
+- [x] 2.3 Bootstrap hand scripts (98 cards): basics, shocks/duals/fetches/checklands/fastlands/painlands, one or two cards per effect op and per keyword, two planeswalkers, layer-system cards (Blood Moon, Urborg, Glorious Anthem, Humility, Opalescence).
+- [x] 2.4 `ScriptResolver` (hand → cached auto → auto-scripter → validate) with `ScriptCache`/`UnsupportedLog` interfaces (in-memory now, SQLite in Phase 5); `scripts/fetch-scryfall.ts` (0.4) and `scripts/scryfall-subset.ts`.
+- [x] 2.5 Scenario tests per bootstrap card in the YAML `tests:` section; differential test harness (`differentialTest`).
 
 ## Phase 3 — Auto-scripter v1 (≈ 8–12 sessions, then continuous)
 
-- [ ] 3.1 Normaliser (name → `~`, reminder text, sentence split, keyword lines, Scryfall keyword cross-check).
-- [ ] 3.2 Sentence classifier (keyword / activated / triggered / static / spell / loyalty / unknown).
-- [ ] 3.3 PEG grammar v1: costs, targets, quantities, durations, conditions, common effect verbs; anaphora resolution.
-- [ ] 3.4 Emitter + golden corpus (≈ 300 cards spanning the common templates).
-- [ ] 3.5 `pnpm cards:coverage` full-Scryfall report with top failing patterns; nightly workflow.
-- [ ] 3.6 Coverage push to ≥ 25% of Scryfall `supported` (vanilla/French-vanilla creatures, burn, pump, simple removal, cantrips, counters, ETB/dies triggers, simple anthems, basic mana rocks/dorks).
+Status: implemented in `packages/cards/src/auto` (85 new tests). The grammar alone reaches 35 of the 37 golden-corpus cards and 87 of the 98 hand-scripted bootstrap cards. Deviations from these docs — a hand-written scanner instead of a `peggy` PEG, and how anaphora and failures are handled — are in `docs/adr/0003-auto-scripter-phase-3.md`.
+
+- [x] 3.1 Normaliser (name → `~`, reminder text, sentence split, keyword lines, Scryfall keyword cross-check).
+- [x] 3.2 Sentence classifier (keyword / enchant / equip / additional cost / activated / triggered / static / spell / loyalty).
+- [x] 3.3 Grammar v1: costs, targets, quantities, durations, conditions, common effect verbs; anaphora resolution. A token scanner with explicit backtracking, not a PEG (ADR 0003).
+- [x] 3.4 Emitter + golden corpus (`packages/cards/test/fixtures/auto-corpus.json`, one card per template, validated end to end including the smoke games; the 98 bootstrap cards are a second, harder corpus).
+- [x] 3.5 `pnpm cards:coverage` full-Scryfall report with top failing patterns; nightly `cards-coverage` workflow.
+- [~] 3.6 Coverage push to ≥ 25% of Scryfall `supported`. Measured against the real base pool (30 816 cards): parser version 1 **12.8%**, version 2 **17.8%**. Version 3 adds the trigger-qualifier, cast-trigger and template fixes the second report ranked, and repairs a classifier regression it caught; see the two addenda in ADR 0003. Re-run `pnpm cards:coverage` for the next figure.
 
 ## Phase 4 — Agents (≈ 6–8 sessions)
 

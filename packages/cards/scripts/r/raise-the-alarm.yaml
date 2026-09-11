@@ -1,0 +1,14 @@
+oracleId: fixture:raise-the-alarm
+name: "Raise the Alarm"
+text: "Create two 1/1 white Soldier creature tokens."
+manaCost: '{1}{W}'
+types: [instant]
+abilities:
+
+  - { kind: spell, covers: [0], effects: [{ op: createToken, token: { name: Soldier, types: [creature], subtypes: [Soldier], colors: [W], power: 1, toughness: 1 }, count: 2 }] }
+
+tests:
+  - name: two soldiers
+    setup: { A: { hand: ['~'], battlefield: [Plains, Plains] } }
+    actions: [{ cast: '~' }, resolveAll]
+    expect: { A.battlefield: [Soldier, Soldier] }

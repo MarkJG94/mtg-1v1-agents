@@ -1,0 +1,14 @@
+oracleId: fixture:giant-growth
+name: "Giant Growth"
+text: "Target creature gets +3/+3 until end of turn."
+manaCost: '{G}'
+types: [instant]
+abilities:
+
+  - { kind: spell, covers: [0], targets: [{ id: t, filter: { type: creature } }], effects: [{ op: pump, target: $t, power: 3, toughness: 3 }] }
+
+tests:
+  - name: pumps until end of turn
+    setup: { A: { hand: ['~'], battlefield: [Forest, Grizzly Bears] } }
+    actions: [{ cast: '~', target: Grizzly Bears }, resolveAll]
+    expect: { Grizzly Bears.power: 5 }

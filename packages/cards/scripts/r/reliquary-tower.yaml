@@ -1,0 +1,7 @@
+oracleId: fixture:reliquary-tower
+name: "Reliquary Tower"
+text: "You have no maximum hand size.\n{T}: Add {C}."
+types: [land]
+abilities:
+  - { kind: static, covers: [0], effect: { type: maxHandSize, player: you, size: unlimited } }
+  - { kind: mana, covers: [1], cost: { tap: true }, produces: '{C}' }

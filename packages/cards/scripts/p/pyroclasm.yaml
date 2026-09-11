@@ -1,0 +1,14 @@
+oracleId: fixture:pyroclasm
+name: "Pyroclasm"
+text: "Pyroclasm deals 2 damage to each creature."
+manaCost: '{1}{R}'
+types: [sorcery]
+abilities:
+
+  - { kind: spell, covers: [0], effects: [{ op: damageEach, filter: { type: creature }, amount: 2 }] }
+
+tests:
+  - name: sweeps small creatures
+    setup: { A: { hand: ['~'], battlefield: [Mountain, Mountain, Hill Giant] }, B: { battlefield: [Grizzly Bears] } }
+    actions: [{ cast: '~' }, resolveAll]
+    expect: { B.graveyard: [Grizzly Bears], Hill Giant.zone: battlefield, Hill Giant.damage: 2 }

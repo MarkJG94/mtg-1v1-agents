@@ -1,0 +1,15 @@
+oracleId: fixture:city-of-brass
+name: "City of Brass"
+text: "Whenever City of Brass becomes tapped, it deals 1 damage to you.\n{T}: Add one mana of any color."
+types: [land]
+abilities:
+  - kind: triggered
+    covers: [0]
+    trigger: { on: tapped, filter: self }
+    effects: [{ op: damage, amount: 1, to: controller }]
+  - { kind: mana, covers: [1], cost: { tap: true }, anyColor: true }
+tests:
+  - name: pings you when tapped
+    setup: { A: { battlefield: ['~'], hand: [Grizzly Bears, Forest] } }
+    actions: [{ playLand: Forest }, { cast: Grizzly Bears }, resolveAll]
+    expect: { A.life: 19, A.battlefield: [Grizzly Bears] }

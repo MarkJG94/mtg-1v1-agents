@@ -1,0 +1,15 @@
+oracleId: fixture:boros-swiftblade
+name: "Boros Swiftblade"
+text: "Double strike"
+manaCost: '{R}{W}'
+types: [creature]
+subtypes: [Human, Soldier]
+power: 1
+toughness: 2
+abilities:
+  - { kind: keyword, keyword: double strike, covers: [0] }
+tests:
+  - name: hits twice
+    setup: { A: { battlefield: ['~'] } }
+    actions: [{ attack: ['~'] }, finishCombat]
+    expect: { B.life: 18 }

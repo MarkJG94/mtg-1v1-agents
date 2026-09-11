@@ -1,0 +1,699 @@
+[
+  {
+    "oracle_id": "corpus:runeclaw-bear",
+    "id": "print:runeclaw-bear",
+    "name": "Runeclaw Bear",
+    "cmc": 0,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Creature \u2014 Bear",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{1}{G}",
+    "power": "2",
+    "toughness": "2"
+  },
+  {
+    "oracle_id": "corpus:air-elemental",
+    "id": "print:air-elemental",
+    "name": "Air Elemental",
+    "cmc": 0,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Creature \u2014 Elemental",
+    "keywords": ["Flying"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{3}{U}{U}",
+    "oracle_text": "Flying",
+    "power": "4",
+    "toughness": "4"
+  },
+  {
+    "oracle_id": "corpus:colossal-dreadmaw",
+    "id": "print:colossal-dreadmaw",
+    "name": "Colossal Dreadmaw",
+    "cmc": 0,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Creature \u2014 Dinosaur",
+    "keywords": ["Trample"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{4}{G}{G}",
+    "oracle_text": "Trample",
+    "power": "6",
+    "toughness": "6"
+  },
+  {
+    "oracle_id": "corpus:ornithopter",
+    "id": "print:ornithopter",
+    "name": "Ornithopter",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Artifact Creature \u2014 Thopter",
+    "keywords": ["Flying"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{0}",
+    "oracle_text": "Flying",
+    "power": "0",
+    "toughness": "2"
+  },
+  {
+    "oracle_id": "corpus:mahamoti-djinn",
+    "id": "print:mahamoti-djinn",
+    "name": "Mahamoti Djinn",
+    "cmc": 0,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Creature \u2014 Djinn",
+    "keywords": ["Flying"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{4}{U}{U}",
+    "oracle_text": "Flying",
+    "power": "5",
+    "toughness": "6"
+  },
+  {
+    "oracle_id": "corpus:wall-of-swords",
+    "id": "print:wall-of-swords",
+    "name": "Wall of Swords",
+    "cmc": 0,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Creature \u2014 Wall",
+    "keywords": ["Defender", "Flying"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{3}{W}",
+    "oracle_text": "Defender\nFlying",
+    "power": "3",
+    "toughness": "5"
+  },
+  {
+    "oracle_id": "corpus:lightning-strike",
+    "id": "print:lightning-strike",
+    "name": "Lightning Strike",
+    "cmc": 0,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Instant",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{1}{R}",
+    "oracle_text": "Lightning Strike deals 3 damage to any target."
+  },
+  {
+    "oracle_id": "corpus:murder",
+    "id": "print:murder",
+    "name": "Murder",
+    "cmc": 0,
+    "colors": ["B"],
+    "color_identity": ["B"],
+    "type_line": "Instant",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{1}{B}{B}",
+    "oracle_text": "Destroy target creature."
+  },
+  {
+    "oracle_id": "corpus:shatter",
+    "id": "print:shatter",
+    "name": "Shatter",
+    "cmc": 0,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Instant",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{1}{R}",
+    "oracle_text": "Destroy target artifact."
+  },
+  {
+    "oracle_id": "corpus:disenchant",
+    "id": "print:disenchant",
+    "name": "Disenchant",
+    "cmc": 0,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Instant",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{1}{W}",
+    "oracle_text": "Destroy target artifact or enchantment."
+  },
+  {
+    "oracle_id": "corpus:cancel",
+    "id": "print:cancel",
+    "name": "Cancel",
+    "cmc": 0,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Instant",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{1}{U}{U}",
+    "oracle_text": "Counter target spell."
+  },
+  {
+    "oracle_id": "corpus:concentrate",
+    "id": "print:concentrate",
+    "name": "Concentrate",
+    "cmc": 0,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Sorcery",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{2}{U}{U}",
+    "oracle_text": "Draw three cards."
+  },
+  {
+    "oracle_id": "corpus:angel-s-mercy",
+    "id": "print:angel-s-mercy",
+    "name": "Angel's Mercy",
+    "cmc": 0,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Instant",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{2}{W}{W}",
+    "oracle_text": "You gain 7 life."
+  },
+  {
+    "oracle_id": "corpus:titanic-growth",
+    "id": "print:titanic-growth",
+    "name": "Titanic Growth",
+    "cmc": 0,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Instant",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{2}{G}",
+    "oracle_text": "Target creature gets +4/+4 until end of turn."
+  },
+  {
+    "oracle_id": "corpus:sorin-s-thirst",
+    "id": "print:sorin-s-thirst",
+    "name": "Sorin's Thirst",
+    "cmc": 0,
+    "colors": ["B"],
+    "color_identity": ["B"],
+    "type_line": "Instant",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{B}{B}",
+    "oracle_text": "Sorin's Thirst deals 2 damage to target creature and you gain 2 life."
+  },
+  {
+    "oracle_id": "corpus:elvish-mystic",
+    "id": "print:elvish-mystic",
+    "name": "Elvish Mystic",
+    "cmc": 0,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Creature \u2014 Elf Druid",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{G}",
+    "oracle_text": "{T}: Add {G}.",
+    "power": "1",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "corpus:prodigal-pyromancer",
+    "id": "print:prodigal-pyromancer",
+    "name": "Prodigal Pyromancer",
+    "cmc": 0,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Creature \u2014 Human Wizard",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{2}{R}",
+    "oracle_text": "{T}: Prodigal Pyromancer deals 1 damage to any target.",
+    "power": "1",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "corpus:angel-of-mercy",
+    "id": "print:angel-of-mercy",
+    "name": "Angel of Mercy",
+    "cmc": 0,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Creature \u2014 Angel",
+    "keywords": ["Flying"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{4}{W}",
+    "oracle_text": "Flying\nWhen Angel of Mercy enters, you gain 3 life.",
+    "power": "3",
+    "toughness": "3"
+  },
+  {
+    "oracle_id": "corpus:soul-warden",
+    "id": "print:soul-warden",
+    "name": "Soul Warden",
+    "cmc": 0,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Creature \u2014 Human Cleric",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{W}",
+    "oracle_text": "Whenever another creature enters, you gain 1 life.",
+    "power": "1",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "corpus:veteran-swordsmith",
+    "id": "print:veteran-swordsmith",
+    "name": "Veteran Swordsmith",
+    "cmc": 0,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Creature \u2014 Human Soldier",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{2}{W}",
+    "oracle_text": "Other Soldier creatures you control get +1/+0.",
+    "power": "2",
+    "toughness": "2"
+  },
+  {
+    "oracle_id": "corpus:shivan-dragon",
+    "id": "print:shivan-dragon",
+    "name": "Shivan Dragon",
+    "cmc": 0,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Creature \u2014 Dragon",
+    "keywords": ["Flying"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{4}{R}{R}",
+    "oracle_text": "Flying\n{R}: Shivan Dragon gets +1/+0 until end of turn.",
+    "power": "5",
+    "toughness": "5"
+  },
+  {
+    "oracle_id": "corpus:goblin-balloon-brigade",
+    "id": "print:goblin-balloon-brigade",
+    "name": "Goblin Balloon Brigade",
+    "cmc": 0,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Creature \u2014 Goblin Warrior",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{R}",
+    "oracle_text": "{R}: Goblin Balloon Brigade gains flying until end of turn.",
+    "power": "1",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "corpus:birds-of-paradise",
+    "id": "print:birds-of-paradise",
+    "name": "Birds of Paradise",
+    "cmc": 0,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Creature \u2014 Bird",
+    "keywords": ["Flying"],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{G}",
+    "oracle_text": "Flying\n{T}: Add one mana of any color.",
+    "power": "0",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "corpus:icy-manipulator",
+    "id": "print:icy-manipulator",
+    "name": "Icy Manipulator",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Artifact",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{4}",
+    "oracle_text": "{1}, {T}: Tap target artifact, creature, or land."
+  },
+  {
+    "oracle_id": "corpus:jayemdae-tome",
+    "id": "print:jayemdae-tome",
+    "name": "Jayemdae Tome",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Artifact",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{4}",
+    "oracle_text": "{4}, {T}: Draw a card."
+  },
+  {
+    "oracle_id": "corpus:mind-stone",
+    "id": "print:mind-stone",
+    "name": "Mind Stone",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Artifact",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{2}",
+    "oracle_text": "{T}: Add {C}.\n{1}, {T}, Sacrifice Mind Stone: Draw a card."
+  },
+  {
+    "oracle_id": "corpus:terramorphic-expanse",
+    "id": "print:terramorphic-expanse",
+    "name": "Terramorphic Expanse",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Land",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "oracle_text": "{T}, Sacrifice Terramorphic Expanse: Search your library for a basic land card, put it onto the battlefield tapped, then shuffle."
+  },
+  {
+    "oracle_id": "corpus:darksteel-citadel",
+    "id": "print:darksteel-citadel",
+    "name": "Darksteel Citadel",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Artifact Land",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "oracle_text": "Indestructible\n{T}: Add {C}."
+  },
+  {
+    "oracle_id": "corpus:trusty-machete",
+    "id": "print:trusty-machete",
+    "name": "Trusty Machete",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Artifact \u2014 Equipment",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{1}",
+    "oracle_text": "Equipped creature gets +2/+1.\nEquip {1}"
+  },
+  {
+    "oracle_id": "corpus:lightning-greaves",
+    "id": "print:lightning-greaves",
+    "name": "Lightning Greaves",
+    "cmc": 0,
+    "colors": [],
+    "color_identity": [],
+    "type_line": "Artifact \u2014 Equipment",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{1}",
+    "oracle_text": "Equipped creature has haste and shroud.\nEquip {0}"
+  },
+  {
+    "oracle_id": "corpus:weakness",
+    "id": "print:weakness",
+    "name": "Weakness",
+    "cmc": 0,
+    "colors": ["B"],
+    "color_identity": ["B"],
+    "type_line": "Enchantment \u2014 Aura",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{B}",
+    "oracle_text": "Enchant creature\nEnchanted creature gets -2/-1."
+  },
+  {
+    "oracle_id": "corpus:sleep-paralysis",
+    "id": "print:sleep-paralysis",
+    "name": "Sleep Paralysis",
+    "cmc": 0,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Enchantment \u2014 Aura",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{3}{U}",
+    "oracle_text": "Enchant creature\nEnchanted creature doesn't untap during its controller's untap step."
+  },
+  {
+    "oracle_id": "corpus:cleansing-nova",
+    "id": "print:cleansing-nova",
+    "name": "Cleansing Nova",
+    "cmc": 0,
+    "colors": ["W"],
+    "color_identity": ["W"],
+    "type_line": "Sorcery",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{3}{W}{W}",
+    "oracle_text": "Choose one \u2014\n\u2022 Destroy all creatures.\n\u2022 Destroy all artifacts and enchantments."
+  },
+  {
+    "oracle_id": "corpus:ancestral-recall",
+    "id": "print:ancestral-recall",
+    "name": "Ancestral Recall",
+    "cmc": 0,
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "type_line": "Instant",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{U}",
+    "oracle_text": "Target player draws three cards."
+  },
+  {
+    "oracle_id": "corpus:lhurgoyf",
+    "id": "print:lhurgoyf",
+    "name": "Lhurgoyf",
+    "cmc": 0,
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "type_line": "Creature \u2014 Lhurgoyf",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{3}{G}",
+    "oracle_text": "Lhurgoyf's power is equal to the number of creature cards in all graveyards and its toughness is equal to that number plus 1.",
+    "power": "*",
+    "toughness": "1+*"
+  },
+  {
+    "oracle_id": "corpus:dark-confidant",
+    "id": "print:dark-confidant",
+    "name": "Dark Confidant",
+    "cmc": 0,
+    "colors": ["B"],
+    "color_identity": ["B"],
+    "type_line": "Creature \u2014 Human Wizard",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{1}{B}",
+    "oracle_text": "At the beginning of your upkeep, reveal the top card of your library and put that card into your hand. You lose life equal to its mana value.",
+    "power": "2",
+    "toughness": "1"
+  },
+  {
+    "oracle_id": "corpus:kird-ape",
+    "id": "print:kird-ape",
+    "name": "Kird Ape",
+    "cmc": 0,
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "type_line": "Creature \u2014 Ape",
+    "keywords": [],
+    "layout": "normal",
+    "legalities": {
+      "vintage": "legal"
+    },
+    "set": "cor",
+    "rarity": "common",
+    "mana_cost": "{R}",
+    "oracle_text": "Kird Ape gets +1/+2 as long as you control a Forest.",
+    "power": "1",
+    "toughness": "1"
+  }
+]

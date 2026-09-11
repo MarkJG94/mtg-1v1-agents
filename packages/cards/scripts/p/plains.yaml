@@ -1,0 +1,7 @@
+oracleId: fixture:plains
+name: "Plains"
+text: "({T}: Add {W}.)"
+types: [land]
+supertypes: [basic]
+subtypes: [Plains]
+abilities: []

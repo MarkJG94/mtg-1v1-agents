@@ -1,0 +1,14 @@
+oracleId: fixture:hardened-scales
+name: "Hardened Scales"
+text: "If one or more +1/+1 counters would be put on a creature you control, that many plus one +1/+1 counters are put on it instead."
+manaCost: '{G}'
+types: [enchantment]
+abilities:
+
+  - { kind: replacement, covers: [0], replaces: { event: counterPlaced, filter: { type: creature, controller: you }, extra: 1 } }
+
+tests:
+  - name: one extra counter
+    setup: { A: { battlefield: ['~', Grizzly Bears, 'Nissa, Voice of Zendikar'] } }
+    actions: [{ activate: 'Nissa, Voice of Zendikar', ability: 1 }, resolveAll]
+    expect: { Grizzly Bears.counters.+1/+1: 2 }

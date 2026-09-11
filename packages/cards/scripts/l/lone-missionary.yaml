@@ -1,0 +1,15 @@
+oracleId: fixture:lone-missionary
+name: "Lone Missionary"
+text: "When Lone Missionary enters, you gain 4 life."
+manaCost: '{1}{W}'
+types: [creature]
+subtypes: [Kor, Monk]
+power: 2
+toughness: 1
+abilities:
+  - { kind: triggered, covers: [0], trigger: { on: etb }, effects: [{ op: gainLife, amount: 4 }] }
+tests:
+  - name: gains 4
+    setup: { A: { hand: ['~'], battlefield: [Plains, Plains] } }
+    actions: [{ cast: '~' }, resolveAll]
+    expect: { A.life: 24 }

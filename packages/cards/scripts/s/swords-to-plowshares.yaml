@@ -1,0 +1,17 @@
+oracleId: fixture:swords-to-plowshares
+name: "Swords to Plowshares"
+text: "Exile target creature. Its controller gains life equal to its power."
+manaCost: '{W}'
+types: [instant]
+abilities:
+
+  - kind: spell
+    covers: [0, 1]
+    targets: [{ id: t, filter: { type: creature } }]
+    effects: [{ op: bind, as: p, value: { power: $t } }, { op: exile, target: $t }, { op: gainLife, amount: { bound: p }, player: $t }]
+
+tests:
+  - name: exiles and gains life
+    setup: { A: { hand: ['~'], battlefield: [Plains] }, B: { battlefield: [Hill Giant] } }
+    actions: [{ cast: '~', target: Hill Giant }, resolveAll]
+    expect: { B.exile: [Hill Giant], B.life: 23 }
