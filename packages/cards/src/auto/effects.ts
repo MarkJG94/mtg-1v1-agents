@@ -1,4 +1,13 @@
-import type { Effect, Filter, PlayerRef, Quantity, Ref, TargetSpec, TokenDef } from '@mtg/engine';
+import type {
+  DurationDef,
+  Effect,
+  Filter,
+  PlayerRef,
+  Quantity,
+  Ref,
+  TargetSpec,
+  TokenDef,
+} from '@mtg/engine';
 import type { CardType, Color } from '@mtg/shared';
 import {
   eatKeyword,
@@ -432,8 +441,11 @@ const bounceClause: Clause = (s, b) => {
   if (!s.eat('return')) return null;
   const t = parseObjectRef(s, b);
   if (t === null) return null;
-  if (!s.eat("to its owner's hand") && !s.eat("to their owners' hands")) return null;
-  return [{ op: 'bounce', target: t }];
+  if (s.eat("to its owner's hand") || s.eat("to their owners' hands"))
+    return [{ op: 'bounce', target: t }];
+  // "Return target creature card from your graveyard to your hand" is a zone change, not a bounce.
+  if (s.eat('to your hand')) return [{ op: 'moveZone', target: t, to: 'hand' }];
+  return null;
 };
 
 const tapClause: Clause = (s, b) => {
@@ -649,6 +661,20 @@ export function parseClause(s: Scanner, b: Bindings): Effect[] | null {
   return null;
 }
 
+/** Ops that take a duration; a leading "Until end of turn," supplies it when the clause did not. */
+function withDuration(effect: Effect, duration: DurationDef): Effect {
+  switch (effect.op) {
+    case 'pump':
+    case 'grantAbility':
+    case 'setPT':
+    case 'gainControl':
+    case 'loseAbilities':
+      return effect.duration === undefined ? ({ ...effect, duration } as Effect) : effect;
+    default:
+      return effect;
+  }
+}
+
 /** "They can't be regenerated" qualifies the destroy in an earlier clause (CR 701.15). */
 export function applyNoRegenerate(effects: Effect[], b: Bindings): Effect[] {
   if (!b.noRegenerate) return effects;
@@ -661,12 +687,17 @@ export function applyNoRegenerate(effects: Effect[], b: Bindings): Effect[] {
 export function parseEffects(s: Scanner, b: Bindings): Effect[] | null {
   // An elided subject only carries within one sentence.
   b.subject = null;
+  // "Until end of turn, target creature gains flying." states the duration before the effect.
+  const lead = s.attempt(() => {
+    const d = parseDuration(s);
+    return d !== null && s.eat(',') ? d : null;
+  });
   const out: Effect[] = [];
   for (;;) {
     const c = parseClause(s, b);
     if (!c) return null;
     out.push(...c);
-    if (s.atEnd()) return out;
+    if (s.atEnd()) return lead ? out.map((e) => withDuration(e, lead)) : out;
     if (s.eat(', then') || s.eat('and then') || s.eat('then') || s.eat('and') || s.eat(','))
       continue;
     return null;

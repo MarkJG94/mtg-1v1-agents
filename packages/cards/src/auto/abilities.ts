@@ -39,6 +39,149 @@ export interface CardShape {
 
 const LOYALTY = /^[+-]?\d+\s*:/;
 
+/**
+ * Keyword abilities the engine has no rules for. They are named so the coverage report says "keyword
+ * ability X" instead of blaming whichever grammar rule tripped over the cost that follows the word.
+ */
+const UNIMPLEMENTED_KEYWORD_ABILITIES = new Set([
+  'adapt',
+  'affinity',
+  'afflict',
+  'afterlife',
+  'aftermath',
+  'amass',
+  'amplify',
+  'annihilator',
+  'ascend',
+  'backup',
+  'bargain',
+  'bestow',
+  'blitz',
+  'bloodthirst',
+  'bushido',
+  'buyback',
+  'cascade',
+  'casualty',
+  'champion',
+  'changeling',
+  'cipher',
+  'companion',
+  'connive',
+  'conspire',
+  'convoke',
+  'craft',
+  'crew',
+  'cumulative',
+  'cycling',
+  'dash',
+  'daybound',
+  'delve',
+  'dethrone',
+  'devoid',
+  'devour',
+  'disguise',
+  'disturb',
+  'dredge',
+  'echo',
+  'embalm',
+  'emerge',
+  'encore',
+  'entwine',
+  'epic',
+  'escalate',
+  'escape',
+  'eternalize',
+  'evoke',
+  'evolve',
+  'exalted',
+  'exploit',
+  'explore',
+  'extort',
+  'fabricate',
+  'fading',
+  'fear',
+  'flashback',
+  'forecast',
+  'foretell',
+  'fortify',
+  'frenzy',
+  'fuse',
+  'graft',
+  'gravestorm',
+  'haunt',
+  'hideaway',
+  'horsemanship',
+  'improvise',
+  'infect',
+  'ingest',
+  'intimidate',
+  'kicker',
+  'landcycling',
+  'level',
+  'madness',
+  'melee',
+  'mentor',
+  'miracle',
+  'modular',
+  'morph',
+  'mutate',
+  'myriad',
+  'ninjutsu',
+  'offering',
+  'offspring',
+  'outlast',
+  'overload',
+  'partner',
+  'persist',
+  'phasing',
+  'plot',
+  'poisonous',
+  'prowess',
+  'prowl',
+  'provoke',
+  'rampage',
+  'ravenous',
+  'rebound',
+  'reconfigure',
+  'recover',
+  'reinforce',
+  'renown',
+  'replicate',
+  'retrace',
+  'riot',
+  'ripple',
+  'saddle',
+  'scavenge',
+  'shadow',
+  'soulbond',
+  'soulshift',
+  'spectacle',
+  'splice',
+  'storm',
+  'sunburst',
+  'surge',
+  'suspend',
+  'toxic',
+  'training',
+  'transfigure',
+  'transmute',
+  'tribute',
+  'undaunted',
+  'undying',
+  'unearth',
+  'unleash',
+  'vanishing',
+  'wither',
+]);
+
+/** The keyword-ability name a line announces, when the engine cannot play it. */
+export function unimplementedKeyword(sentence: string): string | null {
+  const first = /^([a-z][a-z-]*)\b/i.exec(sentence.trim());
+  if (!first) return null;
+  const word = first[1]!.toLowerCase();
+  return UNIMPLEMENTED_KEYWORD_ABILITIES.has(word) ? word : null;
+}
+
 /** Which grammar a sentence belongs to. Permanents default to static text, spells to spell text. */
 export function classify(sentence: string, card: CardShape): SentenceKind {
   const t = sentence.trim();
@@ -185,12 +328,16 @@ function parseTrigger(s: Scanner): TriggerDef | null {
   return s.attempt<TriggerDef>(() => {
     if (s.eat('at the beginning of')) {
       if (s.eat('your upkeep')) return { on: 'upkeep', who: 'you' };
-      if (s.eat('each upkeep')) return { on: 'upkeep', who: 'any' };
+      if (s.eat("each opponent's upkeep")) return { on: 'upkeep', who: 'opponent' };
+      if (s.eat('each upkeep') || s.eat("each player's upkeep"))
+        return { on: 'upkeep', who: 'any' };
       if (s.eat('your end step')) return { on: 'endStep', who: 'you' };
-      if (s.eat('the end step')) return { on: 'endStep', who: 'any' };
-      if (s.eat('each end step')) return { on: 'endStep', who: 'any' };
+      if (s.eat("each opponent's end step")) return { on: 'endStep', who: 'opponent' };
+      if (s.eat('the end step') || s.eat('each end step') || s.eat("each player's end step"))
+        return { on: 'endStep', who: 'any' };
       if (s.eat('combat on your turn') || s.eat('your combat'))
         return { on: 'beginCombat', who: 'you' };
+      if (s.eat('each combat')) return { on: 'beginCombat', who: 'any' };
       return null;
     }
     if (!s.eat('when') && !s.eat('whenever')) return null;

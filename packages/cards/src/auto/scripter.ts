@@ -15,12 +15,13 @@ import {
   parseStatic,
   parseTriggered,
   type SentenceKind,
+  unimplementedKeyword,
 } from './abilities.js';
 import { applyNoRegenerate, Bindings, parseEffects } from './effects.js';
 import { foldText, Scanner } from './scan.js';
 
 /** Bumping this invalidates every cached auto script (docs/03 §Sources of truth). */
-export const AUTO_SCRIPTER_VERSION = 1;
+export const AUTO_SCRIPTER_VERSION = 2;
 
 export interface SentenceFailure {
   index: number;
@@ -51,26 +52,34 @@ function parseModal(
   lines: string[][],
   lineStart: number[],
   li: number,
-): { modes: ModeDef[]; covers: number[]; lastLine: number } | null {
+): { modes: ModeDef[]; covers: number[]; lastLine: number; failure: string | null } | null {
   const head = foldText(lines[li]!.join(' ')).trim();
   if (!/^choose one\b/i.test(head)) return null;
   const covers = lines[li]!.map((_, k) => lineStart[li]! + k);
   const modes: ModeDef[] = [];
   let last = li;
+  let bullets = 0;
+  let failure: string | null = null;
   for (let j = li + 1; j < lines.length; j++) {
     const text = bulletText(lines[j]!);
     if (text === null) break;
+    bullets++;
+    covers.push(...lines[j]!.map((_, k) => lineStart[j]! + k));
+    last = j;
     const b = new Bindings();
     const s = Scanner.of(text);
     const effects = parseEffects(s, b);
-    if (!effects || !s.finish()) return null;
+    if (!effects || !s.finish()) {
+      // Report the mode that could not be read; blaming "Choose one" hides which one it was.
+      failure ??= `mode: ${s.remainder() || text}`;
+      continue;
+    }
     const mode: ModeDef = { label: text.replace(/\.$/, '').slice(0, 60), effects };
     if (b.targets.length > 0) mode.targets = b.targets;
     modes.push(mode);
-    covers.push(...lines[j]!.map((_, k) => lineStart[j]! + k));
-    last = j;
   }
-  return modes.length >= 2 ? { modes, covers, lastLine: last } : null;
+  if (bullets < 2) return null;
+  return { modes, covers, lastLine: last, failure };
 }
 
 /** Characteristics the auto-scripter refuses outright, because only a hand script can express them. */
@@ -127,6 +136,13 @@ export function scriptCard(card: ScryfallCard): ScriptAttempt {
 
     const modal = parseModal(normalized.lines, lineStart, li);
     if (modal) {
+      if (modal.failure)
+        failures.push({
+          index: base,
+          kind: 'spell',
+          sentence: line.join(' '),
+          reason: modal.failure,
+        });
       spellModes = modal.modes;
       spellCovers.push(...modal.covers);
       li = modal.lastLine;
@@ -146,6 +162,24 @@ export function scriptCard(card: ScryfallCard): ScriptAttempt {
       const record = (reason: string): void => {
         failures.push({ index: i, kind, sentence, reason });
       };
+
+      // "Activate only as a sorcery." qualifies the ability above it rather than standing on its own.
+      if (/^activate only as a sorcery\.?$/i.test(folded)) {
+        const last = abilities[abilities.length - 1];
+        if (last?.kind === 'activated') {
+          last.timing = 'sorcery';
+          last.covers = [...(last.covers ?? []), i];
+          return;
+        }
+        record('timing restriction with no activated ability above it');
+        return;
+      }
+
+      const keywordAbility = unimplementedKeyword(folded);
+      if (keywordAbility) {
+        record(`keyword ability "${keywordAbility}" is not implemented by the engine`);
+        return;
+      }
       switch (kind) {
         case 'keyword': {
           const kws = parseKeywordLine(folded);

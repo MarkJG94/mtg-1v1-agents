@@ -8,8 +8,11 @@ import {
   parseStatic,
   parseTriggered,
   Scanner,
+  scriptCard,
   tokenize,
+  unimplementedKeyword,
 } from '../src/auto/index.js';
+import type { ScryfallCard } from '../src/scryfall.js';
 
 describe('tokeniser', () => {
   it('keeps mana runs, P/T pairs and possessives whole', () => {
@@ -206,6 +209,25 @@ describe('effect clauses', () => {
     ]);
   });
 
+  it('applies a leading duration to the effects that take one', () => {
+    expect(parse('Until end of turn, target creature gains flying.').effects).toEqual([
+      {
+        op: 'grantAbility',
+        target: '$t',
+        ability: { kind: 'keyword', keyword: 'flying' },
+        duration: 'untilEndOfTurn',
+      },
+    ]);
+  });
+
+  it('returns a card from a graveyard to hand as a zone change, not a bounce', () => {
+    expect(parse('Return target creature card from your graveyard to your hand.')).toEqual({
+      effects: [{ op: 'moveZone', target: '$t', to: 'hand' }],
+      targets: [{ id: 't', filter: { type: 'creature', zone: 'graveyard', controller: 'you' } }],
+      done: true,
+    });
+  });
+
   it('refuses text it does not understand rather than guessing', () => {
     expect(parse('Exchange control of two target permanents.').effects).toBeNull();
   });
@@ -291,9 +313,83 @@ describe('ability grammars', () => {
     });
   });
 
+  it("reads a trigger on an opponent's step", () => {
+    expect(
+      parseTriggered("At the beginning of each opponent's upkeep, you gain 1 life.").value,
+    ).toEqual({
+      kind: 'triggered',
+      trigger: { on: 'upkeep', who: 'opponent' },
+      effects: [{ op: 'gainLife', amount: 1 }],
+    });
+  });
+
+  it('names a keyword ability the engine cannot play', () => {
+    expect(unimplementedKeyword('Cycling {2}')).toBe('cycling');
+    expect(unimplementedKeyword('Modular 1')).toBe('modular');
+    expect(unimplementedKeyword('Draw a card.')).toBeNull();
+    expect(unimplementedKeyword('Equip {1}')).toBeNull();
+  });
+
   it('reports where it gave up', () => {
     const r = parseTriggered('Whenever ~ becomes the target of a spell, counter that spell.');
     expect(r.value).toBeNull();
     expect(r.failure).toContain('trigger');
+  });
+});
+
+/** A minimal Scryfall entry, so a pipeline rule can be tested without a whole fixture card. */
+function synthetic(
+  type_line: string,
+  oracle_text: string,
+  extra: Partial<ScryfallCard> = {},
+): ScryfallCard {
+  return {
+    oracle_id: 'test:card',
+    id: 'test:print',
+    name: 'Testcard',
+    cmc: 1,
+    colors: [],
+    color_identity: [],
+    type_line,
+    oracle_text,
+    keywords: [],
+    layout: 'normal',
+    legalities: { vintage: 'legal' },
+    ...extra,
+  };
+}
+
+describe('whole-card assembly', () => {
+  it('hangs a timing restriction on the ability above it', () => {
+    const r = scriptCard(
+      synthetic('Artifact', '{2}, {T}: Draw a card.\nActivate only as a sorcery.'),
+    );
+    expect(r.reasons).toEqual([]);
+    expect(r.script?.abilities).toEqual([
+      {
+        kind: 'activated',
+        cost: { mana: '{2}', tap: true },
+        effects: [{ op: 'draw', count: 1 }],
+        timing: 'sorcery',
+        covers: [0, 1],
+      },
+    ]);
+  });
+
+  it('rejects a card whose keyword ability the engine cannot play', () => {
+    const r = scriptCard(
+      synthetic('Creature — Bird', 'Flying\nCycling {2}', { power: '1', toughness: '1' }),
+    );
+    expect(r.script).toBeNull();
+    expect(r.reasons.join()).toContain('keyword ability "cycling"');
+  });
+
+  it('names the mode it could not read instead of blaming "Choose one"', () => {
+    const r = scriptCard(
+      synthetic('Instant', 'Choose one \u2014\n\u2022 Draw a card.\n\u2022 Goad target creature.'),
+    );
+    expect(r.script).toBeNull();
+    expect(r.reasons.join()).toContain('mode:');
+    expect(r.reasons.join().toLowerCase()).toContain('goad');
   });
 });

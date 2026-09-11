@@ -50,7 +50,7 @@ Status: implemented in `packages/cards/src/auto` (85 new tests). The grammar alo
 - [x] 3.3 Grammar v1: costs, targets, quantities, durations, conditions, common effect verbs; anaphora resolution. A token scanner with explicit backtracking, not a PEG (ADR 0003).
 - [x] 3.4 Emitter + golden corpus (`packages/cards/test/fixtures/auto-corpus.json`, one card per template, validated end to end including the smoke games; the 98 bootstrap cards are a second, harder corpus).
 - [x] 3.5 `pnpm cards:coverage` full-Scryfall report with top failing patterns; nightly `cards-coverage` workflow.
-- [~] 3.6 Coverage push to ≥ 25% of Scryfall `supported`. Every template the target names is covered (vanilla/French-vanilla creatures, burn, pump, simple removal, cantrips, counters, ETB/dies triggers, simple anthems, basic mana rocks/dorks), but the sandbox that built this phase cannot reach api.scryfall.com, so the percentage is unmeasured; run `pnpm cards:coverage` on a networked machine for the real figure.
+- [~] 3.6 Coverage push to ≥ 25% of Scryfall `supported`. Parser version 1 measured **12.8%** of 30 816 base-pool cards. Version 2 fixes what that report showed to be the dominant blocker — Scryfall's "this creature" self-reference templating, which the normaliser now folds to `~` — plus timing restrictions, unnamed keyword abilities and several trigger and duration forms; see the addendum in ADR 0003. Re-run `pnpm cards:coverage` on a networked machine for the new figure.
 
 ## Phase 4 — Agents (≈ 6–8 sessions)
 

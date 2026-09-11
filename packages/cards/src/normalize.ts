@@ -1,6 +1,7 @@
 /**
  * Oracle-text normalisation shared by the validator (text coverage) and the auto-scripter (Phase 3):
- * the card's own name becomes `~`, reminder text is dropped, and the text is split into sentences.
+ * the card's own name and its "this creature"-style self references become `~`, reminder text is dropped,
+ * and the text is split into sentences.
  */
 export interface NormalizedText {
   /** One entry per line of oracle text, each split into sentences; flattened indices are used by `covers`. */
@@ -30,6 +31,34 @@ export function replaceSelfName(text: string, name: string): string {
   return out;
 }
 
+/**
+ * Nouns a card refers to itself by. Scryfall's 2024 templating update replaced the card's own name with
+ * "this creature"/"this artifact"/… in most Oracle text, so the two spellings must normalise to the same
+ * `~` — otherwise every pre-update hand script would disagree with its own Scryfall entry, and the
+ * grammar would fail to read the subject of most triggers.
+ */
+const SELF_NOUNS = [
+  'creature',
+  'permanent',
+  'spell',
+  'land',
+  'artifact',
+  'enchantment',
+  'planeswalker',
+  'equipment',
+  'aura',
+  'vehicle',
+  'battle',
+  'token',
+  'card',
+];
+const SELF_REFERENCE = new RegExp(`\\bthis (?:${SELF_NOUNS.join('|')})\\b`, 'gi');
+
+/** "this creature", "this Equipment" → `~`. "this turn" and "this way" are untouched. */
+export function replaceSelfReferences(text: string): string {
+  return text.replace(SELF_REFERENCE, '~');
+}
+
 /** Splits a line into sentences on ". " boundaries, keeping mana symbols and P/T like "+1/+1." intact. */
 export function splitSentences(line: string): string[] {
   const out: string[] = [];
@@ -52,7 +81,7 @@ export function splitSentences(line: string): string[] {
 }
 
 export function normalizeOracleText(text: string | undefined, name: string): NormalizedText {
-  const cleaned = replaceSelfName(stripReminderText(text ?? ''), name);
+  const cleaned = replaceSelfReferences(replaceSelfName(stripReminderText(text ?? ''), name));
   const lines = cleaned
     .split('\n')
     .map((l) => l.trim())

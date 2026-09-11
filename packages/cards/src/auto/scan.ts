@@ -91,8 +91,6 @@ export function tokenize(text: string): Token[] {
  */
 export class Scanner {
   i = 0;
-  /** Furthest index any rule reached, so a failure can point at the token that stopped it. */
-  furthest = 0;
 
   constructor(readonly tokens: Token[]) {}
 
@@ -110,7 +108,6 @@ export class Scanner {
 
   private advance(n: number): void {
     this.i += n;
-    if (this.i > this.furthest) this.furthest = this.i;
   }
 
   next(): Token | undefined {
@@ -177,10 +174,14 @@ export class Scanner {
     return this.done;
   }
 
-  /** Unparsed remainder, for failure messages. */
+  /**
+   * The text from the cursor on, for failure messages. Reported from the current position rather than the
+   * furthest any rule reached: a rule that speculatively consumed the unknown word and rewound would
+   * otherwise hide the very word the coverage report needs to name.
+   */
   remainder(): string {
     return this.tokens
-      .slice(this.furthest)
+      .slice(this.i)
       .map((t) => t.text)
       .join(' ');
   }

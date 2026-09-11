@@ -47,11 +47,11 @@ the sandbox that built it.
    layouts, multi-faced cards, characteristic-defining power/toughness (`*`), and non-numeric loyalty.
 
 7. **Coverage is reported, not asserted, against Scryfall.** Roadmap 3.6 targets ≥ 25% of Scryfall
-   `supported`. The sandbox that built this phase has no access to api.scryfall.com, so the number in the
-   roadmap is the one measurable here: 35 of the 37 golden-corpus cards and 87 of the 98 hand-scripted
+   `supported`. The sandbox that built this phase has no access to api.scryfall.com, so the figures
+   measurable here are the corpora: 35 of the 37 golden-corpus cards and 87 of the 98 hand-scripted
    bootstrap cards are reached by the grammar alone. `pnpm cards:coverage` produces the real figure on a
-   networked machine and the nightly `cards-coverage` workflow publishes it; the roadmap will be updated
-   from that run rather than from an estimate.
+   networked machine and the nightly `cards-coverage` workflow publishes it. The first such run (parser
+   version 1, 30 816 base-pool cards) reported **12.8% supported**; see the addendum below.
 
 8. **Smoke games stay opt-in in the coverage run.** The executability smoke test costs roughly a second per
    card, which is fine for 135 fixture cards and not for 30 000; `pnpm cards:coverage` defaults to schema,
@@ -82,3 +82,39 @@ what the coverage report's top failing patterns should drive next.
   that could alter an emitted script must bump it.
 - `docs/03` §Auto-scripter step 3 now describes a scanner rather than a PEG; the rest of the pipeline is
   unchanged.
+
+
+## Addendum — the first full-Scryfall run (parser version 2)
+
+Parser version 1 scored 12.8% of 30 816 base-pool cards. The top failing patterns were dominated by one
+thing: **Scryfall's 2024 templating update**, which replaced most self references in Oracle text with
+"this creature" / "this artifact" / "this land". The grammar only knew the card's own name, so the subject
+of most triggers, static abilities and activation costs was unreadable — roughly 2 800 cards across
+"when this creature enters, …" (six separate patterns), "this land enters tapped", "cost: this artifact",
+"whenever this creature deals combat damage", and "this creature can't be blocked".
+
+The same drift was silently breaking the bootstrap set: only 67 of the 98 hand scripts still validated,
+because their `text:` fields were written against the old templating and no longer matched the entry
+Scryfall serves.
+
+Parser version 2 changes:
+
+1. **`replaceSelfReferences` in the normaliser** folds "this creature"/"this artifact"/… to `~`, alongside
+   the existing name replacement, exactly as docs 03 step 1 specifies. Because the validator normalises
+   both the script's text and Scryfall's before comparing them, this repairs the hand-script drift as a
+   side effect: the two spellings become the same string. `packages/cards/test/auto-templating.test.ts`
+   rewrites every fixture card into the current templating and asserts the emitted script is unchanged.
+2. **"Activate only as a sorcery."** sets `timing: 'sorcery'` on the ability above it instead of being
+   read as a static sentence about a creature type called "Activate" (371 cards).
+3. **Keyword abilities the engine cannot play** (cycling, kicker, modular, echo, …) are named in the
+   failure rather than blamed on whichever rule tripped over the cost after the word (≈ 600 cards of
+   misleading `static: 1` / `static: {2}` patterns).
+4. **More beginning-of-step triggers**: each opponent's and each player's upkeep and end step, each combat.
+5. **Sentence-initial durations** ("Until end of turn, target creature gains flying").
+6. **Return-to-hand from a graveyard** as a zone change rather than a bounce.
+7. **Modal spells name the mode that failed** instead of reporting `effect: choose one —`, which hid the
+   real gap on 285 cards.
+8. **Failures are reported from the cursor, not the furthest token any rule reached.** A rule that
+   speculatively consumed the unknown word and rewound was hiding the very word the report needed to name.
+
+`AUTO_SCRIPTER_VERSION` is 2, which invalidates every cached auto script.
