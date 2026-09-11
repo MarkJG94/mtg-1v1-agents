@@ -17,7 +17,8 @@
     "build": "pnpm -r build",
     "fetch:scryfall": "node --import tsx scripts/fetch-scryfall.ts",
     "scryfall:subset": "node --import tsx scripts/scryfall-subset.ts",
-    "cards:schema": "pnpm --filter @mtg/cards schema"
+    "cards:schema": "pnpm --filter @mtg/cards schema",
+    "cards:coverage": "node --import tsx scripts/cards-coverage.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.13",

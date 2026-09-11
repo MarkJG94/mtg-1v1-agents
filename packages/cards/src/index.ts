@@ -1,3 +1,5 @@
+export * from './auto/index.js';
+export * from './coverage.js';
 export { type DifferentialResult, differentialTest } from './differential.js';
 export { toDefinition } from './loader.js';
 export * from './normalize.js';

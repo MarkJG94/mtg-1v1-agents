@@ -43,12 +43,14 @@ Status: implemented in `packages/cards` (98 hand scripts, all `supported`; 186 t
 
 ## Phase 3 — Auto-scripter v1 (≈ 8–12 sessions, then continuous)
 
-- [ ] 3.1 Normaliser (name → `~`, reminder text, sentence split, keyword lines, Scryfall keyword cross-check).
-- [ ] 3.2 Sentence classifier (keyword / activated / triggered / static / spell / loyalty / unknown).
-- [ ] 3.3 PEG grammar v1: costs, targets, quantities, durations, conditions, common effect verbs; anaphora resolution.
-- [ ] 3.4 Emitter + golden corpus (≈ 300 cards spanning the common templates).
-- [ ] 3.5 `pnpm cards:coverage` full-Scryfall report with top failing patterns; nightly workflow.
-- [ ] 3.6 Coverage push to ≥ 25% of Scryfall `supported` (vanilla/French-vanilla creatures, burn, pump, simple removal, cantrips, counters, ETB/dies triggers, simple anthems, basic mana rocks/dorks).
+Status: implemented in `packages/cards/src/auto` (85 new tests). The grammar alone reaches 35 of the 37 golden-corpus cards and 87 of the 98 hand-scripted bootstrap cards. Deviations from these docs — a hand-written scanner instead of a `peggy` PEG, and how anaphora and failures are handled — are in `docs/adr/0003-auto-scripter-phase-3.md`.
+
+- [x] 3.1 Normaliser (name → `~`, reminder text, sentence split, keyword lines, Scryfall keyword cross-check).
+- [x] 3.2 Sentence classifier (keyword / enchant / equip / additional cost / activated / triggered / static / spell / loyalty).
+- [x] 3.3 Grammar v1: costs, targets, quantities, durations, conditions, common effect verbs; anaphora resolution. A token scanner with explicit backtracking, not a PEG (ADR 0003).
+- [x] 3.4 Emitter + golden corpus (`packages/cards/test/fixtures/auto-corpus.json`, one card per template, validated end to end including the smoke games; the 98 bootstrap cards are a second, harder corpus).
+- [x] 3.5 `pnpm cards:coverage` full-Scryfall report with top failing patterns; nightly `cards-coverage` workflow.
+- [~] 3.6 Coverage push to ≥ 25% of Scryfall `supported`. Every template the target names is covered (vanilla/French-vanilla creatures, burn, pump, simple removal, cantrips, counters, ETB/dies triggers, simple anthems, basic mana rocks/dorks), but the sandbox that built this phase cannot reach api.scryfall.com, so the percentage is unmeasured; run `pnpm cards:coverage` on a networked machine for the real figure.
 
 ## Phase 4 — Agents (≈ 6–8 sessions)
 
