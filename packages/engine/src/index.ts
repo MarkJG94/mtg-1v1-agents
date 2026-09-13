@@ -2,6 +2,7 @@ export * from './characteristics.js';
 export * from './combat.js';
 export * from './decision.js';
 export * from './events/emitter.js';
+export * from './layers.js';
 export * from './legal-actions.js';
 export * from './mana/ability.js';
 export * from './mana/cost.js';

@@ -1,5 +1,6 @@
 import { asOracleId, type ObjectId, type PlayerId } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
+import { addEffect } from './characteristics.js';
 import {
   assignCombatDamage,
   availableBlockers,
@@ -541,5 +542,67 @@ describe('end of combat (CR 511.3)', () => {
     const attacking = attackWith(state, emitter, mine);
     expect(attacking.combat).not.toBeNull();
     expect(endCombat(attacking).combat).toBeNull();
+  });
+});
+
+describe('continuous effects reach combat', () => {
+  it('an anthem makes an attacker hit harder', () => {
+    const built = board([{ power: 2, toughness: 2 }]);
+    const anthem = createObject(built.state, {
+      definitionId: creature,
+      owner: 'A',
+      zone: 'battlefield',
+    });
+    const withAnthem = addEffect(anthem.state, {
+      source: anthem.object.id,
+      affects: { kind: 'creaturesControlledBy', player: 'sourceController' },
+      change: { kind: 'modifyPowerToughness', power: 1, toughness: 1 },
+      duration: { kind: 'whileSourceOnBattlefield' },
+    }).state;
+
+    const attacking = attackWith(withAnthem, built.emitter, built.mine);
+    const after = dealCombatDamage(attacking, built.emitter, false);
+    expect(after.players.B.life).toBe(17);
+  });
+
+  it('a granted keyword changes what can block', () => {
+    const built = board([{ power: 2, toughness: 2 }], [{ power: 1, toughness: 1 }]);
+    const attacker = built.mine[0] as ObjectId;
+    const blocker = built.theirs[0] as ObjectId;
+    expect(canBlock(attackWith(built.state, built.emitter, built.mine), blocker, attacker)).toBe(
+      true,
+    );
+
+    const granted = addEffect(built.state, {
+      source: attacker,
+      affects: { kind: 'self' },
+      change: { kind: 'addKeyword', keyword: 'flying' },
+      duration: { kind: 'permanent' },
+    }).state;
+    const attacking = attackWith(granted, built.emitter, built.mine);
+    expect(canBlock(attacking, blocker, attacker)).toBe(false);
+  });
+
+  it('protection from a colour stops a blocker of that colour (CR 702.16e)', () => {
+    const built = board([{ power: 2, toughness: 2 }], [{ power: 1, toughness: 1 }]);
+    const attacker = built.mine[0] as ObjectId;
+    const blocker = built.theirs[0] as ObjectId;
+
+    // The blocker is red; the attacker has protection from red.
+    let state = updateObject(built.state, blocker, { colours: ['R'] });
+    state = updateObject(state, attacker, {
+      keywords: keywords({ protectionFrom: ['R'] }),
+    });
+    const attacking = attackWith(state, built.emitter, built.mine);
+    expect(canBlock(attacking, blocker, attacker)).toBe(false);
+  });
+
+  it('a -1/-1 counter makes a creature hit for less', () => {
+    const built = board([{ power: 3, toughness: 3 }]);
+    const weakened = updateObject(built.state, built.mine[0] as ObjectId, {
+      counters: { '-1/-1': 1 },
+    });
+    const attacking = attackWith(weakened, built.emitter, built.mine);
+    expect(dealCombatDamage(attacking, built.emitter, false).players.B.life).toBe(18);
   });
 });

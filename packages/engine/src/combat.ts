@@ -1,10 +1,14 @@
 import { type EventTarget, type ObjectId, opponentOf, type PlayerId } from '@mtg/shared';
-import { effectivePower, isCreature, remainingToughness } from './characteristics.js';
+import {
+  characteristicsOf,
+  keywordsOfObject,
+  powerOf,
+  remainingToughness,
+} from './characteristics.js';
 import type { EventEmitter } from './events/emitter.js';
 import type { GameState } from './state/game-state.js';
-import type { GameObject } from './state/object.js';
 import { getObject, objectsIn, updateObjects, updatePlayer, updateState } from './state/update.js';
-import { canBeTargeted } from './targeting.js';
+import type { Keywords } from './targeting.js';
 import { queueTriggers, triggersFromAttack, triggersFromBlock } from './triggers.js';
 
 /**
@@ -67,12 +71,13 @@ export class IllegalCombatError extends Error {
 export const legalAttackers = (state: GameState): readonly ObjectId[] =>
   objectsIn(state, 'battlefield').filter((id) => {
     const object = getObject(state, id);
+    const traits = characteristicsOf(state, id);
     return (
-      isCreature(object) &&
-      object.controller === state.activePlayer &&
+      traits.isCreature &&
+      traits.controller === state.activePlayer &&
       !object.tapped &&
-      !object.keywords.defender &&
-      (!object.summoningSick || object.keywords.haste)
+      !traits.keywords.defender &&
+      (!object.summoningSick || traits.keywords.haste)
     );
   });
 
@@ -109,7 +114,7 @@ export const declareAttackers = (
   // Tap the attackers that do not have vigilance.
   const toTap = declarations
     .map(({ attacker }) => attacker)
-    .filter((id) => !getObject(state, id).keywords.vigilance);
+    .filter((id) => !keywordsOfObject(state, id).vigilance);
   let next = updateObjects(
     state,
     toTap.map((id) => [id, { tapped: true }] as const),
@@ -138,8 +143,8 @@ export const defendingPlayer = (state: GameState): PlayerId => opponentOf(state.
 export const availableBlockers = (state: GameState): readonly ObjectId[] => {
   const defender = defendingPlayer(state);
   return objectsIn(state, 'battlefield').filter((id) => {
-    const object = getObject(state, id);
-    return isCreature(object) && object.controller === defender && !object.tapped;
+    const traits = characteristicsOf(state, id);
+    return traits.isCreature && traits.controller === defender && !getObject(state, id).tapped;
   });
 };
 
@@ -149,30 +154,20 @@ export const availableBlockers = (state: GameState): readonly ObjectId[] => {
  * (CR 702.9b), and protection stops a blocker of the protected-from colour (CR 702.16e).
  */
 export const canBlock = (state: GameState, blocker: ObjectId, attacker: ObjectId): boolean => {
-  const blocking = getObject(state, blocker);
-  const attacking = getObject(state, attacker);
+  const blocking = characteristicsOf(state, blocker);
+  const attacking = characteristicsOf(state, attacker);
 
-  if (!isCreature(blocking) || !isCreature(attacking) || blocking.tapped) return false;
+  if (!blocking.isCreature || !attacking.isCreature) return false;
+  if (getObject(state, blocker).tapped) return false;
   if (blocking.controller !== defendingPlayer(state)) return false;
   if (attacking.keywords.flying && !(blocking.keywords.flying || blocking.keywords.reach)) {
     return false;
   }
 
-  // Protection stops the protected creature being blocked by that colour, which here is
-  // the attacker's protection against its would-be blocker.
-  const blockerColours = blocking.keywords.protectionFrom;
-  if (attacking.keywords.protectionFrom.length > 0 || blockerColours.length > 0) {
-    // Colours of a creature are a characteristic; until 2.1 supplies them, protection in
-    // combat is decided by the same check targeting uses, with no colours to match.
-    const legality = canBeTargeted(
-      state,
-      { kind: 'object', object: attacker },
-      {
-        controller: blocking.controller,
-        colours: [],
-      },
-    );
-    if (!legality.legal && legality.reason === 'protection') return false;
+  // A creature with protection from a colour can't be blocked by creatures of that colour
+  // (CR 702.16e). Now that colours are computed rather than assumed, this is a real check.
+  if (attacking.keywords.protectionFrom.some((colour) => blocking.colours.includes(colour))) {
+    return false;
   }
 
   return true;
@@ -223,7 +218,7 @@ export const declareBlockers = (
   }
 
   for (const [attacker, blockers] of blockersOf) {
-    if (getObject(state, attacker).keywords.menace && blockers.length < 2) {
+    if (keywordsOfObject(state, attacker).menace && blockers.length < 2) {
       throw new IllegalCombatError(
         `creature ${attacker} has menace and cannot be blocked by only one creature`,
       );
@@ -287,8 +282,8 @@ export const attackersNeedingOrder = (state: GameState): readonly ObjectId[] =>
 // --- Damage (CR 510) ---
 
 /** Whether this creature deals damage in the given step. */
-const dealsDamageIn = (object: GameObject, firstStrikeStep: boolean): boolean => {
-  const { firstStrike, doubleStrike } = object.keywords;
+const dealsDamageIn = (keywords: Keywords, firstStrikeStep: boolean): boolean => {
+  const { firstStrike, doubleStrike } = keywords;
   return firstStrikeStep ? firstStrike || doubleStrike : doubleStrike || !firstStrike;
 };
 
@@ -301,14 +296,14 @@ export const needsFirstStrikeStep = (state: GameState): boolean => {
   const combat = state.combat;
   if (!combat || combat.firstStrikeDone) return false;
 
-  return combat.attackers.some((entry) => {
-    const attacker = state.objects.get(entry.attacker);
-    if (attacker && (attacker.keywords.firstStrike || attacker.keywords.doubleStrike)) return true;
-    return entry.blockedBy.some((id) => {
-      const blocker = state.objects.get(id);
-      return blocker?.keywords.firstStrike === true || blocker?.keywords.doubleStrike === true;
-    });
-  });
+  const strikesFirst = (id: ObjectId): boolean => {
+    const keywords = keywordsOfObject(state, id);
+    return keywords.firstStrike || keywords.doubleStrike;
+  };
+
+  return combat.attackers.some(
+    (entry) => strikesFirst(entry.attacker) || entry.blockedBy.some(strikesFirst),
+  );
 };
 
 interface DamageAssignment {
@@ -324,8 +319,8 @@ interface DamageAssignment {
  * How much damage an attacker must assign to a blocker before moving to the next
  * (CR 510.1a). Deathtouch makes any single point lethal (CR 702.2b).
  */
-const lethalFor = (blocker: GameObject, deathtouch: boolean): number =>
-  deathtouch ? 1 : Math.max(0, remainingToughness(blocker));
+const lethalFor = (state: GameState, blocker: ObjectId, deathtouch: boolean): number =>
+  deathtouch ? 1 : Math.max(0, remainingToughness(state, blocker));
 
 /**
  * Work out every point of combat damage for one step, without applying any of it.
@@ -347,12 +342,15 @@ export const assignCombatDamage = (
 
   for (const entry of combat.attackers) {
     const attacker = state.objects.get(entry.attacker);
-    if (!attacker || !isCreature(attacker) || !dealsDamageIn(attacker, firstStrikeStep)) continue;
+    const traits = characteristicsOf(state, entry.attacker);
+    if (!attacker || !traits.isCreature || !dealsDamageIn(traits.keywords, firstStrikeStep)) {
+      continue;
+    }
 
-    const power = effectivePower(attacker);
-    const deathtouch = attacker.keywords.deathtouch;
-    const lifelink = attacker.keywords.lifelink;
-    const base = { source: entry.attacker, deathtouch, lifelink, controller: attacker.controller };
+    const power = powerOf(state, entry.attacker);
+    const deathtouch = traits.keywords.deathtouch;
+    const lifelink = traits.keywords.lifelink;
+    const base = { source: entry.attacker, deathtouch, lifelink, controller: traits.controller };
 
     // Blockers that are still on the battlefield when damage is dealt.
     const blockers = entry.blockedBy.filter((id) => state.objects.get(id)?.zone === 'battlefield');
@@ -361,7 +359,7 @@ export const assignCombatDamage = (
       if (power > 0) assignments.push({ ...base, target: entry.defender, amount: power });
     } else if (blockers.length === 0) {
       // Blocked but every blocker has gone: it deals no damage at all unless it tramples.
-      if (attacker.keywords.trample && power > 0) {
+      if (traits.keywords.trample && power > 0) {
         assignments.push({ ...base, target: entry.defender, amount: power });
       }
     } else {
@@ -369,12 +367,11 @@ export const assignCombatDamage = (
       for (let i = 0; i < blockers.length; i += 1) {
         const id = blockers[i];
         if (id === undefined) continue;
-        const blocker = getObject(state, id);
         const isLast = i === blockers.length - 1;
-        const lethal = Math.min(remaining, lethalFor(blocker, deathtouch));
+        const lethal = Math.min(remaining, lethalFor(state, id, deathtouch));
 
         // The last blocker soaks up everything left, unless trample carries it over.
-        const amount = isLast && !attacker.keywords.trample ? remaining : lethal;
+        const amount = isLast && !traits.keywords.trample ? remaining : lethal;
         if (amount > 0) {
           assignments.push({ ...base, target: { kind: 'object', object: id }, amount });
         }
@@ -382,16 +379,16 @@ export const assignCombatDamage = (
         if (remaining <= 0) break;
       }
 
-      if (attacker.keywords.trample && remaining > 0) {
+      if (traits.keywords.trample && remaining > 0) {
         assignments.push({ ...base, target: entry.defender, amount: remaining });
       }
     }
 
     // Blockers deal their damage back to the attacker they block.
     for (const id of blockers) {
-      const blocker = getObject(state, id);
-      if (!dealsDamageIn(blocker, firstStrikeStep)) continue;
-      const blockerPower = effectivePower(blocker);
+      const blocker = characteristicsOf(state, id);
+      if (!dealsDamageIn(blocker.keywords, firstStrikeStep)) continue;
+      const blockerPower = powerOf(state, id);
       if (blockerPower <= 0) continue;
       assignments.push({
         source: id,

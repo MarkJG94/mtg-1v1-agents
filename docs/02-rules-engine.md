@@ -41,7 +41,8 @@ interface GameState {
   nextTimestamp: number;                    // layer-system timestamps (CR 613.7)
   config: GameConfig;                       // turnCap, maxHandSize, playerOnPlay
   extraTurns: PlayerId[];                   // owed extra turns, oldest first (CR 500.7)
-  effects: ContinuousEffect[];              // active continuous effects with timestamps        (1.9)
+  effects: ContinuousEffect[];              // active continuous effects with timestamps
+  nextEffectId: number;
   delayedTriggers: DelayedTrigger[];        // set up to fire at a later step (CR 603.7)
   pendingTriggers: TriggerInstance[];       // fired, waiting to go on the stack
   triggersFiredThisTurn: string[];          // for once-each-turn abilities
@@ -74,7 +75,7 @@ The engine pauses with a `pendingDecision` whenever a player must choose. Decisi
 
 ## Continuous effects and layers
 
-Each `ContinuousEffect` records: source object, timestamp (or the effect's own timestamp for one-shot-created effects), affected-object selector (a predicate over characteristics, evaluated at the appropriate layer per CR 611.2c), the layer/sublayer, the change, and duration (`untilEndOfTurn`, `whileSourceOnBattlefield`, `permanent`, custom condition). `characteristics()` applies layers 1 → 7e in order, sorts within a layer by timestamp, and resolves dependencies (CR 613.8) with the standard "apply dependent effects after the effects they depend on" iteration, capped to avoid cycles. Layer 7 sublayers: 7a set, 7b modify, 7c counters, 7d switch.
+Each `ContinuousEffect` records: source object, timestamp (or the effect's own timestamp for one-shot-created effects), affected-object selector (a predicate over characteristics, evaluated at the appropriate layer per CR 611.2c), the layer/sublayer, the change, and duration (`untilEndOfTurn`, `whileSourceOnBattlefield`, `permanent`, custom condition). `characteristics(state, id)` applies layers 1 → 7e in order and sorts within a layer by timestamp, memoised per state. Layer 7 has five sublayers, not four: 7a characteristic-defining, 7b set, 7c modify, 7d counters, 7e switch (CR 613.4). Dependency (CR 613.8) is **not** implemented: effects are applied in timestamp order within each layer, which is correct except where one effect changes what another applies to — Humility with Opalescence, Blood Moon with the Urza lands. Tracked in the roadmap rather than approximated.
 
 Control-changing effects trigger zone-independent controller updates; the copy layer uses `copiableValues(definition, overrides)`.
 

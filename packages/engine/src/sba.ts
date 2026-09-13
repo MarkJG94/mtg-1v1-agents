@@ -1,9 +1,8 @@
 import { type ObjectId, type PlayerId, playerIds, playerZone, type SbaKind } from '@mtg/shared';
 import {
+  characteristicsOf,
   counterCount,
   currentLoyalty,
-  effectiveToughness,
-  isCreature,
   isPlaneswalker,
   remainingToughness,
 } from './characteristics.js';
@@ -66,23 +65,24 @@ const gather = (state: GameState): PendingActions => {
 
   for (const id of objectsIn(state, 'battlefield')) {
     const object = getObject(state, id);
+    const traits = characteristicsOf(state, id);
 
     if (counterCount(object, '+1/+1') > 0 && counterCount(object, '-1/-1') > 0) {
       annihilating.push(id);
     }
 
-    if (isCreature(object)) {
+    if (traits.isCreature) {
       // Zero toughness is not destruction, so indestructible does not save it (CR 704.5f).
-      if (effectiveToughness(object) <= 0) {
+      if ((traits.toughness ?? 0) <= 0) {
         destroyed.push({ id, kind: 'creatureZeroToughness' });
         continue;
       }
-      if (!object.keywords.indestructible) {
+      if (!traits.keywords.indestructible) {
         if (object.deathtouched && object.damage > 0) {
           destroyed.push({ id, kind: 'creatureDeathtouched' });
           continue;
         }
-        if (object.damage > 0 && remainingToughness(object) <= 0) {
+        if (object.damage > 0 && remainingToughness(state, id) <= 0) {
           destroyed.push({ id, kind: 'creatureLethalDamage' });
           continue;
         }
@@ -90,7 +90,7 @@ const gather = (state: GameState): PendingActions => {
     }
 
     // CR 704.5i: a planeswalker with no loyalty counters goes to the graveyard.
-    if (isPlaneswalker(object) && currentLoyalty(object) <= 0) {
+    if (isPlaneswalker(state, id) && currentLoyalty(state, id) <= 0) {
       destroyed.push({ id, kind: 'planeswalkerZeroLoyalty' });
       continue;
     }

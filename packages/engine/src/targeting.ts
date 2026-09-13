@@ -1,4 +1,5 @@
 import type { Colour, EventTarget, ObjectId, PlayerId } from '@mtg/shared';
+import { characteristicsOf } from './characteristics.js';
 import type { ManaCost } from './mana/cost.js';
 import type { GameState } from './state/game-state.js';
 
@@ -90,16 +91,21 @@ export type TargetLegality =
 
 const legalWith = (ward: ManaCost | null): TargetLegality => ({ legal: true, ward });
 
-/** The keywords currently applying to a target, whether an object or a player. */
+/**
+ * The keywords currently applying to a target, whether an object or a player. For an
+ * object this is the computed value, so an effect granting hexproof genuinely protects it.
+ */
 export const keywordsOf = (state: GameState, target: EventTarget): Keywords | null => {
   if (target.kind === 'player') return state.players[target.player].keywords;
-  return state.objects.get(target.object)?.keywords ?? null;
+  return state.objects.has(target.object) ? characteristicsOf(state, target.object).keywords : null;
 };
 
-/** Who controls the target: a player controls themselves. */
+/** Who controls the target: a player controls themselves. Control can be changed (layer 2). */
 export const controllerOfTarget = (state: GameState, target: EventTarget): PlayerId | null => {
   if (target.kind === 'player') return target.player;
-  return state.objects.get(target.object)?.controller ?? null;
+  return state.objects.has(target.object)
+    ? characteristicsOf(state, target.object).controller
+    : null;
 };
 
 /**

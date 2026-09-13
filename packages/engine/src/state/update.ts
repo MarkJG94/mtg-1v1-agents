@@ -1,6 +1,7 @@
 import {
   allZoneIds,
   asObjectId,
+  type Colour,
   type ObjectId,
   type OracleId,
   type PlayerId,
@@ -104,6 +105,7 @@ export interface NewObjectSpec {
   readonly loyalty?: number;
   readonly name?: string;
   readonly legendary?: boolean;
+  readonly colours?: readonly Colour[];
   readonly attachment?: 'aura' | 'equipment';
   readonly triggers?: readonly TriggeredAbility[];
   /** Where in the destination zone; defaults to the end of the array. */
@@ -136,6 +138,7 @@ export const createObject = (
     loyalty: spec.loyalty ?? null,
     name: spec.name ?? null,
     legendary: spec.legendary ?? false,
+    colours: spec.colours ?? [],
     attachment: spec.attachment ?? null,
     deathtouched: false,
     triggers: spec.triggers ?? [],

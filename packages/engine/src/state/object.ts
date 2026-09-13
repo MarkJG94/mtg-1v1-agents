@@ -1,4 +1,4 @@
-import type { ObjectId, OracleId, PlayerId, ZoneId } from '@mtg/shared';
+import type { Colour, ObjectId, OracleId, PlayerId, ZoneId } from '@mtg/shared';
 import type { StackProperties } from '../stack.js';
 import type { Keywords } from '../targeting.js';
 import type { TriggeredAbility } from '../triggers.js';
@@ -34,14 +34,13 @@ export interface GameObject {
   readonly chosen: Readonly<Record<string, string>>;
   readonly token: boolean;
   /**
-   * Targeting keywords currently applying. Stored for now; roadmap 1.9 computes these
-   * through the layer system and 2.1 seeds them from card scripts. See `targeting.ts`.
+   * Printed keywords. Never read directly — `characteristics(state, id)` applies the
+   * layer system on top of these, and effects can add or remove them.
    */
   readonly keywords: Keywords;
   /**
-   * Power and toughness, or `null` for something that is not a creature. Like keywords
-   * these are stored for now and become computed values in roadmap 1.9; combat treats
-   * "has power and toughness" as "is a creature" until card types arrive in 2.1.
+   * Printed power and toughness, or `null` for something that is not a creature. Read
+   * through `characteristics(state, id)`, which applies effects and counters.
    */
   readonly power: number | null;
   readonly toughness: number | null;
@@ -50,6 +49,8 @@ export interface GameObject {
   /** The card's name, which is what the legend rule compares (CR 704.5j). */
   readonly name: string | null;
   readonly legendary: boolean;
+  /** Printed colours, which layer 5 effects can change (CR 105.2). */
+  readonly colours: readonly Colour[];
   /** What this attaches to things as, if anything (CR 303.4, 301.5). */
   readonly attachment: 'aura' | 'equipment' | null;
   /**

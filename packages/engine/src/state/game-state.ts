@@ -9,6 +9,7 @@ import {
 } from '@mtg/shared';
 import type { CombatState } from '../combat.js';
 import type { Decision } from '../decision.js';
+import type { ContinuousEffect } from '../layers.js';
 import { emptyManaPool, type ManaPool } from '../mana/pool.js';
 import type { RngState } from '../rng.js';
 import { type Keywords, noKeywords } from '../targeting.js';
@@ -84,6 +85,10 @@ export interface GameState {
   readonly delayedTriggers: readonly DelayedTrigger[];
   /** `source:abilityId` for each once-each-turn ability that has already fired. */
   readonly triggersFiredThisTurn: readonly string[];
+  /** Continuous effects currently in force (CR 613). */
+  readonly effects: readonly ContinuousEffect[];
+  /** Next id and timestamp for a new continuous effect. */
+  readonly nextEffectId: number;
   /**
    * Players owed an extra turn (CR 500.7), oldest first. The next turn goes to the
    * front of this queue if it has one, otherwise to the other player.
@@ -168,6 +173,8 @@ export const createGameState = (options: CreateGameStateOptions): GameState => {
     pendingTriggers: [],
     delayedTriggers: [],
     triggersFiredThisTurn: [],
+    effects: [],
+    nextEffectId: 1,
     result: null,
   };
 };

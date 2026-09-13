@@ -8,6 +8,7 @@ import {
   skipsPriority,
   steps,
 } from '@mtg/shared';
+import { expireEndOfTurnEffects } from '../characteristics.js';
 import {
   attackersNeedingOrder,
   availableBlockers,
@@ -174,7 +175,9 @@ const finishCleanup = (state: GameState, _emitter: EventEmitter): GameState => {
     .map((id) => [id, getObject(state, id)] as const)
     .filter(([, object]) => object.damage !== 0 || object.deathtouched)
     .map(([id]) => [id, { damage: 0, deathtouched: false }] as const);
-  return updateObjects(state, patches);
+
+  // "Until end of turn" effects end here too (CR 514.2).
+  return expireEndOfTurnEffects(updateObjects(state, patches));
 };
 
 const applyDiscard = (
