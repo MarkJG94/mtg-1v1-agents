@@ -12,13 +12,9 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done.
 - [x] 0.4 `scripts/fetch-scryfall.ts`: streams the gzipped `oracle_cards` JSONL to `data/scryfall/cards.jsonl`, skips non-card layouts, writes `meta.json` and prints counts. See ADR 0001.
 - [x] 0.5 Dockerfile + docker-compose with a `data` volume; `pnpm dev` runs server + web with HMR and an `/api` proxy.
 
-Two things landed with the scaffolding, ahead of their phases, because CI wanted something
-real to check: the seeded RNG from 1.1 (`packages/engine/src/rng.ts`) and the `RunSettings`
-schema from 05 (`packages/shared/src/settings.ts`).
-
 ## Phase 1 — Engine core (≈ 10–14 sessions)
 
-- [~] 1.1 State model, object ids, zones, seeded RNG, structural-sharing update helper, event emitter. *(Seeded RNG done: xoshiro128\*\*, serialisable, forkable. The rest is outstanding.)*
+- [x] 1.1 State model, object ids, zones, seeded RNG, structural-sharing update helper, event emitter. *(Zone and state shape settled in ADR 0002. `GameState` gains its per-subsystem fields in 1.4/1.6/1.8/1.9.)*
 - [ ] 1.2 Turn structure with all steps; untap/draw/cleanup; land drops; turn cap.
 - [ ] 1.3 Mana: pool, costs (incl. hybrid/phyrexian/X), payment solver, mana abilities of basic and simple nonbasic lands.
 - [ ] 1.4 Priority, stack, casting/activating, resolution, countering, fizzling, split second.

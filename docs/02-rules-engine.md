@@ -27,25 +27,33 @@
 
 ```ts
 interface GameState {
-  seed: RngState;
+  version: number;                          // bumped by every update; memoisation key for characteristics()
+  rng: RngState;
   turn: number;
   activePlayer: PlayerId;
   step: Step;                               // 'untap' | 'upkeep' | ... | 'cleanup'
   priority: PlayerId | null;
   passesInARow: number;
   players: Record<PlayerId, PlayerState>;   // life, poison, mana pool, landsPlayedThisTurn, flags
-  objects: Map<ObjectId, GameObject>;       // every card/token/copy currently in any zone
-  zones: Record<ZoneId, ObjectId[]>;        // library/hand/battlefield/graveyard/exile/stack/command per player
-  stack: StackItem[];                       // spells and abilities, bottom → top
-  effects: ContinuousEffect[];              // active continuous effects with timestamps
-  delayedTriggers: DelayedTrigger[];
-  pendingTriggers: TriggeredAbilityInstance[];  // waiting to be put on the stack
-  combat: CombatState | null;
-  pendingDecision: Decision | null;
-  turnLog: TurnFlags;                       // "this turn" bookkeeping
+  objects: ReadonlyMap<ObjectId, GameObject>;   // every card/token/copy currently in any zone
+  zones: Record<ZoneId, ObjectId[]>;        // library/hand/graveyard per player; battlefield/stack/exile/command shared
+  nextObjectId: number;
+  nextTimestamp: number;                    // layer-system timestamps (CR 613.7)
+  effects: ContinuousEffect[];              // active continuous effects with timestamps        (1.9)
+  delayedTriggers: DelayedTrigger[];                                                         // (1.8)
+  pendingTriggers: TriggeredAbilityInstance[];  // waiting to be put on the stack              (1.8)
+  combat: CombatState | null;                                                                // (1.6)
+  pendingDecision: Decision | null;                                                           // (1.4)
   result: GameResult | null;
 }
 ```
+
+Zones follow the Comprehensive Rules rather than being uniformly per player: library, hand
+and graveyard are owned, while the battlefield, stack, exile and command zone are single
+shared zones. Control is a property of the object, so a control-changing effect moves
+nothing and fires no zone-change trigger. The stack *is* the `stack` zone, bottom → top;
+there is no second array, and a spell's targets, modes and X live on its `GameObject`.
+Fields marked with a roadmap number are added by the phase that designs them. See ADR 0002.
 
 A `GameObject` holds `definitionId`, `owner`, `controller`, `zone`, `timestamp`, `tapped`, `counters`, `damage`, `attachedTo`, `attachments`, `chosen` (colour/type/name choices), `lastKnownInfo`, and the per-object continuous-effect cache. Characteristics (name, types, colours, P/T, abilities) are **never** stored directly; they are computed by `characteristics(state, objectId)` which starts from the printed definition (or copiable values) and applies the layer system. The result is memoised per state version.
 
