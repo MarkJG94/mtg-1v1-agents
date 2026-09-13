@@ -7,6 +7,7 @@ import {
   type Step,
   type ZoneId,
 } from '@mtg/shared';
+import type { CombatState } from '../combat.js';
 import type { Decision } from '../decision.js';
 import { emptyManaPool, type ManaPool } from '../mana/pool.js';
 import type { RngState } from '../rng.js';
@@ -74,6 +75,8 @@ export interface GameState {
    * own. A driver answers it with `applyDecision`.
    */
   readonly pendingDecision: Decision | null;
+  /** Non-null only during the combat phase (CR 506). */
+  readonly combat: CombatState | null;
   /**
    * Players owed an extra turn (CR 500.7), oldest first. The next turn goes to the
    * front of this queue if it has one, otherwise to the other player.
@@ -154,6 +157,7 @@ export const createGameState = (options: CreateGameStateOptions): GameState => {
     },
     extraTurns: [],
     pendingDecision: null,
+    combat: null,
     result: null,
   };
 };

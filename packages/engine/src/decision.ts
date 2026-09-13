@@ -1,4 +1,5 @@
-import type { ObjectId, PlayerId } from '@mtg/shared';
+import type { EventTarget, ObjectId, PlayerId } from '@mtg/shared';
+import type { BlockDeclaration } from './combat.js';
 
 /**
  * Decisions (docs/01 "Engine execution model", docs/02 "Decisions").
@@ -36,11 +37,52 @@ export interface DiscardDecision {
   readonly from: readonly ObjectId[];
 }
 
-export type Decision = PriorityDecision | DiscardDecision;
+/** Declaring attackers (CR 508.1). Declaring none is a legal answer. */
+export interface DeclareAttackersDecision {
+  readonly kind: 'declareAttackers';
+  readonly player: PlayerId;
+  /** Creatures that could attack. */
+  readonly legal: readonly ObjectId[];
+  /** Who they would attack; planeswalkers join this in roadmap 1.11. */
+  readonly defender: EventTarget;
+}
+
+/** Declaring blockers (CR 509.1). Declaring none is a legal answer. */
+export interface DeclareBlockersDecision {
+  readonly kind: 'declareBlockers';
+  readonly player: PlayerId;
+  readonly attackers: readonly ObjectId[];
+  /** Untapped creatures the defending player controls. */
+  readonly available: readonly ObjectId[];
+}
+
+/** Ordering the blockers of one attacker for damage assignment (CR 509.2). */
+export interface OrderBlockersDecision {
+  readonly kind: 'orderBlockers';
+  readonly player: PlayerId;
+  readonly attacker: ObjectId;
+  readonly blockers: readonly ObjectId[];
+}
+
+export type Decision =
+  | PriorityDecision
+  | DiscardDecision
+  | DeclareAttackersDecision
+  | DeclareBlockersDecision
+  | OrderBlockersDecision;
 
 export type DecisionResponse =
   | { readonly kind: 'priority'; readonly action: PriorityAction }
-  | { readonly kind: 'discard'; readonly cards: readonly ObjectId[] };
+  | { readonly kind: 'discard'; readonly cards: readonly ObjectId[] }
+  | {
+      readonly kind: 'declareAttackers';
+      readonly attackers: readonly {
+        readonly attacker: ObjectId;
+        readonly defender: EventTarget;
+      }[];
+    }
+  | { readonly kind: 'declareBlockers'; readonly blocks: readonly BlockDeclaration[] }
+  | { readonly kind: 'orderBlockers'; readonly order: readonly ObjectId[] };
 
 export class UnexpectedDecisionError extends Error {
   constructor(message: string) {

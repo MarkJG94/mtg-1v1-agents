@@ -9,6 +9,19 @@ import {
   steps,
 } from '@mtg/shared';
 import {
+  attackersNeedingOrder,
+  availableBlockers,
+  dealCombatDamage,
+  declareAttackers,
+  declareBlockers,
+  defendingPlayer,
+  emptyCombat,
+  endCombat,
+  legalAttackers,
+  needsFirstStrikeStep,
+  orderBlockers,
+} from '../combat.js';
+import {
   type Decision,
   type DecisionResponse,
   priorityDecision,
@@ -41,11 +54,20 @@ import {
 export type TurnOptions = Record<string, never>;
 
 /**
- * The first-strike damage step exists only when a creature with first or double strike
- * is in combat (CR 510.5). Combat arrives in roadmap 1.6; until then there are never any
- * attackers, so the step is always skipped.
+ * Steps that do not happen this turn.
+ *
+ * The first-strike damage step exists only when a creature with first or double strike is
+ * in combat (CR 510.4). And if nobody attacks, the declare blockers and combat damage
+ * steps are skipped entirely (CR 506.5) — which is why a turn with no attack shows ten
+ * steps rather than twelve.
  */
-const isStepSkipped = (_state: GameState, step: Step): boolean => step === 'firstStrikeDamage';
+const isStepSkipped = (state: GameState, step: Step): boolean => {
+  if (step === 'firstStrikeDamage') return !needsFirstStrikeStep(state);
+  if (step === 'declareBlockers' || step === 'combatDamage') {
+    return (state.combat?.attackers.length ?? 0) === 0;
+  }
+  return false;
+};
 
 /** The next step in the turn, or `null` when the turn is over. */
 export const nextStep = (state: GameState, from: Step): Step | null => {
@@ -181,12 +203,77 @@ const applyDiscard = (
   return finishCleanup(next, emitter);
 };
 
+/**
+ * Ask the active player which creatures attack (CR 508.1). With nothing able to attack
+ * there is nothing to decide, so combat simply starts empty.
+ */
+const performDeclareAttackers = (state: GameState): GameState => {
+  const legal = legalAttackers(state);
+  const started = updateState(state, { combat: emptyCombat });
+  if (legal.length === 0) return started;
+
+  return updateState(started, {
+    pendingDecision: {
+      kind: 'declareAttackers',
+      player: state.activePlayer,
+      legal,
+      defender: { kind: 'player', player: defendingPlayer(state) },
+    },
+  });
+};
+
+/** Ask the defending player which creatures block (CR 509.1). */
+const performDeclareBlockers = (state: GameState): GameState => {
+  const attackers = (state.combat?.attackers ?? []).map((entry) => entry.attacker);
+  const available = availableBlockers(state);
+  if (attackers.length === 0 || available.length === 0) return state;
+
+  return updateState(state, {
+    pendingDecision: {
+      kind: 'declareBlockers',
+      player: defendingPlayer(state),
+      attackers,
+      available,
+    },
+  });
+};
+
+/**
+ * After blockers are declared, any attacker facing two or more of them needs its blockers
+ * put in a damage-assignment order (CR 509.2). Returns a state waiting on that decision,
+ * or the state unchanged once every order is settled.
+ */
+const askForBlockerOrder = (state: GameState): GameState => {
+  const attacker = attackersNeedingOrder(state)[0];
+  if (attacker === undefined) return state;
+
+  const entry = state.combat?.attackers.find((candidate) => candidate.attacker === attacker);
+  return updateState(state, {
+    pendingDecision: {
+      kind: 'orderBlockers',
+      player: state.activePlayer,
+      attacker,
+      blockers: entry?.blockedBy ?? [],
+    },
+  });
+};
+
 const performTurnBasedActions = (state: GameState, emitter: EventEmitter): GameState => {
   switch (state.step) {
     case 'untap':
       return performUntap(state, emitter);
     case 'draw':
       return performDraw(state, emitter);
+    case 'declareAttackers':
+      return performDeclareAttackers(state);
+    case 'declareBlockers':
+      return performDeclareBlockers(state);
+    case 'firstStrikeDamage':
+      return dealCombatDamage(state, emitter, true);
+    case 'combatDamage':
+      return dealCombatDamage(state, emitter, false);
+    case 'endCombat':
+      return endCombat(state);
     case 'cleanup':
       return performCleanup(state, emitter);
     default:
@@ -320,10 +407,19 @@ export const applyDecision = (
   }
 
   const cleared = updateState(state, { pendingDecision: null });
-  const next =
-    decision.kind === 'discard' && response.kind === 'discard'
-      ? applyDiscard(cleared, emitter, decision, response.cards)
-      : applyPriority(cleared, emitter, decision as Extract<Decision, { kind: 'priority' }>);
+  let next: GameState;
+
+  if (decision.kind === 'discard' && response.kind === 'discard') {
+    next = applyDiscard(cleared, emitter, decision, response.cards);
+  } else if (decision.kind === 'declareAttackers' && response.kind === 'declareAttackers') {
+    next = declareAttackers(cleared, emitter, response.attackers);
+  } else if (decision.kind === 'declareBlockers' && response.kind === 'declareBlockers') {
+    next = askForBlockerOrder(declareBlockers(cleared, emitter, response.blocks));
+  } else if (decision.kind === 'orderBlockers' && response.kind === 'orderBlockers') {
+    next = askForBlockerOrder(orderBlockers(cleared, decision.attacker, response.order));
+  } else {
+    next = applyPriority(cleared, emitter, decision as Extract<Decision, { kind: 'priority' }>);
+  }
 
   return advanceToDecision(next, emitter);
 };

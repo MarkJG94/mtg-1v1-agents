@@ -38,6 +38,13 @@ export interface GameObject {
    */
   readonly keywords: Keywords;
   /**
+   * Power and toughness, or `null` for something that is not a creature. Like keywords
+   * these are stored for now and become computed values in roadmap 1.9; combat treats
+   * "has power and toughness" as "is a creature" until card types arrive in 2.1.
+   */
+  readonly power: number | null;
+  readonly toughness: number | null;
+  /**
    * Set only while the object is on the stack: where it resolves to, and whether it has
    * split second. Cleared as it leaves.
    */

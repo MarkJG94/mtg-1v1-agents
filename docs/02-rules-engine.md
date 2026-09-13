@@ -44,7 +44,7 @@ interface GameState {
   effects: ContinuousEffect[];              // active continuous effects with timestamps        (1.9)
   delayedTriggers: DelayedTrigger[];                                                         // (1.8)
   pendingTriggers: TriggeredAbilityInstance[];  // waiting to be put on the stack              (1.8)
-  combat: CombatState | null;                                                                // (1.6)
+  combat: CombatState | null;               // non-null only during the combat phase
   pendingDecision: Decision | null;         // set when a player must choose; null while it can run
   result: GameResult | null;
 }

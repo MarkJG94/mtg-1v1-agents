@@ -98,6 +98,8 @@ export interface NewObjectSpec {
   readonly controller?: PlayerId;
   readonly token?: boolean;
   readonly keywords?: Keywords;
+  readonly power?: number;
+  readonly toughness?: number;
   /** Where in the destination zone; defaults to the end of the array. */
   readonly position?: ZonePosition;
 }
@@ -123,6 +125,8 @@ export const createObject = (
     chosen: {},
     token: spec.token ?? false,
     keywords: spec.keywords ?? noKeywords,
+    power: spec.power ?? null,
+    toughness: spec.toughness ?? null,
     summoningSick: false,
   };
 

@@ -1,3 +1,4 @@
+export * from './combat.js';
 export * from './decision.js';
 export * from './events/emitter.js';
 export * from './legal-actions.js';

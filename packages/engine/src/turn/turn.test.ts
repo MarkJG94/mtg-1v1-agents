@@ -9,6 +9,7 @@ import {
   type GameState,
 } from '../state/game-state.js';
 import { createObject, getObject, objectsIn, updateObject, updatePlayer } from '../state/update.js';
+import { type Keywords, keywords } from '../targeting.js';
 import {
   applyDecision,
   drawCard,
@@ -112,13 +113,14 @@ describe('starting the game', () => {
 });
 
 describe('the sequence of steps (CR 500)', () => {
-  it('walks every step of the turn in order', () => {
+  it('walks the steps of a turn with no attack, skipping blockers and damage (CR 506.5)', () => {
     const { state, emitter } = setup();
     passThroughTurn(startGame(state, emitter), emitter);
 
     const walked = emitter.events
       .filter((event) => event.type === 'stepStart' && event.turn === 1)
       .map((event) => event.step);
+    // Nobody attacked, so the declare blockers and combat damage steps do not happen.
     expect(walked).toEqual([
       'untap',
       'upkeep',
@@ -126,8 +128,6 @@ describe('the sequence of steps (CR 500)', () => {
       'precombatMain',
       'beginCombat',
       'declareAttackers',
-      'declareBlockers',
-      'combatDamage',
       'endCombat',
       'postcombatMain',
       'end',
@@ -135,12 +135,12 @@ describe('the sequence of steps (CR 500)', () => {
     ]);
   });
 
-  it('skips the first-strike damage step when no first striker is in combat (CR 510.5)', () => {
+  it('never reaches the first-strike damage step with nobody in combat (CR 510.4)', () => {
     const { state, emitter } = setup();
     passThroughTurn(startGame(state, emitter), emitter);
     const walked = emitter.events.filter((event) => event.type === 'stepStart').map((e) => e.step);
     expect(walked).not.toContain('firstStrikeDamage');
-    expect(nextStep(state, 'declareBlockers')).toBe('combatDamage');
+    expect(nextStep(state, 'declareBlockers')).toBe('endCombat');
   });
 
   it('reports no next step after cleanup', () => {
@@ -486,5 +486,154 @@ describe('the event stream', () => {
       emitter.events.map((_event, index) => index),
     );
     for (const event of emitter.events) expect(event.turn).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('combat through the decision flow', () => {
+  /** A game at A's declare-attackers step with the given creatures in play. */
+  const withCreatures = (
+    a: readonly { power: number; toughness: number; keys?: Partial<Keywords> }[],
+    b: readonly { power: number; toughness: number; keys?: Partial<Keywords> }[] = [],
+  ) => {
+    const built = setup();
+    let state = built.state;
+    const mine: ObjectId[] = [];
+    const theirs: ObjectId[] = [];
+    for (const [owner, specs, into] of [
+      ['A', a, mine],
+      ['B', b, theirs],
+    ] as const) {
+      for (const spec of specs) {
+        const created = createObject(state, {
+          definitionId: card,
+          owner,
+          zone: 'battlefield',
+          power: spec.power,
+          toughness: spec.toughness,
+          keywords: keywords(spec.keys ?? {}),
+        });
+        state = created.state;
+        into.push(created.object.id);
+      }
+    }
+
+    const emitter = built.emitter;
+    let current = startGame(state, emitter);
+    while (current.pendingDecision?.kind !== 'declareAttackers') current = pass(current, emitter);
+    return { state: current, emitter, mine, theirs };
+  };
+
+  /** Pass priority until the named decision comes up. */
+  const untilDecision = (state: GameState, emitter: EventEmitter, kind: string): GameState => {
+    let current = state;
+    for (let i = 0; i < 50; i += 1) {
+      if (current.pendingDecision?.kind === kind) return current;
+      current = pass(current, emitter);
+    }
+    throw new Error(`never reached a ${kind} decision`);
+  };
+
+  const attackWithAll = (
+    state: GameState,
+    emitter: EventEmitter,
+    attackers: readonly ObjectId[],
+  ): GameState =>
+    applyDecision(state, emitter, {
+      kind: 'declareAttackers',
+      attackers: attackers.map((attacker) => ({
+        attacker,
+        defender: { kind: 'player', player: 'B' } as const,
+      })),
+    });
+
+  it('asks the active player to declare attackers', () => {
+    const { state, mine } = withCreatures([{ power: 2, toughness: 2 }]);
+    expect(state.pendingDecision).toMatchObject({
+      kind: 'declareAttackers',
+      player: 'A',
+      legal: mine,
+      defender: { kind: 'player', player: 'B' },
+    });
+  });
+
+  it('lets the player decline to attack, skipping blockers and damage', () => {
+    const { state, emitter } = withCreatures([{ power: 2, toughness: 2 }]);
+    let current = applyDecision(state, emitter, { kind: 'declareAttackers', attackers: [] });
+    // Players still get priority in the declare-attackers step (CR 508.2).
+    expect(current.step).toBe('declareAttackers');
+    current = passThroughTurn(current, emitter);
+
+    const walked = emitter.events
+      .filter((event) => event.type === 'stepStart' && event.turn === 1)
+      .map((event) => event.step);
+    expect(walked).not.toContain('declareBlockers');
+    expect(walked).not.toContain('combatDamage');
+    expect(current.players.B.life).toBe(20);
+  });
+
+  it('asks the defender to block once an attack is declared', () => {
+    const { state, emitter, mine } = withCreatures(
+      [{ power: 2, toughness: 2 }],
+      [{ power: 1, toughness: 1 }],
+    );
+    const attacked = attackWithAll(state, emitter, [mine[0] as ObjectId]);
+    const blocking = untilDecision(attacked, emitter, 'declareBlockers');
+    expect(blocking.pendingDecision).toMatchObject({ kind: 'declareBlockers', player: 'B' });
+  });
+
+  it('carries an unblocked attack through to the player’s life total', () => {
+    const { state, emitter, mine } = withCreatures([{ power: 3, toughness: 3 }]);
+    let current = attackWithAll(state, emitter, [mine[0] as ObjectId]);
+    // Nobody can block, so the game runs on to the damage step by itself.
+    while (current.step !== 'endCombat' && !current.result) current = pass(current, emitter);
+    expect(current.players.B.life).toBe(17);
+  });
+
+  it('walks all twelve steps when a first striker attacks', () => {
+    const { state, emitter, mine } = withCreatures([
+      { power: 2, toughness: 2, keys: { firstStrike: true } },
+    ]);
+    let current = attackWithAll(state, emitter, [mine[0] as ObjectId]);
+    current = passThroughTurn(current, emitter);
+
+    const walked = emitter.events
+      .filter((event) => event.type === 'stepStart' && event.turn === 1)
+      .map((event) => event.step);
+    // Every step happens, including the first-strike damage step: thirteen in all.
+    expect(walked).toContain('firstStrikeDamage');
+    expect(walked).toHaveLength(13);
+  });
+
+  it('asks for a damage-assignment order on a double block', () => {
+    const { state, emitter, mine, theirs } = withCreatures(
+      [{ power: 3, toughness: 3 }],
+      [
+        { power: 1, toughness: 1 },
+        { power: 1, toughness: 1 },
+      ],
+    );
+    const attacked = attackWithAll(state, emitter, [mine[0] as ObjectId]);
+    const blocking = untilDecision(attacked, emitter, 'declareBlockers');
+    const blocked = applyDecision(blocking, emitter, {
+      kind: 'declareBlockers',
+      blocks: theirs.map((blocker) => ({ blocker, blocking: [mine[0] as ObjectId] })),
+    });
+    expect(blocked.pendingDecision).toMatchObject({
+      kind: 'orderBlockers',
+      player: 'A',
+      attacker: mine[0],
+    });
+
+    const order = [theirs[1] as ObjectId, theirs[0] as ObjectId];
+    const ordered = applyDecision(blocked, emitter, { kind: 'orderBlockers', order });
+    expect(ordered.combat?.attackers[0]?.blockedBy).toEqual(order);
+    expect(ordered.pendingDecision?.kind).toBe('priority');
+  });
+
+  it('clears combat by the end of the turn', () => {
+    const { state, emitter, mine } = withCreatures([{ power: 2, toughness: 2 }]);
+    let current = attackWithAll(state, emitter, [mine[0] as ObjectId]);
+    current = passThroughTurn(current, emitter);
+    expect(current.combat).toBeNull();
   });
 });
