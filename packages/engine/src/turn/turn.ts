@@ -5,10 +5,18 @@ import {
   playerIds,
   playerZone,
   type Step,
+  skipsPriority,
   steps,
 } from '@mtg/shared';
+import {
+  type Decision,
+  type DecisionResponse,
+  priorityDecision,
+  UnexpectedDecisionError,
+} from '../decision.js';
 import type { EventEmitter } from '../events/emitter.js';
 import { emptyManaPool, isManaPoolEmpty } from '../mana/pool.js';
+import { isStackEmpty, resolveTopOfStack } from '../stack.js';
 import type { GameState } from '../state/game-state.js';
 import { isGameOver } from '../state/game-state.js';
 import {
@@ -29,20 +37,8 @@ import {
  * performs one step's automatic actions and stops, rather than running a whole turn.
  */
 
-export interface TurnOptions {
-  /**
-   * Which cards the active player discards in cleanup when over the hand-size limit
-   * (CR 514.1). This is a genuine player choice, so the engine cannot invent it; roadmap
-   * 1.4 replaces this hook with a `pendingDecision` the driver answers. Until then a game
-   * that reaches cleanup with a full hand and no chooser fails loudly rather than
-   * silently discarding the wrong cards.
-   */
-  readonly chooseDiscards?: (
-    state: GameState,
-    player: PlayerId,
-    count: number,
-  ) => readonly ObjectId[];
-}
+/** Reserved for options later phases add; kept so signatures stay stable. */
+export type TurnOptions = Record<string, never>;
 
 /**
  * The first-strike damage step exists only when a creature with first or double strike
@@ -121,75 +117,78 @@ export const drawCard = (state: GameState, emitter: EventEmitter, player: Player
  * simultaneously all damage is removed from permanents and "until end of turn" effects
  * end. Those effects arrive with the layer system in roadmap 1.9.
  */
-const performCleanup = (
-  state: GameState,
-  emitter: EventEmitter,
-  options: TurnOptions,
-): GameState => {
-  const discarded = discardToHandSize(state, emitter, options);
+const performCleanup = (state: GameState, emitter: EventEmitter): GameState => {
+  const player = state.activePlayer;
+  const excess = objectsIn(state, playerZone(player, 'hand')).length - state.config.maxHandSize;
 
-  const patches = objectsIn(discarded, 'battlefield')
-    .map((id) => [id, getObject(discarded, id)] as const)
-    .filter(([, object]) => object.damage !== 0)
-    .map(([id]) => [id, { damage: 0 }] as const);
+  // Discarding is a real choice, so the engine stops and asks. `applyDecision` calls
+  // `finishCleanup` once the player has answered.
+  if (excess > 0) {
+    return updateState(state, {
+      pendingDecision: {
+        kind: 'discard',
+        player,
+        count: excess,
+        from: objectsIn(state, playerZone(player, 'hand')),
+      },
+    });
+  }
 
-  return updateObjects(discarded, patches);
+  return finishCleanup(state, emitter);
 };
 
-const discardToHandSize = (
+/** The rest of cleanup, once any discard has happened: all damage is removed (CR 514.2). */
+const finishCleanup = (state: GameState, _emitter: EventEmitter): GameState => {
+  const patches = objectsIn(state, 'battlefield')
+    .map((id) => [id, getObject(state, id)] as const)
+    .filter(([, object]) => object.damage !== 0)
+    .map(([id]) => [id, { damage: 0 }] as const);
+  return updateObjects(state, patches);
+};
+
+const applyDiscard = (
   state: GameState,
   emitter: EventEmitter,
-  options: TurnOptions,
+  decision: Extract<Decision, { kind: 'discard' }>,
+  chosen: readonly ObjectId[],
 ): GameState => {
-  const player = state.activePlayer;
-  const hand = playerZone(player, 'hand');
-  const excess = objectsIn(state, hand).length - state.config.maxHandSize;
-  if (excess <= 0) return state;
-
-  const chooser = options.chooseDiscards;
-  if (!chooser) {
-    throw new Error(
-      `player ${player} must discard ${excess} card(s) in cleanup, but no chooseDiscards ` +
-        `was supplied; roadmap 1.4 replaces this hook with a pendingDecision`,
+  if (chosen.length !== decision.count) {
+    throw new UnexpectedDecisionError(
+      `expected ${decision.count} card(s) to discard, got ${chosen.length}`,
     );
   }
 
-  const chosen = chooser(state, player, excess);
-  if (chosen.length !== excess) {
-    throw new Error(`chooseDiscards returned ${chosen.length} card(s), expected ${excess}`);
-  }
+  const player = decision.player;
+  const hand = playerZone(player, 'hand');
+  const graveyard = playerZone(player, 'graveyard');
+  const allowed = new Set(decision.from);
 
-  const inHand = new Set(objectsIn(state, hand));
   let next = state;
   for (const id of chosen) {
-    if (!inHand.has(id)) {
-      throw new Error(`chooseDiscards returned ${id}, which is not in ${player}'s hand`);
+    if (!allowed.has(id)) {
+      throw new UnexpectedDecisionError(`card ${id} is not in ${player}'s hand`);
     }
-    inHand.delete(id);
-    next = moveObject(next, id, playerZone(player, 'graveyard'));
+    allowed.delete(id);
+    next = moveObject(next, id, graveyard);
     emitter.emit(next, {
       type: 'moveZone',
       object: id,
       from: hand,
-      to: playerZone(player, 'graveyard'),
+      to: graveyard,
       cause: 'discard',
     });
   }
-  return next;
+  return finishCleanup(next, emitter);
 };
 
-const performTurnBasedActions = (
-  state: GameState,
-  emitter: EventEmitter,
-  options: TurnOptions,
-): GameState => {
+const performTurnBasedActions = (state: GameState, emitter: EventEmitter): GameState => {
   switch (state.step) {
     case 'untap':
       return performUntap(state, emitter);
     case 'draw':
       return performDraw(state, emitter);
     case 'cleanup':
-      return performCleanup(state, emitter, options);
+      return performCleanup(state, emitter);
     default:
       return state;
   }
@@ -211,15 +210,10 @@ const nextTurnPlayer = (
 export const grantExtraTurn = (state: GameState, player: PlayerId): GameState =>
   updateState(state, { extraTurns: [...state.extraTurns, player] });
 
-const enterStep = (
-  state: GameState,
-  emitter: EventEmitter,
-  step: Step,
-  options: TurnOptions,
-): GameState => {
+const enterStep = (state: GameState, emitter: EventEmitter, step: Step): GameState => {
   // Unused mana empties as a step or phase ends (CR 500.4). Clearing it as the next step
   // begins is the same thing, and keeps mana available for the whole step that made it.
-  let entered = updateState(state, { step, passesInARow: 0 });
+  let entered = updateState(state, { step, passesInARow: 0, priority: null });
   for (const id of playerIds) {
     if (!isManaPoolEmpty(entered.players[id].manaPool)) {
       entered = updatePlayer(entered, id, { manaPool: emptyManaPool });
@@ -227,7 +221,7 @@ const enterStep = (
   }
 
   emitter.emit(entered, { type: 'stepStart' });
-  return performTurnBasedActions(entered, emitter, options);
+  return performTurnBasedActions(entered, emitter);
 };
 
 const beginTurn = (
@@ -235,12 +229,12 @@ const beginTurn = (
   emitter: EventEmitter,
   player: PlayerId,
   extraTurns: readonly PlayerId[],
-  options: TurnOptions,
 ): GameState => {
   const turn = state.turn + 1;
   if (turn > state.config.turnCap) {
     const ended = updateState(state, {
       result: { winner: null, reason: 'turnCap', turn: state.turn },
+      pendingDecision: null,
     });
     emitter.emit(ended, { type: 'gameEnd', winner: null, reason: 'turnCap' });
     return ended;
@@ -252,51 +246,160 @@ const beginTurn = (
   for (const id of playerIds) started = updatePlayer(started, id, { landsPlayedThisTurn: 0 });
 
   emitter.emit(started, { type: 'turnStart', activePlayer: player });
-  return enterStep(started, emitter, 'untap', options);
+  return enterStep(started, emitter, 'untap');
 };
 
-/**
- * Begin turn 1 for the player on the play, running the untap step's turn-based actions.
- * Mulligans and opening hands are roadmap 1.12; this assumes the game is already set up.
- */
-export const startFirstTurn = (
-  state: GameState,
-  emitter: EventEmitter,
-  options: TurnOptions = {},
-): GameState => {
-  if (state.turn !== 0) throw new Error(`the game has already started (turn ${state.turn})`);
-  return beginTurn(state, emitter, state.config.playerOnPlay, state.extraTurns, options);
-};
-
-/**
- * Advance to the next step, running its turn-based actions, rolling over into the next
- * turn after cleanup. A finished game is returned unchanged.
- */
-export const advanceStep = (
-  state: GameState,
-  emitter: EventEmitter,
-  options: TurnOptions = {},
-): GameState => {
-  if (isGameOver(state)) return state;
-  if (state.turn === 0) throw new Error('the game has not started; call startFirstTurn first');
-
+/** Move to the next step, or into the next turn when the current one is over. */
+const leaveStep = (state: GameState, emitter: EventEmitter): GameState => {
   const following = nextStep(state, state.step);
-  if (following) return enterStep(state, emitter, following, options);
+  if (following) return enterStep(state, emitter, following);
 
   const { player, extraTurns } = nextTurnPlayer(state);
-  return beginTurn(state, emitter, player, extraTurns, options);
+  return beginTurn(state, emitter, player, extraTurns);
 };
 
-/** Advance until the game ends or `limit` steps have passed. Mostly for tests. */
-export const advanceUntilGameOver = (
+/** Hand a player priority and stop for their decision (CR 117.1). */
+const grantPriority = (state: GameState, player: PlayerId): GameState =>
+  updateState(state, { priority: player, pendingDecision: priorityDecision(player) });
+
+/**
+ * Run the game forward until a player must decide, or it ends.
+ *
+ * State-based actions and putting triggered abilities on the stack both belong here,
+ * immediately before priority is granted (CR 117.5); they arrive in roadmap 1.7 and 1.8.
+ */
+export const advanceToDecision = (
   state: GameState,
   emitter: EventEmitter,
-  options: TurnOptions = {},
-  limit = 100_000,
+  limit = 10_000,
 ): GameState => {
   let current = state;
+  for (let i = 0; i < limit; i += 1) {
+    if (isGameOver(current) || current.pendingDecision !== null) return current;
+    if (current.turn === 0) {
+      throw new Error('the game has not started; call startGame first');
+    }
+
+    if (skipsPriority(current.step)) {
+      current = leaveStep(current, emitter);
+      continue;
+    }
+
+    // Either nobody holds priority yet this step (the active player gets it first,
+    // CR 117.3a) or somebody acted and gets it straight back (CR 117.3c).
+    current = grantPriority(current, current.priority ?? current.activePlayer);
+  }
+  throw new Error(`the game made no progress in ${limit} steps`);
+};
+
+/**
+ * Begin turn 1 for the player on the play and run to the first decision.
+ * Mulligans and opening hands are roadmap 1.12; this assumes the game is set up.
+ */
+export const startGame = (state: GameState, emitter: EventEmitter): GameState => {
+  if (state.turn !== 0) throw new Error(`the game has already started (turn ${state.turn})`);
+  const started = beginTurn(state, emitter, state.config.playerOnPlay, state.extraTurns);
+  return advanceToDecision(started, emitter);
+};
+
+/**
+ * Answer the pending decision and run on to the next one — the `step(state, decision)` of
+ * docs/01. A game is therefore a pure function of its seed and the decisions taken.
+ */
+export const applyDecision = (
+  state: GameState,
+  emitter: EventEmitter,
+  response: DecisionResponse,
+): GameState => {
+  const decision = state.pendingDecision;
+  if (!decision) throw new UnexpectedDecisionError('no decision is pending');
+  if (decision.kind !== response.kind) {
+    throw new UnexpectedDecisionError(
+      `the pending decision is "${decision.kind}", not "${response.kind}"`,
+    );
+  }
+
+  const cleared = updateState(state, { pendingDecision: null });
+  const next =
+    decision.kind === 'discard' && response.kind === 'discard'
+      ? applyDiscard(cleared, emitter, decision, response.cards)
+      : applyPriority(cleared, emitter, decision as Extract<Decision, { kind: 'priority' }>);
+
+  return advanceToDecision(next, emitter);
+};
+
+/**
+ * A pass. Two passes in a row resolve the top of the stack, or end the step when the
+ * stack is empty (CR 117.4). Anything else the player might do is not a decision option
+ * yet — a driver holding priority calls `putOnStack` directly — so this only handles
+ * passing until `legalActions` arrives in roadmap 1.5.
+ */
+const applyPriority = (
+  state: GameState,
+  emitter: EventEmitter,
+  decision: Extract<Decision, { kind: 'priority' }>,
+): GameState => {
+  const passes = state.passesInARow + 1;
+  if (passes < playerIds.length) {
+    return grantPriority(updateState(state, { passesInARow: passes }), opponentOf(decision.player));
+  }
+
+  if (isStackEmpty(state)) {
+    return leaveStep(updateState(state, { passesInARow: 0, priority: null }), emitter);
+  }
+
+  const resolved = resolveTopOfStack(updateState(state, { passesInARow: 0 }), emitter);
+  // The active player receives priority after something resolves (CR 117.3b).
+  return grantPriority(resolved, resolved.activePlayer);
+};
+
+// --- Driving a whole game, for tests and the random agent ---
+
+export interface AutoPlayOptions {
+  /** Which cards to pitch to a discard decision; defaults to the first ones in hand. */
+  readonly chooseDiscards?: (
+    decision: Extract<Decision, { kind: 'discard' }>,
+  ) => readonly ObjectId[];
+  readonly limit?: number;
+}
+
+/** Answer the pending decision by passing, or by discarding, until the game ends. */
+export const runUntilGameOver = (
+  state: GameState,
+  emitter: EventEmitter,
+  options: AutoPlayOptions = {},
+): GameState => {
+  const limit = options.limit ?? 100_000;
+  let current = state;
   for (let i = 0; i < limit && !isGameOver(current); i += 1) {
-    current = advanceStep(current, emitter, options);
+    const decision = current.pendingDecision;
+    if (!decision) {
+      current = advanceToDecision(current, emitter);
+      continue;
+    }
+    current =
+      decision.kind === 'discard'
+        ? applyDecision(current, emitter, {
+            kind: 'discard',
+            cards: (options.chooseDiscards ?? ((d) => d.from.slice(0, d.count)))(decision),
+          })
+        : applyDecision(current, emitter, { kind: 'priority', action: { kind: 'pass' } });
   }
   return current;
+};
+
+/** Drive the game forward, passing priority, until `step` begins. For tests. */
+export const advanceToStep = (
+  state: GameState,
+  emitter: EventEmitter,
+  step: Step,
+  limit = 2_000,
+): GameState => {
+  let current = state;
+  for (let i = 0; i < limit; i += 1) {
+    if (current.step === step && current.pendingDecision !== null) return current;
+    if (isGameOver(current)) throw new Error(`the game ended before reaching ${step}`);
+    current = applyDecision(current, emitter, { kind: 'priority', action: { kind: 'pass' } });
+  }
+  throw new Error(`did not reach ${step} within ${limit} decisions`);
 };

@@ -7,6 +7,7 @@ import {
   type Step,
   type ZoneId,
 } from '@mtg/shared';
+import type { Decision } from '../decision.js';
 import { emptyManaPool, type ManaPool } from '../mana/pool.js';
 import type { RngState } from '../rng.js';
 import type { GameObject } from './object.js';
@@ -65,6 +66,11 @@ export interface GameState {
   /** Next layer-system timestamp (CR 613.7). */
   readonly nextTimestamp: number;
   readonly config: GameConfig;
+  /**
+   * Set when the game is waiting for a player to choose; `null` while it can run on its
+   * own. A driver answers it with `applyDecision`.
+   */
+  readonly pendingDecision: Decision | null;
   /**
    * Players owed an extra turn (CR 500.7), oldest first. The next turn goes to the
    * front of this queue if it has one, otherwise to the other player.
@@ -143,6 +149,7 @@ export const createGameState = (options: CreateGameStateOptions): GameState => {
       playerOnPlay: options.onPlay,
     },
     extraTurns: [],
+    pendingDecision: null,
     result: null,
   };
 };

@@ -45,7 +45,7 @@ interface GameState {
   delayedTriggers: DelayedTrigger[];                                                         // (1.8)
   pendingTriggers: TriggeredAbilityInstance[];  // waiting to be put on the stack              (1.8)
   combat: CombatState | null;                                                                // (1.6)
-  pendingDecision: Decision | null;                                                           // (1.4)
+  pendingDecision: Decision | null;         // set when a player must choose; null while it can run
   result: GameResult | null;
 }
 ```

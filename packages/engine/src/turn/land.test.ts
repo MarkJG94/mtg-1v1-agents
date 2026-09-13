@@ -5,9 +5,13 @@ import { stateFromSeed } from '../rng.js';
 import { createGameState, type GameState } from '../state/game-state.js';
 import { createObject, getObject, objectsIn, updatePlayer } from '../state/update.js';
 import { canPlayLand, IllegalLandPlayError, landsRemainingThisTurn, playLand } from './land.js';
-import { advanceStep, startFirstTurn } from './turn.js';
+import { applyDecision, startGame } from './turn.js';
 
 const forest = asOracleId('oracle-forest');
+
+/** Answer the pending priority decision by passing. */
+const pass = (state: GameState, emitter: EventEmitter): GameState =>
+  applyDecision(state, emitter, { kind: 'priority', action: { kind: 'pass' } });
 
 /** A started game with one card in each player's hand, stopped at A's precombat main. */
 const atMainPhase = (): {
@@ -31,8 +35,8 @@ const atMainPhase = (): {
   state = b.state;
 
   const emitter = createEventEmitter();
-  let current = startFirstTurn(state, emitter);
-  while (current.step !== 'precombatMain') current = advanceStep(current, emitter);
+  let current = startGame(state, emitter);
+  while (current.step !== 'precombatMain') current = pass(current, emitter);
   return { state: current, emitter, mine: a.object.id, theirs: b.object.id };
 };
 
@@ -73,14 +77,14 @@ describe('canPlayLand (CR 305.1)', () => {
   it('refuses outside a main phase', () => {
     const { state, emitter } = atMainPhase();
     let current = state;
-    while (current.step !== 'declareAttackers') current = advanceStep(current, emitter);
+    while (current.step !== 'declareAttackers') current = pass(current, emitter);
     expect(canPlayLand(current, 'A')).toBe(false);
   });
 
   it('allows the postcombat main phase too', () => {
     const { state, emitter } = atMainPhase();
     let current = state;
-    while (current.step !== 'postcombatMain') current = advanceStep(current, emitter);
+    while (current.step !== 'postcombatMain') current = pass(current, emitter);
     expect(canPlayLand(current, 'A')).toBe(true);
   });
 
@@ -172,7 +176,7 @@ describe('playLand', () => {
     while (
       !(current.activePlayer === 'A' && current.step === 'precombatMain' && current.turn > 1)
     ) {
-      current = advanceStep(current, emitter);
+      current = pass(current, emitter);
     }
     expect(current.turn).toBe(3);
     expect(landsRemainingThisTurn(current, 'A')).toBe(1);
@@ -184,7 +188,7 @@ describe('the land-drop counter is per player', () => {
     const { state, emitter, mine, theirs } = atMainPhase();
     let current = playLand(state, emitter, 'A', mine);
     while (!(current.activePlayer === 'B' && current.step === 'precombatMain')) {
-      current = advanceStep(current, emitter);
+      current = pass(current, emitter);
     }
     const bothPlayed = playLand(current, emitter, 'B', theirs);
     expect(objectsIn(bothPlayed, 'battlefield')).toHaveLength(2);

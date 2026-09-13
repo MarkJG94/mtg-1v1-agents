@@ -10,15 +10,19 @@ import {
 } from '../state/game-state.js';
 import { createObject, getObject, objectsIn, updateObject, updatePlayer } from '../state/update.js';
 import {
-  advanceStep,
-  advanceUntilGameOver,
+  applyDecision,
   drawCard,
   grantExtraTurn,
   nextStep,
-  startFirstTurn,
+  runUntilGameOver,
+  startGame,
 } from './turn.js';
 
 const card = asOracleId('oracle-card');
+
+/** Answer the pending priority decision by passing. */
+const pass = (state: GameState, emitter: EventEmitter): GameState =>
+  applyDecision(state, emitter, { kind: 'priority', action: { kind: 'pass' } });
 
 /** A game with `librarySize` cards in each library and nothing else. */
 const setup = (
@@ -51,53 +55,71 @@ const putOnBattlefield = (
   return { state: updateObject(created.state, created.object.id, patch), id: created.object.id };
 };
 
-const stepsOfTurn = (state: GameState, emitter: EventEmitter): string[] => {
-  const seen = [state.step];
+const addToHand = (state: GameState, player: PlayerId, count: number): GameState => {
   let current = state;
-  const startingTurn = state.turn;
-  while (current.turn === startingTurn) {
-    current = advanceStep(current, emitter);
-    if (current.turn === startingTurn) seen.push(current.step);
+  for (let i = 0; i < count; i += 1) {
+    current = createObject(current, {
+      definitionId: card,
+      owner: player,
+      zone: playerZone(player, 'hand'),
+    }).state;
   }
-  return seen;
+  return current;
+};
+
+/** Pass priority until the turn number changes. */
+const passThroughTurn = (state: GameState, emitter: EventEmitter): GameState => {
+  let current = state;
+  const startingTurn = current.turn;
+  while (current.turn === startingTurn && !current.result) current = pass(current, emitter);
+  return current;
 };
 
 describe('starting the game', () => {
-  it('begins turn 1 with the player on the play, in the untap step', () => {
+  it('stops at the first step where a player gets priority', () => {
     const { state, emitter } = setup();
-    const started = startFirstTurn(state, emitter);
-    expect(started).toMatchObject({ turn: 1, activePlayer: 'A', step: 'untap' });
+    const started = startGame(state, emitter);
+    // Untap gives nobody priority (CR 502.3), so the first stop is upkeep.
+    expect(started).toMatchObject({ turn: 1, activePlayer: 'A', step: 'upkeep' });
+    expect(started.pendingDecision).toEqual({
+      kind: 'priority',
+      player: 'A',
+      options: [{ kind: 'pass' }],
+    });
   });
 
-  it('gives the first turn to whoever is on the play', () => {
+  it('gives the first turn and the first priority to the player on the play', () => {
     const { state, emitter } = setup(10, { onPlay: 'B' });
-    expect(startFirstTurn(state, emitter).activePlayer).toBe('B');
+    const started = startGame(state, emitter);
+    expect(started.activePlayer).toBe('B');
+    expect(started.priority).toBe('B');
   });
 
-  it('emits turnStart then stepStart', () => {
+  it('emits turnStart and the untap and upkeep stepStarts before stopping', () => {
     const { state, emitter } = setup();
-    startFirstTurn(state, emitter);
-    expect(emitter.events.map((event) => event.type)).toEqual(['turnStart', 'stepStart']);
-    expect(emitter.events[0]).toMatchObject({ type: 'turnStart', activePlayer: 'A', turn: 1 });
+    startGame(state, emitter);
+    expect(emitter.events.map((event) => event.type)).toEqual([
+      'turnStart',
+      'stepStart',
+      'stepStart',
+    ]);
   });
 
   it('refuses to start twice', () => {
     const { state, emitter } = setup();
-    expect(() => startFirstTurn(startFirstTurn(state, emitter), emitter)).toThrow(
-      /already started/,
-    );
-  });
-
-  it('refuses to advance a game that has not started', () => {
-    const { state, emitter } = setup();
-    expect(() => advanceStep(state, emitter)).toThrow(/has not started/);
+    expect(() => startGame(startGame(state, emitter), emitter)).toThrow(/already started/);
   });
 });
 
 describe('the sequence of steps (CR 500)', () => {
-  it('walks every step in turn order', () => {
+  it('walks every step of the turn in order', () => {
     const { state, emitter } = setup();
-    expect(stepsOfTurn(startFirstTurn(state, emitter), emitter)).toEqual([
+    passThroughTurn(startGame(state, emitter), emitter);
+
+    const walked = emitter.events
+      .filter((event) => event.type === 'stepStart' && event.turn === 1)
+      .map((event) => event.step);
+    expect(walked).toEqual([
       'untap',
       'upkeep',
       'draw',
@@ -115,7 +137,8 @@ describe('the sequence of steps (CR 500)', () => {
 
   it('skips the first-strike damage step when no first striker is in combat (CR 510.5)', () => {
     const { state, emitter } = setup();
-    const walked = stepsOfTurn(startFirstTurn(state, emitter), emitter);
+    passThroughTurn(startGame(state, emitter), emitter);
+    const walked = emitter.events.filter((event) => event.type === 'stepStart').map((e) => e.step);
     expect(walked).not.toContain('firstStrikeDamage');
     expect(nextStep(state, 'declareBlockers')).toBe('combatDamage');
   });
@@ -125,57 +148,83 @@ describe('the sequence of steps (CR 500)', () => {
     expect(nextStep(state, 'cleanup')).toBeNull();
   });
 
-  it('emits one stepStart per step of the turn', () => {
+  it('never rests in a step that gives no priority', () => {
     const { state, emitter } = setup();
-    // stepsOfTurn runs on into the next turn's untap, so count only turn 1's events.
-    stepsOfTurn(startFirstTurn(state, emitter), emitter);
-    const stepStarts = emitter.events.filter(
-      (event) => event.type === 'stepStart' && event.turn === 1,
+    let current = startGame(state, emitter);
+    for (let i = 0; i < 40; i += 1) {
+      expect(current.step).not.toBe('untap');
+      expect(current.step).not.toBe('cleanup');
+      current = pass(current, emitter);
+    }
+  });
+});
+
+describe('priority (CR 117)', () => {
+  it('gives the active player priority first in each step (CR 117.3a)', () => {
+    const { state, emitter } = setup();
+    expect(startGame(state, emitter).priority).toBe('A');
+  });
+
+  it('passes priority to the opponent on a pass', () => {
+    const { state, emitter } = setup();
+    expect(pass(startGame(state, emitter), emitter).priority).toBe('B');
+  });
+
+  it('ends the step when both players pass in succession (CR 117.4)', () => {
+    const { state, emitter } = setup();
+    const started = startGame(state, emitter);
+    expect(started.step).toBe('upkeep');
+    const bothPassed = pass(pass(started, emitter), emitter);
+    expect(bothPassed.step).toBe('draw');
+    expect(bothPassed.priority).toBe('A');
+  });
+
+  it('resets the pass count when the step changes', () => {
+    const { state, emitter } = setup();
+    const bothPassed = pass(pass(startGame(state, emitter), emitter), emitter);
+    expect(bothPassed.passesInARow).toBe(0);
+  });
+
+  it('refuses a decision when none is pending', () => {
+    const { state, emitter } = setup();
+    const started = startGame(state, emitter);
+    const noDecision = { ...started, pendingDecision: null };
+    expect(() => pass(noDecision, emitter)).toThrow(/no decision is pending/);
+  });
+
+  it('refuses an answer of the wrong kind', () => {
+    const { state, emitter } = setup();
+    const started = startGame(state, emitter);
+    expect(() => applyDecision(started, emitter, { kind: 'discard', cards: [] })).toThrow(
+      /pending decision is "priority"/,
     );
-    expect(stepStarts).toHaveLength(12);
-    expect(stepStarts.map((event) => event.step)).toEqual([
-      'untap',
-      'upkeep',
-      'draw',
-      'precombatMain',
-      'beginCombat',
-      'declareAttackers',
-      'declareBlockers',
-      'combatDamage',
-      'endCombat',
-      'postcombatMain',
-      'end',
-      'cleanup',
-    ]);
   });
 });
 
 describe('turn rollover', () => {
   it('passes the turn to the opponent after cleanup', () => {
     const { state, emitter } = setup();
-    let current = startFirstTurn(state, emitter);
-    while (current.turn === 1) current = advanceStep(current, emitter);
-    expect(current).toMatchObject({ turn: 2, activePlayer: 'B', step: 'untap' });
+    const next = passThroughTurn(startGame(state, emitter), emitter);
+    expect(next).toMatchObject({ turn: 2, activePlayer: 'B', step: 'upkeep' });
   });
 
   it('alternates players across several turns', () => {
     const { state, emitter } = setup(60);
-    let current = startFirstTurn(state, emitter);
+    let current = startGame(state, emitter);
     const active: PlayerId[] = [current.activePlayer];
     while (current.turn < 5) {
-      current = advanceStep(current, emitter);
-      if (current.step === 'untap' && active.length < current.turn)
-        active.push(current.activePlayer);
+      current = passThroughTurn(current, emitter);
+      active.push(current.activePlayer);
     }
     expect(active).toEqual(['A', 'B', 'A', 'B', 'A']);
   });
 
   it('resets land drops for both players each turn', () => {
     const { state, emitter } = setup();
-    let current = startFirstTurn(state, emitter);
+    let current = startGame(state, emitter);
     current = updatePlayer(current, 'A', { landsPlayedThisTurn: 1 });
     current = updatePlayer(current, 'B', { landsPlayedThisTurn: 1 });
-    while (current.turn === 1) current = advanceStep(current, emitter);
+    current = passThroughTurn(current, emitter);
     expect(current.players.A.landsPlayedThisTurn).toBe(0);
     expect(current.players.B.landsPlayedThisTurn).toBe(0);
   });
@@ -185,36 +234,32 @@ describe('the untap step (CR 502)', () => {
   it('untaps the permanents the active player controls', () => {
     const { state, emitter } = setup();
     const mine = putOnBattlefield(state, 'A', { tapped: true });
-    const started = startFirstTurn(mine.state, emitter);
-    expect(getObject(started, mine.id).tapped).toBe(false);
+    expect(getObject(startGame(mine.state, emitter), mine.id).tapped).toBe(false);
   });
 
   it('leaves the opponent’s permanents tapped', () => {
     const { state, emitter } = setup();
     const theirs = putOnBattlefield(state, 'B', { tapped: true });
-    const started = startFirstTurn(theirs.state, emitter);
-    expect(getObject(started, theirs.id).tapped).toBe(true);
+    expect(getObject(startGame(theirs.state, emitter), theirs.id).tapped).toBe(true);
   });
 
   it('clears summoning sickness for the active player (CR 302.6)', () => {
     const { state, emitter } = setup();
     const mine = putOnBattlefield(state, 'A', { summoningSick: true });
-    const started = startFirstTurn(mine.state, emitter);
-    expect(getObject(started, mine.id).summoningSick).toBe(false);
+    expect(getObject(startGame(mine.state, emitter), mine.id).summoningSick).toBe(false);
   });
 
   it('leaves the opponent’s creatures summoning sick', () => {
     const { state, emitter } = setup();
     const theirs = putOnBattlefield(state, 'B', { summoningSick: true });
-    const started = startFirstTurn(theirs.state, emitter);
-    expect(getObject(started, theirs.id).summoningSick).toBe(true);
+    expect(getObject(startGame(theirs.state, emitter), theirs.id).summoningSick).toBe(true);
   });
 
   it('emits an untap event per permanent actually untapped', () => {
     const { state, emitter } = setup();
     const tapped = putOnBattlefield(state, 'A', { tapped: true });
     const untappedAlready = putOnBattlefield(tapped.state, 'A');
-    startFirstTurn(untappedAlready.state, emitter);
+    startGame(untappedAlready.state, emitter);
     const untaps = emitter.events.filter((event) => event.type === 'untap');
     expect(untaps).toHaveLength(1);
     expect(untaps[0]).toMatchObject({ object: tapped.id });
@@ -222,40 +267,32 @@ describe('the untap step (CR 502)', () => {
 });
 
 describe('the draw step (CR 504)', () => {
-  const drawUntilStep = (state: GameState, emitter: EventEmitter): GameState => {
-    let current = startFirstTurn(state, emitter);
-    while (current.step !== 'draw') current = advanceStep(current, emitter);
-    return current;
-  };
-
   it('lets the player on the play skip their first draw (CR 103.7a)', () => {
     const { state, emitter } = setup();
-    const atDraw = drawUntilStep(state, emitter);
-    expect(objectsIn(atDraw, playerZone('A', 'hand'))).toEqual([]);
-    expect(objectsIn(atDraw, playerZone('A', 'library'))).toHaveLength(10);
+    let current = startGame(state, emitter);
+    while (current.step !== 'precombatMain') current = pass(current, emitter);
+    expect(objectsIn(current, playerZone('A', 'hand'))).toEqual([]);
+    expect(objectsIn(current, playerZone('A', 'library'))).toHaveLength(10);
   });
 
   it('has the player on the draw draw on their first turn', () => {
     const { state, emitter } = setup();
-    let current = startFirstTurn(state, emitter);
-    while (current.turn === 1) current = advanceStep(current, emitter);
-    while (current.step !== 'draw') current = advanceStep(current, emitter);
+    let current = passThroughTurn(startGame(state, emitter), emitter);
+    while (current.step !== 'precombatMain') current = pass(current, emitter);
     expect(objectsIn(current, playerZone('B', 'hand'))).toHaveLength(1);
   });
 
   it('draws from the top of the library', () => {
-    const { state, emitter } = setup(10, { onPlay: 'B' });
-    const top = objectsIn(state, playerZone('B', 'library'))[0];
-    const atDraw = drawUntilStep(state, emitter);
-    // B is on the play here, so it skips; draw explicitly to check which card comes off.
-    const drawn = drawCard(atDraw, emitter, 'B');
-    expect(objectsIn(drawn, playerZone('B', 'hand'))).toEqual([top]);
+    const { state, emitter } = setup();
+    const top = objectsIn(state, playerZone('A', 'library'))[0];
+    const drawn = drawCard(startGame(state, emitter), emitter, 'A');
+    expect(objectsIn(drawn, playerZone('A', 'hand'))).toEqual([top]);
   });
 
   it('emits a draw event naming the card', () => {
     const { state, emitter } = setup();
     const top = objectsIn(state, playerZone('A', 'library'))[0];
-    drawCard(startFirstTurn(state, emitter), emitter, 'A');
+    drawCard(startGame(state, emitter), emitter, 'A');
     expect(emitter.events.at(-1)).toMatchObject({ type: 'draw', player: 'A', object: top });
   });
 });
@@ -263,15 +300,14 @@ describe('the draw step (CR 504)', () => {
 describe('drawing from an empty library (CR 120.3, 704.5b)', () => {
   it('flags the player rather than losing on the spot', () => {
     const { state, emitter } = setup(0);
-    const started = startFirstTurn(state, emitter);
-    const after = drawCard(started, emitter, 'A');
+    const after = drawCard(startGame(state, emitter), emitter, 'A');
     expect(after.players.A.drewFromEmptyLibrary).toBe(true);
     expect(after.result).toBeNull();
   });
 
   it('draws no card and emits no draw event', () => {
     const { state, emitter } = setup(0);
-    const started = startFirstTurn(state, emitter);
+    const started = startGame(state, emitter);
     const before = emitter.events.length;
     const after = drawCard(started, emitter, 'A');
     expect(objectsIn(after, playerZone('A', 'hand'))).toEqual([]);
@@ -280,209 +316,175 @@ describe('drawing from an empty library (CR 120.3, 704.5b)', () => {
 
   it('stays flagged without churning state on a second attempt', () => {
     const { state, emitter } = setup(0);
-    const first = drawCard(startFirstTurn(state, emitter), emitter, 'A');
+    const first = drawCard(startGame(state, emitter), emitter, 'A');
     expect(drawCard(first, emitter, 'A')).toBe(first);
   });
 });
 
 describe('the cleanup step (CR 514)', () => {
-  const runToCleanup = (state: GameState, emitter: EventEmitter, options = {}): GameState => {
-    let current = startFirstTurn(state, emitter, options);
-    while (current.step !== 'cleanup') current = advanceStep(current, emitter, options);
-    return current;
-  };
-
   it('removes all damage from permanents (CR 514.2)', () => {
     const { state, emitter } = setup();
     const damaged = putOnBattlefield(state, 'A', { damage: 3 });
     const other = putOnBattlefield(damaged.state, 'B', { damage: 1 });
-    const cleaned = runToCleanup(other.state, emitter);
-    expect(getObject(cleaned, damaged.id).damage).toBe(0);
-    expect(getObject(cleaned, other.id).damage).toBe(0);
+    const nextTurn = passThroughTurn(startGame(other.state, emitter), emitter);
+    expect(getObject(nextTurn, damaged.id).damage).toBe(0);
+    expect(getObject(nextTurn, other.id).damage).toBe(0);
   });
 
-  it('does nothing when the hand is within the limit', () => {
+  it('runs straight through when the hand is within the limit', () => {
     const { state, emitter } = setup();
-    const cleaned = runToCleanup(state, emitter);
-    expect(objectsIn(cleaned, playerZone('A', 'graveyard'))).toEqual([]);
+    const nextTurn = passThroughTurn(startGame(state, emitter), emitter);
+    expect(objectsIn(nextTurn, playerZone('A', 'graveyard'))).toEqual([]);
+    expect(nextTurn.turn).toBe(2);
   });
 
-  it('discards down to the maximum hand size (CR 514.1)', () => {
+  it('stops for a discard decision when the hand is too big (CR 514.1)', () => {
     const { state, emitter } = setup();
-    let current = state;
-    for (let i = 0; i < 9; i += 1) {
-      current = createObject(current, {
-        definitionId: card,
-        owner: 'A',
-        zone: playerZone('A', 'hand'),
-      }).state;
-    }
-    const cleaned = runToCleanup(current, emitter, {
-      chooseDiscards: (s: GameState, player: PlayerId, count: number) =>
-        objectsIn(s, playerZone(player, 'hand')).slice(0, count),
-    });
-    expect(objectsIn(cleaned, playerZone('A', 'hand'))).toHaveLength(7);
-    expect(objectsIn(cleaned, playerZone('A', 'graveyard'))).toHaveLength(2);
+    const full = addToHand(state, 'A', 9);
+    let current = startGame(full, emitter);
+    while (current.pendingDecision?.kind !== 'discard') current = pass(current, emitter);
+
+    expect(current.step).toBe('cleanup');
+    expect(current.pendingDecision).toMatchObject({ kind: 'discard', player: 'A', count: 2 });
+    expect(current.pendingDecision?.from).toHaveLength(9);
   });
 
-  it('fails loudly rather than guessing which cards to discard', () => {
+  it('discards the chosen cards and carries on', () => {
     const { state, emitter } = setup();
-    let current = state;
-    for (let i = 0; i < 8; i += 1) {
-      current = createObject(current, {
-        definitionId: card,
-        owner: 'A',
-        zone: playerZone('A', 'hand'),
-      }).state;
-    }
-    expect(() => runToCleanup(current, emitter)).toThrow(/must discard 1 card/);
+    const full = addToHand(state, 'A', 9);
+    let current = startGame(full, emitter);
+    while (current.pendingDecision?.kind !== 'discard') current = pass(current, emitter);
+
+    const chosen = current.pendingDecision.from.slice(0, 2);
+    const after = applyDecision(current, emitter, { kind: 'discard', cards: chosen });
+    expect(objectsIn(after, playerZone('A', 'hand'))).toHaveLength(7);
+    expect(objectsIn(after, playerZone('A', 'graveyard'))).toEqual(chosen);
+    expect(after.turn).toBe(2);
   });
 
-  it('rejects a chooser that returns the wrong number of cards', () => {
+  it('rejects the wrong number of cards', () => {
     const { state, emitter } = setup();
-    let current = state;
-    for (let i = 0; i < 9; i += 1) {
-      current = createObject(current, {
-        definitionId: card,
-        owner: 'A',
-        zone: playerZone('A', 'hand'),
-      }).state;
-    }
-    expect(() => runToCleanup(current, emitter, { chooseDiscards: () => [] })).toThrow(
-      /expected 2/,
+    const full = addToHand(state, 'A', 9);
+    let current = startGame(full, emitter);
+    while (current.pendingDecision?.kind !== 'discard') current = pass(current, emitter);
+    expect(() => applyDecision(current, emitter, { kind: 'discard', cards: [] })).toThrow(
+      /expected 2 card/,
     );
   });
 
-  it('rejects a chooser that names a card outside the hand', () => {
+  it('rejects a card that is not in hand', () => {
     const { state, emitter } = setup();
-    let current = state;
-    for (let i = 0; i < 8; i += 1) {
-      current = createObject(current, {
-        definitionId: card,
-        owner: 'A',
-        zone: playerZone('A', 'hand'),
-      }).state;
-    }
+    const full = addToHand(state, 'A', 9);
+    let current = startGame(full, emitter);
+    while (current.pendingDecision?.kind !== 'discard') current = pass(current, emitter);
     const notInHand = objectsIn(current, playerZone('A', 'library'))[0];
     expect(() =>
-      runToCleanup(current, emitter, { chooseDiscards: () => [notInHand as ObjectId] }),
+      applyDecision(current, emitter, {
+        kind: 'discard',
+        cards: [notInHand as ObjectId, notInHand as ObjectId],
+      }),
     ).toThrow(/not in A's hand/);
   });
 
   it('honours a custom maximum hand size', () => {
     const { state, emitter } = setup(10, { maxHandSize: 3 });
-    let current = state;
-    for (let i = 0; i < 4; i += 1) {
-      current = createObject(current, {
-        definitionId: card,
-        owner: 'A',
-        zone: playerZone('A', 'hand'),
-      }).state;
-    }
-    const cleaned = runToCleanup(current, emitter, {
-      chooseDiscards: (s: GameState, player: PlayerId, count: number) =>
-        objectsIn(s, playerZone(player, 'hand')).slice(0, count),
-    });
-    expect(objectsIn(cleaned, playerZone('A', 'hand'))).toHaveLength(3);
+    const full = addToHand(state, 'A', 4);
+    let current = startGame(full, emitter);
+    while (current.pendingDecision?.kind !== 'discard') current = pass(current, emitter);
+    expect(current.pendingDecision).toMatchObject({ count: 1 });
   });
 });
 
 describe('the turn cap', () => {
   it('ends the game as a draw once the cap is passed', () => {
     const { state, emitter } = setup(200, { turnCap: 3 });
-    const finished = advanceUntilGameOver(startFirstTurn(state, emitter), emitter);
+    const finished = runUntilGameOver(startGame(state, emitter), emitter);
     expect(finished.result).toEqual({ winner: null, reason: 'turnCap', turn: 3 });
   });
 
   it('plays exactly turnCap turns', () => {
     const { state, emitter } = setup(200, { turnCap: 5 });
-    const finished = advanceUntilGameOver(startFirstTurn(state, emitter), emitter);
-    expect(finished.turn).toBe(5);
+    expect(runUntilGameOver(startGame(state, emitter), emitter).turn).toBe(5);
   });
 
   it('emits gameEnd once', () => {
     const { state, emitter } = setup(200, { turnCap: 2 });
-    advanceUntilGameOver(startFirstTurn(state, emitter), emitter);
+    runUntilGameOver(startGame(state, emitter), emitter);
     const ends = emitter.events.filter((event) => event.type === 'gameEnd');
     expect(ends).toHaveLength(1);
     expect(ends[0]).toMatchObject({ winner: null, reason: 'turnCap' });
   });
 
-  it('is inert once the game is over', () => {
+  it('leaves no decision pending once the game is over', () => {
     const { state, emitter } = setup(200, { turnCap: 2 });
-    const finished = advanceUntilGameOver(startFirstTurn(state, emitter), emitter);
-    expect(advanceStep(finished, emitter)).toBe(finished);
+    const finished = runUntilGameOver(startGame(state, emitter), emitter);
+    expect(finished.pendingDecision).toBeNull();
+  });
+
+  it('handles discards along the way', () => {
+    const { state, emitter } = setup(200, { turnCap: 12 });
+    const finished = runUntilGameOver(startGame(state, emitter), emitter);
+    expect(finished.result?.reason).toBe('turnCap');
+    expect(objectsIn(finished, playerZone('B', 'hand')).length).toBeLessThanOrEqual(7);
   });
 });
 
 describe('extra turns (CR 500.7)', () => {
   it('gives the next turn to the player owed one', () => {
     const { state, emitter } = setup(60);
-    let current = grantExtraTurn(startFirstTurn(state, emitter), 'A');
-    while (current.turn === 1) current = advanceStep(current, emitter);
+    const current = passThroughTurn(grantExtraTurn(startGame(state, emitter), 'A'), emitter);
     expect(current).toMatchObject({ turn: 2, activePlayer: 'A' });
   });
 
   it('consumes the extra turn, so the turn after that is the opponent’s', () => {
     const { state, emitter } = setup(60);
-    let current = grantExtraTurn(startFirstTurn(state, emitter), 'A');
-    while (current.turn < 3) current = advanceStep(current, emitter);
+    let current = passThroughTurn(grantExtraTurn(startGame(state, emitter), 'A'), emitter);
+    current = passThroughTurn(current, emitter);
     expect(current).toMatchObject({ turn: 3, activePlayer: 'B' });
     expect(current.extraTurns).toEqual([]);
   });
 
   it('queues several extra turns in order', () => {
     const { state, emitter } = setup(60);
-    let current = grantExtraTurn(grantExtraTurn(startFirstTurn(state, emitter), 'A'), 'B');
+    let current = grantExtraTurn(grantExtraTurn(startGame(state, emitter), 'A'), 'B');
     expect(current.extraTurns).toEqual(['A', 'B']);
-    while (current.turn < 2) current = advanceStep(current, emitter);
+    current = passThroughTurn(current, emitter);
     expect(current.activePlayer).toBe('A');
-    while (current.turn < 3) current = advanceStep(current, emitter);
+    current = passThroughTurn(current, emitter);
     expect(current.activePlayer).toBe('B');
-  });
-});
-
-describe('the event stream', () => {
-  it('stamps every event with the turn and step it happened in', () => {
-    const { state, emitter } = setup();
-    let current = startFirstTurn(state, emitter);
-    while (current.turn === 1) current = advanceStep(current, emitter);
-
-    for (const event of emitter.events) {
-      expect(event.turn).toBeGreaterThanOrEqual(1);
-      expect(typeof event.step).toBe('string');
-    }
-    expect(emitter.events.map((event) => event.seq)).toEqual(
-      emitter.events.map((_event, index) => index),
-    );
   });
 });
 
 describe('mana empties between steps (CR 500.4)', () => {
   it('clears both pools as the next step begins', () => {
     const { state, emitter } = setup();
-    let current = startFirstTurn(state, emitter);
+    let current = startGame(state, emitter);
     current = updatePlayer(current, 'A', { manaPool: addMana(emptyManaPool, 'G', 2) });
     current = updatePlayer(current, 'B', { manaPool: addMana(emptyManaPool, 'U', 1) });
 
-    const next = advanceStep(current, emitter);
+    const next = pass(pass(current, emitter), emitter);
     expect(next.players.A.manaPool).toEqual([]);
     expect(next.players.B.manaPool).toEqual([]);
   });
 
   it('leaves mana alone within the step that produced it', () => {
     const { state, emitter } = setup();
-    const started = startFirstTurn(state, emitter);
-    const withMana = updatePlayer(started, 'A', { manaPool: addMana(emptyManaPool, 'G', 2) });
-    expect(withMana.players.A.manaPool).toHaveLength(2);
-  });
-
-  it('is empty again after a turn rolls over', () => {
-    const { state, emitter } = setup();
-    let current = updatePlayer(startFirstTurn(state, emitter), 'A', {
+    const withMana = updatePlayer(startGame(state, emitter), 'A', {
       manaPool: addMana(emptyManaPool, 'G', 2),
     });
-    while (current.turn === 1) current = advanceStep(current, emitter);
-    expect(current.players.A.manaPool).toEqual([]);
+    expect(withMana.players.A.manaPool).toHaveLength(2);
+    // One pass moves priority but does not end the step.
+    expect(pass(withMana, emitter).players.A.manaPool).toHaveLength(2);
+  });
+});
+
+describe('the event stream', () => {
+  it('numbers events in order and stamps each with its turn and step', () => {
+    const { state, emitter } = setup();
+    passThroughTurn(startGame(state, emitter), emitter);
+    expect(emitter.events.map((event) => event.seq)).toEqual(
+      emitter.events.map((_event, index) => index),
+    );
+    for (const event of emitter.events) expect(event.turn).toBeGreaterThanOrEqual(1);
   });
 });
