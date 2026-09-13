@@ -381,3 +381,123 @@ describe('memoisation', () => {
     expect(powerOf(g.state, id)).toBe(3);
   });
 });
+
+describe('dependency within a layer (CR 613.8)', () => {
+  it('applies the effect another depends on first, even with a later timestamp', () => {
+    // The Opalescence shape. Effect A is created first and says "all creatures become
+    // 4/4". Effect B is created second and makes one non-creature permanent a 1/1
+    // creature. In plain timestamp order A would run while the permanent is not yet a
+    // creature, miss it, and leave it a 1/1. A depends on B, so B goes first and the
+    // permanent ends up 4/4.
+    const g = build();
+    const source = g.put('A');
+    const permanent = g.put('A');
+    expect(characteristicsOf(g.state, permanent).isCreature).toBe(false);
+
+    g.effect(source, { kind: 'becomesCreature', power: 4, toughness: 4 }, { kind: 'allCreatures' });
+    g.effect(
+      source,
+      { kind: 'becomesCreature', power: 1, toughness: 1 },
+      { kind: 'object', object: permanent },
+    );
+
+    expect([powerOf(g.state, permanent), toughnessOf(g.state, permanent)]).toEqual([4, 4]);
+  });
+
+  it('still uses timestamp order when neither effect depends on the other', () => {
+    const g = build();
+    const id = g.put('A', { power: 2, toughness: 2 });
+    g.effect(id, { kind: 'setPowerToughness', power: 1, toughness: 1 });
+    g.effect(id, { kind: 'setPowerToughness', power: 6, toughness: 6 });
+    expect([powerOf(g.state, id), toughnessOf(g.state, id)]).toEqual([6, 6]);
+  });
+
+  it('a creature already in play is unaffected by the dependency, just pumped', () => {
+    const g = build();
+    const source = g.put('A');
+    const creature = g.put('A', { power: 2, toughness: 2 });
+    g.effect(source, { kind: 'becomesCreature', power: 4, toughness: 4 }, { kind: 'allCreatures' });
+    expect([powerOf(g.state, creature), toughnessOf(g.state, creature)]).toEqual([4, 4]);
+  });
+
+  it('an effect that does not apply cannot be depended on', () => {
+    // B only touches a different object, so A's applicability never changes and plain
+    // timestamp order stands.
+    const g = build();
+    const source = g.put('A');
+    const mine = g.put('A', { power: 2, toughness: 2 });
+    const other = g.put('B');
+
+    g.effect(mine, { kind: 'setPowerToughness', power: 3, toughness: 3 });
+    g.effect(
+      source,
+      { kind: 'becomesCreature', power: 9, toughness: 9 },
+      {
+        kind: 'object',
+        object: other,
+      },
+    );
+    expect([powerOf(g.state, mine), toughnessOf(g.state, mine)]).toEqual([3, 3]);
+  });
+
+  it('removal then granting in layer 6 still follows timestamps', () => {
+    // Neither changes what the other applies to, so no dependency is involved.
+    const g = build();
+    const id = g.put('A', { power: 2, toughness: 2, flying: true });
+    g.effect(id, { kind: 'removeAllAbilities' }, { kind: 'allCreatures' });
+    g.effect(id, { kind: 'addKeyword', keyword: 'trample' }, { kind: 'allCreatures' });
+
+    const traits = characteristicsOf(g.state, id);
+    expect(traits.keywords.flying).toBe(false);
+    expect(traits.keywords.trample).toBe(true);
+  });
+
+  it('terminates and applies everything with many interacting effects', () => {
+    const g = build();
+    const source = g.put('A');
+    const permanent = g.put('A');
+
+    g.effect(source, { kind: 'becomesCreature', power: 2, toughness: 2 }, { kind: 'allCreatures' });
+    g.effect(
+      source,
+      { kind: 'becomesCreature', power: 1, toughness: 1 },
+      {
+        kind: 'object',
+        object: permanent,
+      },
+    );
+    g.effect(
+      source,
+      { kind: 'modifyPowerToughness', power: 1, toughness: 1 },
+      {
+        kind: 'allCreatures',
+      },
+    );
+    g.effect(source, { kind: 'addKeyword', keyword: 'flying' }, { kind: 'allCreatures' });
+
+    const traits = characteristicsOf(g.state, permanent);
+    // Became a creature, caught the "all creatures" set, then the pump and the keyword.
+    expect([traits.power, traits.toughness]).toEqual([3, 3]);
+    expect(traits.keywords.flying).toBe(true);
+  });
+
+  it('gives the same answer every time, so a replay matches', () => {
+    const g = build();
+    const source = g.put('A');
+    const permanent = g.put('A');
+    g.effect(source, { kind: 'becomesCreature', power: 4, toughness: 4 }, { kind: 'allCreatures' });
+    g.effect(
+      source,
+      { kind: 'becomesCreature', power: 1, toughness: 1 },
+      {
+        kind: 'object',
+        object: permanent,
+      },
+    );
+
+    const first = characteristicsOf(g.state, permanent);
+    // A fresh state with the same effects computes the same thing.
+    const again = characteristicsOf({ ...g.state, version: g.state.version + 1 }, permanent);
+    expect(again).toEqual(first);
+  });
+});

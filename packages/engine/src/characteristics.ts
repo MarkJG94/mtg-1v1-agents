@@ -89,15 +89,101 @@ const printedOf = (object: GameObject): Working => ({
   controller: object.controller,
 });
 
+const appliesTo = (
+  state: GameState,
+  effect: ContinuousEffect,
+  object: GameObject,
+  working: Working,
+): boolean =>
+  selectorMatches(
+    state,
+    effect,
+    object,
+    working.controller,
+    working.power !== null && working.toughness !== null,
+  );
+
+/** Apply one effect's change to the working characteristics. */
+const applyOne = (working: Working, effect: ContinuousEffect): Working => {
+  const change = effect.change;
+  switch (change.kind) {
+    case 'changeControl':
+      return { ...working, controller: change.controller };
+    case 'becomesCreature':
+      return { ...working, power: change.power, toughness: change.toughness };
+    case 'setColours':
+      return { ...working, colours: change.colours };
+    case 'addKeyword':
+      return { ...working, keywords: { ...working.keywords, [change.keyword]: true } };
+    case 'removeAllAbilities':
+      // Humility's half: everything printed goes, and only later effects can add back.
+      return { ...working, keywords: noKeywords };
+    case 'setPowerToughness':
+      return { ...working, power: change.power, toughness: change.toughness };
+    case 'modifyPowerToughness':
+      return {
+        ...working,
+        power: (working.power ?? 0) + change.power,
+        toughness: (working.toughness ?? 0) + change.toughness,
+      };
+    case 'switchPowerToughness':
+      return { ...working, power: working.toughness, toughness: working.power };
+  }
+};
+
 /**
- * Apply every effect in one layer, in timestamp order (CR 613.7).
+ * Whether `effect` depends on `other` (CR 613.8a): would applying `other` first change
+ * what `effect` applies to, or what it does?
  *
- * Dependency (CR 613.8) is not handled here beyond the natural consequence of evaluating
- * each effect's selector against the state as it stands: an effect that stops applying
- * because an earlier one in the same layer removed what it looked at will already miss.
- * The cases that need true dependency ordering — Humility with Opalescence, Blood Moon
- * with the Urza lands — are noted in the roadmap as outstanding rather than silently
- * approximated.
+ * "What it applies to" is the case that bites, and it is detectable: apply `other`, then
+ * ask again whether `effect` still picks this object out. Opalescence and Humility are
+ * exactly this — one makes enchantments into creatures, and whether the other's "all
+ * creatures" catches them depends on whether it went first.
+ *
+ * "What it does" cannot currently change, because every change in the vocabulary is a
+ * fixed value or amount rather than something read off the board. When 2.1 adds a change
+ * whose result depends on the game state, this is the one function that needs widening.
+ */
+const dependsOn = (
+  state: GameState,
+  object: GameObject,
+  working: Working,
+  effect: ContinuousEffect,
+  other: ContinuousEffect,
+): boolean => {
+  if (!appliesTo(state, other, object, working)) return false;
+
+  const before = appliesTo(state, effect, object, working);
+  const after = appliesTo(state, effect, object, applyOne(working, other));
+  return before !== after;
+};
+
+/**
+ * Choose which effect to apply next (CR 613.8b): the first, in timestamp order, that
+ * depends on none of the others still waiting. A cycle — every remaining effect depending
+ * on another — falls back to timestamp order, which is exactly what the rule says to do.
+ */
+const pickNext = (
+  state: GameState,
+  object: GameObject,
+  working: Working,
+  remaining: readonly ContinuousEffect[],
+): number => {
+  for (let i = 0; i < remaining.length; i += 1) {
+    const candidate = remaining[i];
+    if (!candidate) continue;
+    const dependent = remaining.some(
+      (other, j) => j !== i && dependsOn(state, object, working, candidate, other),
+    );
+    if (!dependent) return i;
+  }
+  return 0;
+};
+
+/**
+ * Apply every effect in one layer. Effects that do not depend on each other go in
+ * timestamp order (CR 613.7); where one depends on another, the independent one goes
+ * first (CR 613.8b).
  */
 const applyLayer = (
   state: GameState,
@@ -106,43 +192,13 @@ const applyLayer = (
   effects: readonly ContinuousEffect[],
 ): Working => {
   let current = working;
+  const remaining = [...effects].sort((a, b) => a.timestamp - b.timestamp);
 
-  for (const effect of effects) {
-    const isCreature = current.power !== null && current.toughness !== null;
-    if (!selectorMatches(state, effect, object, current.controller, isCreature)) continue;
-
-    const change = effect.change;
-    switch (change.kind) {
-      case 'changeControl':
-        current = { ...current, controller: change.controller };
-        break;
-      case 'becomesCreature':
-        current = { ...current, power: change.power, toughness: change.toughness };
-        break;
-      case 'setColours':
-        current = { ...current, colours: change.colours };
-        break;
-      case 'addKeyword':
-        current = { ...current, keywords: { ...current.keywords, [change.keyword]: true } };
-        break;
-      case 'removeAllAbilities':
-        // Humility's half: everything printed goes, and only later layers can add back.
-        current = { ...current, keywords: noKeywords };
-        break;
-      case 'setPowerToughness':
-        current = { ...current, power: change.power, toughness: change.toughness };
-        break;
-      case 'modifyPowerToughness':
-        current = {
-          ...current,
-          power: (current.power ?? 0) + change.power,
-          toughness: (current.toughness ?? 0) + change.toughness,
-        };
-        break;
-      case 'switchPowerToughness':
-        current = { ...current, power: current.toughness, toughness: current.power };
-        break;
-    }
+  while (remaining.length > 0) {
+    const index = pickNext(state, object, current, remaining);
+    const [next] = remaining.splice(index, 1);
+    if (!next) break;
+    if (appliesTo(state, next, object, current)) current = applyOne(current, next);
   }
 
   return current;
