@@ -1,8 +1,16 @@
-import { type ObjectId, type PlayerId, playerZone, type ZoneId } from '@mtg/shared';
+import {
+  type Colour,
+  type EventTarget,
+  type ObjectId,
+  type PlayerId,
+  playerZone,
+  type ZoneId,
+} from '@mtg/shared';
 import { priorityDecision } from './decision.js';
 import type { EventEmitter } from './events/emitter.js';
 import type { GameState } from './state/game-state.js';
 import { getObject, moveObject, objectsIn, updateObject, updateState } from './state/update.js';
+import { canBeTargeted, type TargetSource } from './targeting.js';
 
 /**
  * The stack (CR 405).
@@ -22,6 +30,10 @@ export interface StackProperties {
   readonly resolvesTo: ZoneId;
   /** CR 702.61: while this is on the stack, nothing else can be cast or activated. */
   readonly splitSecond: boolean;
+  /** What the spell targets (CR 115). Empty for a spell that targets nothing. */
+  readonly targets: readonly EventTarget[];
+  /** The spell's own colours, which decide what protection stops it. */
+  readonly colours: readonly Colour[];
 }
 
 /** The object on top of the stack, or undefined when the stack is empty. */
@@ -48,6 +60,9 @@ export interface PutOnStackOptions {
   /** Defaults to the owner's graveyard, which is where instants and sorceries go. */
   readonly resolvesTo?: ZoneId;
   readonly splitSecond?: boolean;
+  /** Chosen targets; each is checked for legality as the spell is cast (CR 601.2c). */
+  readonly targets?: readonly EventTarget[];
+  readonly colours?: readonly Colour[];
 }
 
 /**
@@ -80,9 +95,25 @@ export const putOnStack = (
     throw new IllegalStackActionError(`object ${id} is in ${object.zone}, not ${player}'s hand`);
   }
 
+  const targets = options.targets ?? [];
+  const colours = options.colours ?? [];
+  const source: TargetSource = { controller: player, colours };
+
+  // Targets are chosen as the spell is cast and must be legal then (CR 601.2c).
+  for (const target of targets) {
+    const legality = canBeTargeted(state, target, source);
+    if (!legality.legal) {
+      throw new IllegalStackActionError(
+        `${describeTarget(target)} cannot be targeted by ${player}'s spell (${legality.reason})`,
+      );
+    }
+  }
+
   const stackProperties: StackProperties = {
     resolvesTo: options.resolvesTo ?? playerZone(object.owner, 'graveyard'),
     splitSecond: options.splitSecond ?? false,
+    targets,
+    colours,
   };
 
   const moved = updateObject(moveObject(state, id, 'stack'), id, { stack: stackProperties });
@@ -99,17 +130,38 @@ export const putOnStack = (
   });
 };
 
+const describeTarget = (target: EventTarget): string =>
+  target.kind === 'player' ? `player ${target.player}` : `object ${target.object}`;
+
+/**
+ * Whether every target a spell chose has since become illegal (CR 608.2b). A spell with
+ * no targets never fizzles; one that keeps even a single legal target still resolves, and
+ * simply does nothing to the targets it lost.
+ */
+export const hasFizzled = (state: GameState, id: ObjectId): boolean => {
+  const object = getObject(state, id);
+  const stack = object.stack;
+  if (!stack || stack.targets.length === 0) return false;
+
+  const source: TargetSource = { controller: object.controller, colours: stack.colours };
+  return stack.targets.every((target) => !canBeTargeted(state, target, source).legal);
+};
+
 /**
  * Resolve the top object on the stack (CR 608). It goes wherever its `resolvesTo` says:
  * the battlefield for a permanent spell, its owner's graveyard for an instant or sorcery.
  *
+ * A spell all of whose targets have become illegal does not resolve at all: it is
+ * countered by the rules (CR 608.2b), which players call fizzling.
+ *
  * What a spell *does* on resolution is its card script, so that arrives with definitions
- * in roadmap 2.1. Fizzling — countering a spell on resolution because every target became
- * illegal (CR 608.2b) — needs targeting, which is 1.5.
+ * in roadmap 2.1.
  */
 export const resolveTopOfStack = (state: GameState, emitter: EventEmitter): GameState => {
   const id = topOfStack(state);
   if (id === undefined) throw new IllegalStackActionError('the stack is empty');
+
+  if (hasFizzled(state, id)) return fizzle(state, emitter, id);
 
   const object = getObject(state, id);
   const destination = object.stack?.resolvesTo ?? playerZone(object.owner, 'graveyard');
@@ -129,6 +181,30 @@ export const resolveTopOfStack = (state: GameState, emitter: EventEmitter): Game
   return destination === 'battlefield'
     ? updateObject(resolved, id, { summoningSick: true })
     : resolved;
+};
+
+/**
+ * A spell whose targets have all become illegal is countered on resolution (CR 608.2b).
+ * It never resolves, so it does nothing at all.
+ */
+const fizzle = (state: GameState, emitter: EventEmitter, id: ObjectId): GameState => {
+  const object = getObject(state, id);
+  const graveyard = playerZone(object.owner, 'graveyard');
+
+  emitter.emit(state, {
+    type: 'fizzle',
+    object: id,
+    reason: 'every target is now illegal',
+  });
+  const fizzled = updateObject(moveObject(state, id, graveyard), id, { stack: undefined });
+  emitter.emit(fizzled, {
+    type: 'moveZone',
+    object: id,
+    from: 'stack',
+    to: graveyard,
+    cause: 'effect',
+  });
+  return fizzled;
 };
 
 /**

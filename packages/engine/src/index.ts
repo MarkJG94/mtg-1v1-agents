@@ -1,5 +1,6 @@
 export * from './decision.js';
 export * from './events/emitter.js';
+export * from './legal-actions.js';
 export * from './mana/ability.js';
 export * from './mana/cost.js';
 export * from './mana/payment.js';
@@ -9,5 +10,6 @@ export * from './stack.js';
 export * from './state/game-state.js';
 export * from './state/object.js';
 export * from './state/update.js';
+export * from './targeting.js';
 export * from './turn/land.js';
 export * from './turn/turn.js';

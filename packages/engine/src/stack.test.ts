@@ -4,6 +4,7 @@ import { createEventEmitter, type EventEmitter } from './events/emitter.js';
 import { stateFromSeed } from './rng.js';
 import {
   counterObject,
+  hasFizzled,
   IllegalStackActionError,
   isStackEmpty,
   putOnStack,
@@ -12,7 +13,8 @@ import {
   topOfStack,
 } from './stack.js';
 import { createGameState, type GameState } from './state/game-state.js';
-import { createObject, getObject, objectsIn } from './state/update.js';
+import { createObject, destroyObject, getObject, objectsIn, updateObject } from './state/update.js';
+import { noKeywords, objectTarget } from './targeting.js';
 import { applyDecision, startGame } from './turn/turn.js';
 
 const spell = asOracleId('oracle-spell');
@@ -83,7 +85,12 @@ describe('putOnStack', () => {
     const { state, emitter, hands } = atMain();
     const id = hands.A[0] as ObjectId;
     const after = putOnStack(state, emitter, 'A', id, { resolvesTo: 'battlefield' });
-    expect(getObject(after, id).stack).toEqual({ resolvesTo: 'battlefield', splitSecond: false });
+    expect(getObject(after, id).stack).toEqual({
+      resolvesTo: 'battlefield',
+      splitSecond: false,
+      targets: [],
+      colours: [],
+    });
   });
 
   it('defaults to resolving into the owner’s graveyard, as instants do', () => {
@@ -278,5 +285,115 @@ describe('priority and the stack together', () => {
     current = pass(current, emitter);
     expect(objectsIn(current, playerZone('B', 'graveyard'))).toEqual([responseB]);
     expect(objectsIn(current, 'stack')).toEqual([spellA]);
+  });
+});
+
+describe('targets and fizzling (CR 608.2b)', () => {
+  const withTargetableCreature = (keywords = noKeywords) => {
+    const built = atMain();
+    const created = createObject(built.state, {
+      definitionId: asOracleId('oracle-creature'),
+      owner: 'B',
+      zone: 'battlefield',
+      keywords,
+    });
+    return { ...built, state: created.state, creature: created.object.id };
+  };
+
+  it('records the chosen targets on the spell', () => {
+    const { state, emitter, hands, creature } = withTargetableCreature();
+    const cast = putOnStack(state, emitter, 'A', hands.A[0] as ObjectId, {
+      targets: [objectTarget(creature)],
+      colours: ['R'],
+    });
+    expect(getObject(cast, hands.A[0] as ObjectId).stack).toMatchObject({
+      targets: [objectTarget(creature)],
+      colours: ['R'],
+    });
+  });
+
+  it('refuses an illegal target as the spell is cast (CR 601.2c)', () => {
+    const { state, emitter, hands, creature } = withTargetableCreature({
+      ...noKeywords,
+      hexproof: true,
+    });
+    expect(() =>
+      putOnStack(state, emitter, 'A', hands.A[0] as ObjectId, {
+        targets: [objectTarget(creature)],
+      }),
+    ).toThrow(/cannot be targeted.*hexproof/);
+  });
+
+  it('resolves normally while the target is still legal', () => {
+    const { state, emitter, hands, creature } = withTargetableCreature();
+    const id = hands.A[0] as ObjectId;
+    const cast = putOnStack(state, emitter, 'A', id, { targets: [objectTarget(creature)] });
+    expect(hasFizzled(cast, id)).toBe(false);
+
+    const resolved = resolveTopOfStack(cast, emitter);
+    expect(objectsIn(resolved, playerZone('A', 'graveyard'))).toEqual([id]);
+    expect(emitter.events.some((event) => event.type === 'fizzle')).toBe(false);
+  });
+
+  it('fizzles when its only target gains hexproof in response', () => {
+    const { state, emitter, hands, creature } = withTargetableCreature();
+    const id = hands.A[0] as ObjectId;
+    const cast = putOnStack(state, emitter, 'A', id, { targets: [objectTarget(creature)] });
+
+    const protectedNow = updateObject(cast, creature, {
+      keywords: { ...noKeywords, hexproof: true },
+    });
+    expect(hasFizzled(protectedNow, id)).toBe(true);
+
+    const resolved = resolveTopOfStack(protectedNow, emitter);
+    expect(objectsIn(resolved, playerZone('A', 'graveyard'))).toEqual([id]);
+    expect(emitter.events.at(-2)).toMatchObject({ type: 'fizzle', object: id });
+  });
+
+  it('fizzles when its only target has left the battlefield', () => {
+    const { state, emitter, hands, creature } = withTargetableCreature();
+    const id = hands.A[0] as ObjectId;
+    const cast = putOnStack(state, emitter, 'A', id, { targets: [objectTarget(creature)] });
+    const gone = destroyObject(cast, creature);
+    expect(hasFizzled(gone, id)).toBe(true);
+  });
+
+  it('does not fizzle while one of several targets is still legal', () => {
+    const { state, emitter, hands, creature } = withTargetableCreature();
+    const second = createObject(state, {
+      definitionId: asOracleId('oracle-creature'),
+      owner: 'B',
+      zone: 'battlefield',
+    });
+    const id = hands.A[0] as ObjectId;
+    const cast = putOnStack(second.state, emitter, 'A', id, {
+      targets: [objectTarget(creature), objectTarget(second.object.id)],
+    });
+
+    const oneProtected = updateObject(cast, creature, {
+      keywords: { ...noKeywords, hexproof: true },
+    });
+    expect(hasFizzled(oneProtected, id)).toBe(false);
+  });
+
+  it('never fizzles a spell that targets nothing', () => {
+    const { state, emitter, hands } = withTargetableCreature();
+    const id = hands.A[0] as ObjectId;
+    expect(hasFizzled(putOnStack(state, emitter, 'A', id), id)).toBe(false);
+  });
+
+  it('a fizzled permanent spell never reaches the battlefield', () => {
+    const { state, emitter, hands, creature } = withTargetableCreature();
+    const id = hands.A[0] as ObjectId;
+    const cast = putOnStack(state, emitter, 'A', id, {
+      targets: [objectTarget(creature)],
+      resolvesTo: 'battlefield',
+    });
+    const protectedNow = updateObject(cast, creature, {
+      keywords: { ...noKeywords, shroud: true },
+    });
+    const resolved = resolveTopOfStack(protectedNow, emitter);
+    expect(objectsIn(resolved, 'battlefield')).toEqual([creature]);
+    expect(objectsIn(resolved, playerZone('A', 'graveyard'))).toEqual([id]);
   });
 });

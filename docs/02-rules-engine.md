@@ -63,7 +63,7 @@ A `GameObject` holds `definitionId`, `owner`, `controller`, `zone`, `timestamp`,
 
 The engine pauses with a `pendingDecision` whenever a player must choose. Decision kinds: `mulligan`, `bottomCards`, `priority` (pass or a list of legal actions: cast, activate, play land, special actions), `chooseTargets`, `chooseMode`, `payCost` (which permanents to sacrifice/tap, which mana to spend when ambiguous), `chooseX`, `declareAttackers`, `declareBlockers`, `orderBlockers`, `assignDamage`, `orderTriggers`, `chooseReplacement`, `chooseCardsFromLibrary`, `discard`, `distributeCounters`, `yesNo`, `chooseOption`. Every decision carries the full list of legal options so the AI never has to compute legality itself and fuzzers can pick uniformly.
 
-`legalActions(state, player)` is the single source of truth for what can be cast/activated/played, including timing restrictions, cost payability (a mana-solver checks the pool + untapped mana sources against the cost), and targeting availability.
+`legalActions(state, player, cards)` is the single source of truth for what can be cast/activated/played, including timing restrictions and cost payability (the mana solver checks the pool plus what untapped sources could still make, treating a source that offers a choice of colours as one mana with several possible types). It reads what a card *is* — land, cost, sorcery-speed — through a `CardInfoSource`, which card scripts implement in phase 2.1. Where a source's modes would make different amounts of mana it deliberately under-reports, so the function never offers an action the engine would then reject.
 
 ## Stack and priority
 

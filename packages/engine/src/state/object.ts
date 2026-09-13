@@ -1,5 +1,6 @@
 import type { ObjectId, OracleId, PlayerId, ZoneId } from '@mtg/shared';
 import type { StackProperties } from '../stack.js';
+import type { Keywords } from '../targeting.js';
 
 /**
  * An object in a zone (CR 109): a card, a token, or a copy.
@@ -31,6 +32,11 @@ export interface GameObject {
   /** Choices made for this object, e.g. a chosen colour or creature type. */
   readonly chosen: Readonly<Record<string, string>>;
   readonly token: boolean;
+  /**
+   * Targeting keywords currently applying. Stored for now; roadmap 1.9 computes these
+   * through the layer system and 2.1 seeds them from card scripts. See `targeting.ts`.
+   */
+  readonly keywords: Keywords;
   /**
    * Set only while the object is on the stack: where it resolves to, and whether it has
    * split second. Cleared as it leaves.

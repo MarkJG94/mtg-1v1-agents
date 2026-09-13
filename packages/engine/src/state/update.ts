@@ -6,6 +6,7 @@ import {
   type PlayerId,
   type ZoneId,
 } from '@mtg/shared';
+import { type Keywords, noKeywords } from '../targeting.js';
 import type { GameState, PlayerState } from './game-state.js';
 import type { GameObject } from './object.js';
 
@@ -96,6 +97,7 @@ export interface NewObjectSpec {
   /** Defaults to the owner. */
   readonly controller?: PlayerId;
   readonly token?: boolean;
+  readonly keywords?: Keywords;
   /** Where in the destination zone; defaults to the end of the array. */
   readonly position?: ZonePosition;
 }
@@ -120,6 +122,7 @@ export const createObject = (
     attachments: [],
     chosen: {},
     token: spec.token ?? false,
+    keywords: spec.keywords ?? noKeywords,
     summoningSick: false,
   };
 

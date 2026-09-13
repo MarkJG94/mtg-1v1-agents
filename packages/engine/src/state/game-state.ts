@@ -10,6 +10,7 @@ import {
 import type { Decision } from '../decision.js';
 import { emptyManaPool, type ManaPool } from '../mana/pool.js';
 import type { RngState } from '../rng.js';
+import { type Keywords, noKeywords } from '../targeting.js';
 import type { GameObject } from './object.js';
 
 /**
@@ -28,6 +29,8 @@ export interface PlayerState {
    * immediately; they lose the next time state-based actions are checked (CR 704.5b).
    */
   readonly drewFromEmptyLibrary: boolean;
+  /** Players can have hexproof or protection too, e.g. Leyline of Sanctity. */
+  readonly keywords: Keywords;
 }
 
 /**
@@ -104,6 +107,7 @@ const emptyPlayerState = (life: number): PlayerState => ({
   landsPlayedThisTurn: 0,
   maxLandsPerTurn: 1,
   drewFromEmptyLibrary: false,
+  keywords: noKeywords,
 });
 
 const emptyZones = (): Record<ZoneId, readonly ObjectId[]> => {
