@@ -26,4 +26,30 @@ TypeScript monorepo (pnpm workspaces). `packages/engine` (pure TS rules engine),
 
 ## Status
 
-Planning complete; no code yet. First milestone is the end-to-end thin slice described in the roadmap.
+Phase 0 (repository and scaffolding) is done; phase 1 (engine core) is next. The first
+milestone is the end-to-end thin slice described in the roadmap.
+
+What runs today: `pnpm dev` starts the Fastify API and the Vite dev server together,
+`pnpm fetch:scryfall` builds the card projection from Scryfall's bulk data, and
+`pnpm check` (lint, typecheck, test, build) is green.
+
+## Getting started
+
+```bash
+pnpm install
+pnpm fetch:scryfall   # ~25 MB download; writes data/scryfall/cards.jsonl
+pnpm dev              # API on :8080, web on :5173 (proxying /api)
+```
+
+| Command | Does |
+| --- | --- |
+| `pnpm dev` | Server and web app with hot reload. |
+| `pnpm test` | Vitest across every workspace package. |
+| `pnpm lint` / `pnpm format` | Biome check / check --write. |
+| `pnpm typecheck` | `tsc` per package. |
+| `pnpm build` | tsup bundles for the packages and server, Vite build for the web app. |
+| `pnpm check` | Everything CI runs (`ci` is a reserved pnpm subcommand). |
+| `pnpm fetch:scryfall` | Refresh `data/scryfall/cards.jsonl` (add `--force` to refetch). |
+
+Docker, for the homelab: `docker compose up --build` serves the API and the built web app
+on one port with `data/` on a named volume.

@@ -1,0 +1,27 @@
+{
+  "name": "@mtg/cards",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Card-script schema, hand scripts, Scryfall loader and oracle-text auto-scripter",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mtg/engine": "workspace:*",
+    "@mtg/shared": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -6,15 +6,19 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done.
 
 ## Phase 0 — Repository and scaffolding (≈ 2 sessions)
 
-- [ ] 0.1 `git init` in the project folder; create the GitHub repo `mtg-1v1-agents`; push; branch protection on `main`.
-- [ ] 0.2 pnpm monorepo: `packages/{shared,engine,cards,agents,sim}`, `apps/{server,web}`, shared tsconfig, Biome, Vitest, tsup, Vite.
-- [ ] 0.3 GitHub Actions `ci.yml` (lint, typecheck, test, build) green on an empty tree.
-- [ ] 0.4 `scripts/fetch-scryfall.ts`: download the `oracle-cards` bulk file to `data/scryfall/`, build the `cards` projection, print counts.
-- [ ] 0.5 Dockerfile + docker-compose with a `data` volume; `pnpm dev` runs server + web with HMR.
+- [~] 0.1 `git init` in the project folder; create the GitHub repo `mtg-1v1-agents`; push; branch protection on `main`. *(Repo created and pushed. Branch protection on `main` is still to be switched on in the GitHub settings — an operator action.)*
+- [x] 0.2 pnpm monorepo: `packages/{shared,engine,cards,agents,sim}`, `apps/{server,web}`, shared tsconfig, Biome, Vitest, tsup, Vite. *(Dependency versions are pinned centrally in the pnpm catalog in `pnpm-workspace.yaml`. Internal packages export TypeScript source and are bundled into the server by tsup, so there is no build ordering to manage.)*
+- [x] 0.3 GitHub Actions `ci.yml` (lint, typecheck, test, build), plus a job that builds the Docker image.
+- [x] 0.4 `scripts/fetch-scryfall.ts`: streams the gzipped `oracle_cards` JSONL to `data/scryfall/cards.jsonl`, skips non-card layouts, writes `meta.json` and prints counts. See ADR 0001.
+- [x] 0.5 Dockerfile + docker-compose with a `data` volume; `pnpm dev` runs server + web with HMR and an `/api` proxy.
+
+Two things landed with the scaffolding, ahead of their phases, because CI wanted something
+real to check: the seeded RNG from 1.1 (`packages/engine/src/rng.ts`) and the `RunSettings`
+schema from 05 (`packages/shared/src/settings.ts`).
 
 ## Phase 1 — Engine core (≈ 10–14 sessions)
 
-- [ ] 1.1 State model, object ids, zones, seeded RNG, structural-sharing update helper, event emitter.
+- [~] 1.1 State model, object ids, zones, seeded RNG, structural-sharing update helper, event emitter. *(Seeded RNG done: xoshiro128\*\*, serialisable, forkable. The rest is outstanding.)*
 - [ ] 1.2 Turn structure with all steps; untap/draw/cleanup; land drops; turn cap.
 - [ ] 1.3 Mana: pool, costs (incl. hybrid/phyrexian/X), payment solver, mana abilities of basic and simple nonbasic lands.
 - [ ] 1.4 Priority, stack, casting/activating, resolution, countering, fizzling, split second.

@@ -1,0 +1,27 @@
+{
+  "name": "@mtg/agents",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Play AI and deck-change AI",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mtg/cards": "workspace:*",
+    "@mtg/engine": "workspace:*",
+    "@mtg/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
