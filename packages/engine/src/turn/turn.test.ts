@@ -637,3 +637,120 @@ describe('combat through the decision flow', () => {
     expect(current.combat).toBeNull();
   });
 });
+
+describe('combat and state-based actions together', () => {
+  const boardWith = (
+    a: readonly { power: number; toughness: number; keys?: Partial<Keywords> }[],
+    b: readonly { power: number; toughness: number; keys?: Partial<Keywords> }[] = [],
+  ) => {
+    const built = setup(40);
+    let state = built.state;
+    const mine: ObjectId[] = [];
+    const theirs: ObjectId[] = [];
+    for (const [owner, specs, into] of [
+      ['A', a, mine],
+      ['B', b, theirs],
+    ] as const) {
+      for (const spec of specs) {
+        const created = createObject(state, {
+          definitionId: card,
+          owner,
+          zone: 'battlefield',
+          power: spec.power,
+          toughness: spec.toughness,
+          keywords: keywords(spec.keys ?? {}),
+        });
+        state = created.state;
+        into.push(created.object.id);
+      }
+    }
+    const emitter = built.emitter;
+    let current = startGame(state, emitter);
+    while (current.pendingDecision?.kind !== 'declareAttackers') current = pass(current, emitter);
+    return { state: current, emitter, mine, theirs };
+  };
+
+  const attack = (state: GameState, emitter: EventEmitter, attackers: readonly ObjectId[]) =>
+    applyDecision(state, emitter, {
+      kind: 'declareAttackers',
+      attackers: attackers.map((attacker) => ({
+        attacker,
+        defender: { kind: 'player', player: 'B' } as const,
+      })),
+    });
+
+  it('two 2/2s that block each other both die', () => {
+    const { state, emitter, mine, theirs } = boardWith(
+      [{ power: 2, toughness: 2 }],
+      [{ power: 2, toughness: 2 }],
+    );
+    let current = attack(state, emitter, [mine[0] as ObjectId]);
+    while (current.pendingDecision?.kind !== 'declareBlockers') current = pass(current, emitter);
+    current = applyDecision(current, emitter, {
+      kind: 'declareBlockers',
+      blocks: [{ blocker: theirs[0] as ObjectId, blocking: [mine[0] as ObjectId] }],
+    });
+    while (current.step !== 'endCombat' && !current.result) current = pass(current, emitter);
+
+    expect(objectsIn(current, 'battlefield')).toEqual([]);
+    expect(objectsIn(current, playerZone('A', 'graveyard'))).toEqual([mine[0]]);
+    expect(objectsIn(current, playerZone('B', 'graveyard'))).toEqual([theirs[0]]);
+  });
+
+  it('a 3/3 blocked by a 1/1 kills the blocker and survives', () => {
+    const { state, emitter, mine, theirs } = boardWith(
+      [{ power: 3, toughness: 3 }],
+      [{ power: 1, toughness: 1 }],
+    );
+    let current = attack(state, emitter, [mine[0] as ObjectId]);
+    while (current.pendingDecision?.kind !== 'declareBlockers') current = pass(current, emitter);
+    current = applyDecision(current, emitter, {
+      kind: 'declareBlockers',
+      blocks: [{ blocker: theirs[0] as ObjectId, blocking: [mine[0] as ObjectId] }],
+    });
+    while (current.step !== 'endCombat' && !current.result) current = pass(current, emitter);
+
+    expect(objectsIn(current, 'battlefield')).toEqual([mine[0]]);
+    expect(getObject(current, mine[0] as ObjectId).damage).toBe(1);
+  });
+
+  it('a deathtouch blocker kills what it blocks, however big', () => {
+    const { state, emitter, mine, theirs } = boardWith(
+      [{ power: 6, toughness: 6 }],
+      [{ power: 1, toughness: 1, keys: { deathtouch: true } }],
+    );
+    let current = attack(state, emitter, [mine[0] as ObjectId]);
+    while (current.pendingDecision?.kind !== 'declareBlockers') current = pass(current, emitter);
+    current = applyDecision(current, emitter, {
+      kind: 'declareBlockers',
+      blocks: [{ blocker: theirs[0] as ObjectId, blocking: [mine[0] as ObjectId] }],
+    });
+    while (current.step !== 'endCombat' && !current.result) current = pass(current, emitter);
+
+    expect(objectsIn(current, playerZone('A', 'graveyard'))).toEqual([mine[0]]);
+  });
+
+  it('a lethal unblocked attack ends the game', () => {
+    const { state, emitter, mine } = boardWith([{ power: 20, toughness: 20 }]);
+    let current = attack(state, emitter, [mine[0] as ObjectId]);
+    for (let i = 0; i < 30 && !current.result; i += 1) current = pass(current, emitter);
+
+    expect(current.result).toMatchObject({ winner: 'A', reason: 'life' });
+    expect(current.players.B.life).toBe(0);
+  });
+
+  it('damage wears off in cleanup, so a survivor is whole next turn', () => {
+    const { state, emitter, mine, theirs } = boardWith(
+      [{ power: 3, toughness: 3 }],
+      [{ power: 1, toughness: 1 }],
+    );
+    let current = attack(state, emitter, [mine[0] as ObjectId]);
+    while (current.pendingDecision?.kind !== 'declareBlockers') current = pass(current, emitter);
+    current = applyDecision(current, emitter, {
+      kind: 'declareBlockers',
+      blocks: [{ blocker: theirs[0] as ObjectId, blocking: [mine[0] as ObjectId] }],
+    });
+    current = passThroughTurn(current, emitter);
+    expect(getObject(current, mine[0] as ObjectId).damage).toBe(0);
+  });
+});

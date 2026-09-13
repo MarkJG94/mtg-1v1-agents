@@ -64,7 +64,20 @@ export interface OrderBlockersDecision {
   readonly blockers: readonly ObjectId[];
 }
 
+/**
+ * A choice between objects that the rules force but do not decide, such as which of two
+ * legendary permanents with the same name to keep (CR 704.5j).
+ */
+export interface ChooseOptionDecision {
+  readonly kind: 'chooseOption';
+  readonly player: PlayerId;
+  /** Why the choice is being made, so a driver can answer sensibly. */
+  readonly reason: 'legendRule';
+  readonly options: readonly ObjectId[];
+}
+
 export type Decision =
+  | ChooseOptionDecision
   | PriorityDecision
   | DiscardDecision
   | DeclareAttackersDecision
@@ -82,7 +95,8 @@ export type DecisionResponse =
       }[];
     }
   | { readonly kind: 'declareBlockers'; readonly blocks: readonly BlockDeclaration[] }
-  | { readonly kind: 'orderBlockers'; readonly order: readonly ObjectId[] };
+  | { readonly kind: 'orderBlockers'; readonly order: readonly ObjectId[] }
+  | { readonly kind: 'chooseOption'; readonly chosen: ObjectId };
 
 export class UnexpectedDecisionError extends Error {
   constructor(message: string) {

@@ -1,4 +1,5 @@
 import { type EventTarget, type ObjectId, opponentOf, type PlayerId } from '@mtg/shared';
+import { effectivePower, isCreature, remainingToughness } from './characteristics.js';
 import type { EventEmitter } from './events/emitter.js';
 import type { GameState } from './state/game-state.js';
 import type { GameObject } from './state/object.js';
@@ -55,17 +56,6 @@ export class IllegalCombatError extends Error {
     this.name = 'IllegalCombatError';
   }
 }
-
-/** Treated as a creature for combat while card types wait on roadmap 2.1. */
-export const isCreature = (object: GameObject): boolean =>
-  object.power !== null && object.toughness !== null;
-
-export const powerOf = (object: GameObject): number => object.power ?? 0;
-export const toughnessOf = (object: GameObject): number => object.toughness ?? 0;
-
-/** Damage already marked, which counts toward lethal within a turn (CR 120.3). */
-export const remainingToughness = (object: GameObject): number =>
-  toughnessOf(object) - object.damage;
 
 // --- Declaring attackers (CR 508) ---
 
@@ -351,7 +341,7 @@ export const assignCombatDamage = (
     const attacker = state.objects.get(entry.attacker);
     if (!attacker || !isCreature(attacker) || !dealsDamageIn(attacker, firstStrikeStep)) continue;
 
-    const power = powerOf(attacker);
+    const power = effectivePower(attacker);
     const deathtouch = attacker.keywords.deathtouch;
     const lifelink = attacker.keywords.lifelink;
     const base = { source: entry.attacker, deathtouch, lifelink, controller: attacker.controller };
@@ -393,7 +383,7 @@ export const assignCombatDamage = (
     for (const id of blockers) {
       const blocker = getObject(state, id);
       if (!dealsDamageIn(blocker, firstStrikeStep)) continue;
-      const blockerPower = powerOf(blocker);
+      const blockerPower = effectivePower(blocker);
       if (blockerPower <= 0) continue;
       assignments.push({
         source: id,
@@ -424,6 +414,7 @@ export const dealCombatDamage = (
 
   // Accumulate first, apply once: simultaneity is what makes creatures trade.
   const damageByObject = new Map<ObjectId, number>();
+  const deathtouchedObjects = new Set<ObjectId>();
   const lifeByPlayer = new Map<PlayerId, number>();
   const lifeGain = new Map<PlayerId, number>();
 
@@ -431,6 +422,9 @@ export const dealCombatDamage = (
     if (assignment.target.kind === 'object') {
       const id = assignment.target.object;
       damageByObject.set(id, (damageByObject.get(id) ?? 0) + assignment.amount);
+      // Remembered so the state-based action can destroy it even if the damage is not
+      // lethal on its own (CR 702.2b).
+      if (assignment.deathtouch && assignment.amount > 0) deathtouchedObjects.add(id);
     } else {
       const player = assignment.target.player;
       lifeByPlayer.set(player, (lifeByPlayer.get(player) ?? 0) + assignment.amount);
@@ -446,7 +440,14 @@ export const dealCombatDamage = (
   let next = updateObjects(
     state,
     [...damageByObject].map(
-      ([id, amount]) => [id, { damage: getObject(state, id).damage + amount }] as const,
+      ([id, amount]) =>
+        [
+          id,
+          {
+            damage: getObject(state, id).damage + amount,
+            ...(deathtouchedObjects.has(id) ? { deathtouched: true } : {}),
+          },
+        ] as const,
     ),
   );
 

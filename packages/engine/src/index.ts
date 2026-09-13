@@ -1,3 +1,4 @@
+export * from './characteristics.js';
 export * from './combat.js';
 export * from './decision.js';
 export * from './events/emitter.js';
@@ -7,6 +8,7 @@ export * from './mana/cost.js';
 export * from './mana/payment.js';
 export * from './mana/pool.js';
 export * from './rng.js';
+export * from './sba.js';
 export * from './stack.js';
 export * from './state/game-state.js';
 export * from './state/object.js';

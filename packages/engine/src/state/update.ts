@@ -100,6 +100,10 @@ export interface NewObjectSpec {
   readonly keywords?: Keywords;
   readonly power?: number;
   readonly toughness?: number;
+  readonly loyalty?: number;
+  readonly name?: string;
+  readonly legendary?: boolean;
+  readonly attachment?: 'aura' | 'equipment';
   /** Where in the destination zone; defaults to the end of the array. */
   readonly position?: ZonePosition;
 }
@@ -127,6 +131,11 @@ export const createObject = (
     keywords: spec.keywords ?? noKeywords,
     power: spec.power ?? null,
     toughness: spec.toughness ?? null,
+    loyalty: spec.loyalty ?? null,
+    name: spec.name ?? null,
+    legendary: spec.legendary ?? false,
+    attachment: spec.attachment ?? null,
+    deathtouched: false,
     summoningSick: false,
   };
 

@@ -29,6 +29,7 @@ import {
 } from '../decision.js';
 import type { EventEmitter } from '../events/emitter.js';
 import { emptyManaPool, isManaPoolEmpty } from '../mana/pool.js';
+import { applyLegendRule, checkStateBasedActions } from '../sba.js';
 import { isStackEmpty, resolveTopOfStack } from '../stack.js';
 import type { GameState } from '../state/game-state.js';
 import { isGameOver } from '../state/game-state.js';
@@ -163,8 +164,8 @@ const performCleanup = (state: GameState, emitter: EventEmitter): GameState => {
 const finishCleanup = (state: GameState, _emitter: EventEmitter): GameState => {
   const patches = objectsIn(state, 'battlefield')
     .map((id) => [id, getObject(state, id)] as const)
-    .filter(([, object]) => object.damage !== 0)
-    .map(([id]) => [id, { damage: 0 }] as const);
+    .filter(([, object]) => object.damage !== 0 || object.deathtouched)
+    .map(([id]) => [id, { damage: 0, deathtouched: false }] as const);
   return updateObjects(state, patches);
 };
 
@@ -352,8 +353,9 @@ const grantPriority = (state: GameState, player: PlayerId): GameState =>
 /**
  * Run the game forward until a player must decide, or it ends.
  *
- * State-based actions and putting triggered abilities on the stack both belong here,
- * immediately before priority is granted (CR 117.5); they arrive in roadmap 1.7 and 1.8.
+ * State-based actions are checked immediately before priority is granted (CR 704.3), and
+ * they can end the game or raise a decision of their own. Putting triggered abilities on
+ * the stack belongs in the same place and arrives in roadmap 1.8.
  */
 export const advanceToDecision = (
   state: GameState,
@@ -369,6 +371,12 @@ export const advanceToDecision = (
 
     if (skipsPriority(current.step)) {
       current = leaveStep(current, emitter);
+      continue;
+    }
+
+    const settled = checkStateBasedActions(current, emitter);
+    if (settled !== current) {
+      current = settled;
       continue;
     }
 
@@ -415,6 +423,8 @@ export const applyDecision = (
     next = declareAttackers(cleared, emitter, response.attackers);
   } else if (decision.kind === 'declareBlockers' && response.kind === 'declareBlockers') {
     next = askForBlockerOrder(declareBlockers(cleared, emitter, response.blocks));
+  } else if (decision.kind === 'chooseOption' && response.kind === 'chooseOption') {
+    next = applyLegendRule(cleared, emitter, decision.options, response.chosen);
   } else if (decision.kind === 'orderBlockers' && response.kind === 'orderBlockers') {
     next = askForBlockerOrder(orderBlockers(cleared, decision.attacker, response.order));
   } else {

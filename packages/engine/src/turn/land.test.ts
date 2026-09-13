@@ -21,6 +21,19 @@ const atMainPhase = (): {
   theirs: ObjectId;
 } => {
   let state = createGameState({ rng: stateFromSeed('1'), onPlay: 'A' });
+
+  // Give both players a library. Without one, the first draw decks them and the
+  // state-based actions added in 1.7 end the game before these tests can run.
+  for (const player of ['A', 'B'] as const) {
+    for (let i = 0; i < 20; i += 1) {
+      state = createObject(state, {
+        definitionId: forest,
+        owner: player,
+        zone: playerZone(player, 'library'),
+      }).state;
+    }
+  }
+
   const a = createObject(state, {
     definitionId: forest,
     owner: 'A',

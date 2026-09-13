@@ -44,6 +44,18 @@ export interface GameObject {
    */
   readonly power: number | null;
   readonly toughness: number | null;
+  /** Starting loyalty, and the marker that this is a planeswalker at all (CR 306). */
+  readonly loyalty: number | null;
+  /** The card's name, which is what the legend rule compares (CR 704.5j). */
+  readonly name: string | null;
+  readonly legendary: boolean;
+  /** What this attaches to things as, if anything (CR 303.4, 301.5). */
+  readonly attachment: 'aura' | 'equipment' | null;
+  /**
+   * Marked damage this turn came from a source with deathtouch, which makes any amount
+   * of it lethal (CR 702.2b). Cleared with the damage in cleanup.
+   */
+  readonly deathtouched: boolean;
   /**
    * Set only while the object is on the stack: where it resolves to, and whether it has
    * split second. Cleared as it leaves.
