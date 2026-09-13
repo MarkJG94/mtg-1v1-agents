@@ -39,6 +39,8 @@ interface GameState {
   zones: Record<ZoneId, ObjectId[]>;        // library/hand/graveyard per player; battlefield/stack/exile/command shared
   nextObjectId: number;
   nextTimestamp: number;                    // layer-system timestamps (CR 613.7)
+  config: GameConfig;                       // turnCap, maxHandSize, playerOnPlay
+  extraTurns: PlayerId[];                   // owed extra turns, oldest first (CR 500.7)
   effects: ContinuousEffect[];              // active continuous effects with timestamps        (1.9)
   delayedTriggers: DelayedTrigger[];                                                         // (1.8)
   pendingTriggers: TriggeredAbilityInstance[];  // waiting to be put on the stack              (1.8)

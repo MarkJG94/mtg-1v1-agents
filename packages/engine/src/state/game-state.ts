@@ -64,11 +64,32 @@ export interface GameState {
   readonly nextObjectId: number;
   /** Next layer-system timestamp (CR 613.7). */
   readonly nextTimestamp: number;
+  readonly config: GameConfig;
+  /**
+   * Players owed an extra turn (CR 500.7), oldest first. The next turn goes to the
+   * front of this queue if it has one, otherwise to the other player.
+   */
+  readonly extraTurns: readonly PlayerId[];
   /** Non-null once the game is over. */
   readonly result: GameResult | null;
 }
 
 export const DEFAULT_STARTING_LIFE = 20;
+export const DEFAULT_TURN_CAP = 40;
+export const DEFAULT_MAX_HAND_SIZE = 7;
+
+/**
+ * Fixed for the whole game. `turnCap` comes from run settings (docs/05) and makes an
+ * unfinished game a draw so a run cannot stall on a board neither agent can break.
+ */
+export interface GameConfig {
+  /** Turns 1..turnCap are played; starting one past it is a draw. */
+  readonly turnCap: number;
+  /** Maximum hand size, enforced in cleanup (CR 514.1). */
+  readonly maxHandSize: number;
+  /** Who took the first turn. Needed for the CR 103.7a first-draw skip. */
+  readonly playerOnPlay: PlayerId;
+}
 
 const emptyPlayerState = (life: number): PlayerState => ({
   life,
@@ -90,6 +111,8 @@ export interface CreateGameStateOptions {
   /** The player who takes the first turn. */
   readonly onPlay: PlayerId;
   readonly startingLife?: number;
+  readonly turnCap?: number;
+  readonly maxHandSize?: number;
 }
 
 /**
@@ -114,6 +137,12 @@ export const createGameState = (options: CreateGameStateOptions): GameState => {
     zones: emptyZones(),
     nextObjectId: 1,
     nextTimestamp: 1,
+    config: {
+      turnCap: options.turnCap ?? DEFAULT_TURN_CAP,
+      maxHandSize: options.maxHandSize ?? DEFAULT_MAX_HAND_SIZE,
+      playerOnPlay: options.onPlay,
+    },
+    extraTurns: [],
     result: null,
   };
 };

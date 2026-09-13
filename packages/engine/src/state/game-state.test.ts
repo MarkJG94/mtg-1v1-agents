@@ -1,7 +1,13 @@
 import { allZoneIds, playerIds } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
 import { stateFromSeed } from '../rng.js';
-import { createGameState, DEFAULT_STARTING_LIFE, isGameOver } from './game-state.js';
+import {
+  createGameState,
+  DEFAULT_MAX_HAND_SIZE,
+  DEFAULT_STARTING_LIFE,
+  DEFAULT_TURN_CAP,
+  isGameOver,
+} from './game-state.js';
 import { checkStateInvariants } from './update.js';
 
 const state = () => createGameState({ rng: stateFromSeed('7'), onPlay: 'A' });
@@ -60,5 +66,27 @@ describe('createGameState', () => {
 
   it('carries the RNG state it was given', () => {
     expect(state().rng).toEqual(stateFromSeed('7'));
+  });
+
+  it('defaults the game config and records who is on the play', () => {
+    expect(state().config).toEqual({
+      turnCap: DEFAULT_TURN_CAP,
+      maxHandSize: DEFAULT_MAX_HAND_SIZE,
+      playerOnPlay: 'A',
+    });
+  });
+
+  it('honours a custom turn cap and hand size', () => {
+    const game = createGameState({
+      rng: stateFromSeed('1'),
+      onPlay: 'B',
+      turnCap: 12,
+      maxHandSize: 5,
+    });
+    expect(game.config).toEqual({ turnCap: 12, maxHandSize: 5, playerOnPlay: 'B' });
+  });
+
+  it('starts with nobody owed an extra turn', () => {
+    expect(state().extraTurns).toEqual([]);
   });
 });
