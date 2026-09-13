@@ -7,6 +7,7 @@ import {
   type ZoneId,
 } from '@mtg/shared';
 import { type Keywords, noKeywords } from '../targeting.js';
+import type { TriggeredAbility } from '../triggers.js';
 import type { GameState, PlayerState } from './game-state.js';
 import type { GameObject } from './object.js';
 
@@ -104,6 +105,7 @@ export interface NewObjectSpec {
   readonly name?: string;
   readonly legendary?: boolean;
   readonly attachment?: 'aura' | 'equipment';
+  readonly triggers?: readonly TriggeredAbility[];
   /** Where in the destination zone; defaults to the end of the array. */
   readonly position?: ZonePosition;
 }
@@ -136,6 +138,7 @@ export const createObject = (
     legendary: spec.legendary ?? false,
     attachment: spec.attachment ?? null,
     deathtouched: false,
+    triggers: spec.triggers ?? [],
     summoningSick: false,
   };
 

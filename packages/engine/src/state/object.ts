@@ -1,6 +1,7 @@
 import type { ObjectId, OracleId, PlayerId, ZoneId } from '@mtg/shared';
 import type { StackProperties } from '../stack.js';
 import type { Keywords } from '../targeting.js';
+import type { TriggeredAbility } from '../triggers.js';
 
 /**
  * An object in a zone (CR 109): a card, a token, or a copy.
@@ -56,6 +57,8 @@ export interface GameObject {
    * of it lethal (CR 702.2b). Cleared with the damage in cleanup.
    */
   readonly deathtouched: boolean;
+  /** Triggered abilities this object has (CR 603). Seeded from card scripts in 2.1. */
+  readonly triggers: readonly TriggeredAbility[];
   /**
    * Set only while the object is on the stack: where it resolves to, and whether it has
    * split second. Cleared as it leaves.

@@ -2,6 +2,7 @@ import {
   type Colour,
   type EventTarget,
   type ObjectId,
+  type OracleId,
   type PlayerId,
   playerZone,
   type ZoneId,
@@ -9,8 +10,17 @@ import {
 import { priorityDecision } from './decision.js';
 import type { EventEmitter } from './events/emitter.js';
 import type { GameState } from './state/game-state.js';
-import { getObject, moveObject, objectsIn, updateObject, updateState } from './state/update.js';
+import {
+  createObject,
+  destroyObject,
+  getObject,
+  moveObject,
+  objectsIn,
+  updateObject,
+  updateState,
+} from './state/update.js';
 import { canBeTargeted, type TargetSource } from './targeting.js';
+import { queueTriggers, triggersFromZoneChange } from './triggers.js';
 
 /**
  * The stack (CR 405).
@@ -34,6 +44,14 @@ export interface StackProperties {
   readonly targets: readonly EventTarget[];
   /** The spell's own colours, which decide what protection stops it. */
   readonly colours: readonly Colour[];
+  /**
+   * True for a triggered or activated ability. An ability is not a card: when it
+   * finishes resolving it simply ceases to exist rather than going to a graveyard
+   * (CR 608.2m), which is why resolution has to tell them apart.
+   */
+  readonly isAbility?: boolean;
+  /** Which ability of its source this is, for the card script that supplies behaviour. */
+  readonly abilityId?: string;
 }
 
 /** The object on top of the stack, or undefined when the stack is empty. */
@@ -164,6 +182,13 @@ export const resolveTopOfStack = (state: GameState, emitter: EventEmitter): Game
   if (hasFizzled(state, id)) return fizzle(state, emitter, id);
 
   const object = getObject(state, id);
+
+  // An ability leaves the game entirely rather than going anywhere (CR 608.2m).
+  if (object.stack?.isAbility === true) {
+    emitter.emit(state, { type: 'resolve', object: id });
+    return destroyObject(state, id);
+  }
+
   const destination = object.stack?.resolvesTo ?? playerZone(object.owner, 'graveyard');
 
   emitter.emit(state, { type: 'resolve', object: id });
@@ -176,11 +201,15 @@ export const resolveTopOfStack = (state: GameState, emitter: EventEmitter): Game
     cause: 'resolve',
   });
 
+  if (destination !== 'battlefield') return resolved;
+
   // A permanent entering the battlefield has summoning sickness until its controller's
-  // next turn begins (CR 302.6).
-  return destination === 'battlefield'
-    ? updateObject(resolved, id, { summoningSick: true })
-    : resolved;
+  // next turn begins (CR 302.6), and its arrival is something abilities can trigger on.
+  const entered = updateObject(resolved, id, { summoningSick: true });
+  return queueTriggers(
+    entered,
+    triggersFromZoneChange(entered, id, getObject(entered, id), 'enters'),
+  );
 };
 
 /**
@@ -233,4 +262,47 @@ export const counterObject = (
     cause: 'effect',
   });
   return countered;
+};
+
+/**
+ * Put a triggered ability on the stack (CR 603.3). It becomes an object on the stack in
+ * its own right, controlled by the ability's controller, and is destroyed rather than
+ * buried when it resolves.
+ */
+export const putTriggerOnStack = (
+  state: GameState,
+  emitter: EventEmitter,
+  trigger: {
+    readonly abilityId: string;
+    readonly source: ObjectId;
+    readonly controller: PlayerId;
+    readonly definitionId: OracleId;
+  },
+): GameState => {
+  const created = createObject(state, {
+    definitionId: trigger.definitionId,
+    owner: trigger.controller,
+    controller: trigger.controller,
+    zone: 'stack',
+  });
+
+  const next = updateObject(created.state, created.object.id, {
+    stack: {
+      resolvesTo: 'exile',
+      splitSecond: false,
+      targets: [],
+      colours: [],
+      isAbility: true,
+      abilityId: trigger.abilityId,
+    },
+  });
+
+  emitter.emit(next, {
+    type: 'trigger',
+    controller: trigger.controller,
+    source: trigger.source,
+    abilityIndex: 0,
+  });
+  emitter.emit(next, { type: 'putOnStack', object: created.object.id });
+  return next;
 };

@@ -5,6 +5,7 @@ import type { GameState } from './state/game-state.js';
 import type { GameObject } from './state/object.js';
 import { getObject, objectsIn, updateObjects, updatePlayer, updateState } from './state/update.js';
 import { canBeTargeted } from './targeting.js';
+import { queueTriggers, triggersFromAttack, triggersFromBlock } from './triggers.js';
 
 /**
  * Combat (CR 506-511).
@@ -121,6 +122,10 @@ export const declareAttackers = (
   }
   for (const id of toTap) emitter.emit(next, { type: 'tap', object: id });
 
+  // "Whenever this creature attacks" fires as attackers are declared (CR 508.2).
+  for (const { attacker } of declarations) {
+    next = queueTriggers(next, triggersFromAttack(next, attacker));
+  }
   return next;
 };
 
@@ -232,9 +237,12 @@ export const declareBlockers = (
       : { ...entry, blockedBy: blockers, blocked: true, orderSettled: blockers.length < 2 };
   });
 
-  const next = updateState(state, { combat: { ...combat, attackers } });
+  let next = updateState(state, { combat: { ...combat, attackers } });
   for (const { blocker, blocking } of declarations) {
     if (blocking.length > 0) emitter.emit(next, { type: 'block', blocker, blocking });
+  }
+  for (const { blocker, blocking } of declarations) {
+    if (blocking.length > 0) next = queueTriggers(next, triggersFromBlock(next, blocker));
   }
   return next;
 };

@@ -76,8 +76,20 @@ export interface ChooseOptionDecision {
   readonly options: readonly ObjectId[];
 }
 
+/**
+ * Putting several of one player's triggers on the stack, which they order (CR 603.3b).
+ * The last one put on the stack resolves first.
+ */
+export interface OrderTriggersDecision {
+  readonly kind: 'orderTriggers';
+  readonly player: PlayerId;
+  /** Ability ids, in the order they fired. */
+  readonly triggers: readonly string[];
+}
+
 export type Decision =
   | ChooseOptionDecision
+  | OrderTriggersDecision
   | PriorityDecision
   | DiscardDecision
   | DeclareAttackersDecision
@@ -96,7 +108,8 @@ export type DecisionResponse =
     }
   | { readonly kind: 'declareBlockers'; readonly blocks: readonly BlockDeclaration[] }
   | { readonly kind: 'orderBlockers'; readonly order: readonly ObjectId[] }
-  | { readonly kind: 'chooseOption'; readonly chosen: ObjectId };
+  | { readonly kind: 'chooseOption'; readonly chosen: ObjectId }
+  | { readonly kind: 'orderTriggers'; readonly order: readonly string[] };
 
 export class UnexpectedDecisionError extends Error {
   constructor(message: string) {

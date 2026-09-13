@@ -42,8 +42,9 @@ interface GameState {
   config: GameConfig;                       // turnCap, maxHandSize, playerOnPlay
   extraTurns: PlayerId[];                   // owed extra turns, oldest first (CR 500.7)
   effects: ContinuousEffect[];              // active continuous effects with timestamps        (1.9)
-  delayedTriggers: DelayedTrigger[];                                                         // (1.8)
-  pendingTriggers: TriggeredAbilityInstance[];  // waiting to be put on the stack              (1.8)
+  delayedTriggers: DelayedTrigger[];        // set up to fire at a later step (CR 603.7)
+  pendingTriggers: TriggerInstance[];       // fired, waiting to go on the stack
+  triggersFiredThisTurn: string[];          // for once-each-turn abilities
   combat: CombatState | null;               // non-null only during the combat phase
   pendingDecision: Decision | null;         // set when a player must choose; null while it can run
   result: GameResult | null;

@@ -14,5 +14,6 @@ export * from './state/game-state.js';
 export * from './state/object.js';
 export * from './state/update.js';
 export * from './targeting.js';
+export * from './triggers.js';
 export * from './turn/land.js';
 export * from './turn/turn.js';

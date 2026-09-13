@@ -754,3 +754,24 @@ describe('combat and state-based actions together', () => {
     expect(getObject(current, mine[0] as ObjectId).damage).toBe(0);
   });
 });
+
+describe('runUntilGameOver answers every kind of decision', () => {
+  it('plays a whole game out with creatures on both sides', () => {
+    const built = setup(60, { turnCap: 8 });
+    let state = built.state;
+    for (const owner of ['A', 'B'] as const) {
+      for (let i = 0; i < 2; i += 1) {
+        state = createObject(state, {
+          definitionId: card,
+          owner,
+          zone: 'battlefield',
+          power: 2,
+          toughness: 2,
+        }).state;
+      }
+    }
+    const finished = runUntilGameOver(startGame(state, built.emitter), built.emitter);
+    expect(finished.result).not.toBeNull();
+    expect(finished.pendingDecision).toBeNull();
+  });
+});

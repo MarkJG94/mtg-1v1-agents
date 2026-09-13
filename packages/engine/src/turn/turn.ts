@@ -30,7 +30,7 @@ import {
 import type { EventEmitter } from '../events/emitter.js';
 import { emptyManaPool, isManaPoolEmpty } from '../mana/pool.js';
 import { applyLegendRule, checkStateBasedActions } from '../sba.js';
-import { isStackEmpty, resolveTopOfStack } from '../stack.js';
+import { isStackEmpty, putTriggerOnStack, resolveTopOfStack } from '../stack.js';
 import type { GameState } from '../state/game-state.js';
 import { isGameOver } from '../state/game-state.js';
 import {
@@ -41,6 +41,14 @@ import {
   updatePlayer,
   updateState,
 } from '../state/update.js';
+import {
+  evaluateCondition,
+  fireDelayedTriggers,
+  queueTriggers,
+  type TriggerInstance,
+  triggersFromStep,
+  triggersInApnapOrder,
+} from '../triggers.js';
 
 /**
  * Turn structure (CR 500): walking the steps, and the turn-based actions that happen
@@ -309,6 +317,15 @@ const enterStep = (state: GameState, emitter: EventEmitter, step: Step): GameSta
   }
 
   emitter.emit(entered, { type: 'stepStart' });
+
+  // "At the beginning of your upkeep" and friends, plus any delayed trigger waiting for
+  // this step (CR 603.7). They queue now and go on the stack before the next priority.
+  const { fired, remaining } = fireDelayedTriggers(entered, step);
+  entered = queueTriggers(updateState(entered, { delayedTriggers: remaining }), [
+    ...triggersFromStep(entered, step),
+    ...fired,
+  ]);
+
   return performTurnBasedActions(entered, emitter);
 };
 
@@ -330,7 +347,13 @@ const beginTurn = (
 
   // "This turn" bookkeeping resets for both players, not only the active one: effects
   // can let a player play lands on someone else's turn.
-  let started = updateState(state, { turn, activePlayer: player, extraTurns, passesInARow: 0 });
+  let started = updateState(state, {
+    turn,
+    activePlayer: player,
+    extraTurns,
+    passesInARow: 0,
+    triggersFiredThisTurn: [],
+  });
   for (const id of playerIds) started = updatePlayer(started, id, { landsPlayedThisTurn: 0 });
 
   emitter.emit(started, { type: 'turnStart', activePlayer: player });
@@ -344,6 +367,56 @@ const leaveStep = (state: GameState, emitter: EventEmitter): GameState => {
 
   const { player, extraTurns } = nextTurnPlayer(state);
   return beginTurn(state, emitter, player, extraTurns);
+};
+
+/**
+ * Empty the trigger queue onto the stack (CR 603.3b).
+ *
+ * The active player's triggers go on first, then the non-active player's — which means
+ * the non-active player's resolve first, since the stack is last-on-first-off. A player
+ * with more than one chooses the order themselves, so this stops for a decision.
+ */
+const putPendingTriggersOnStack = (state: GameState, emitter: EventEmitter): GameState => {
+  if (state.pendingTriggers.length === 0) return state;
+
+  const { active, nonActive } = triggersInApnapOrder(state);
+  const group = active.length > 0 ? active : nonActive;
+  const first = group[0];
+  if (!first) return state;
+
+  if (group.length > 1) {
+    return updateState(state, {
+      pendingDecision: {
+        kind: 'orderTriggers',
+        player: first.controller,
+        triggers: group.map((trigger) => trigger.abilityId),
+      },
+    });
+  }
+
+  return stackOneTrigger(state, emitter, first);
+};
+
+/**
+ * Put one queued trigger on the stack, unless its intervening-if clause is false — in
+ * which case it simply never goes on the stack at all (CR 603.4).
+ */
+const stackOneTrigger = (
+  state: GameState,
+  emitter: EventEmitter,
+  trigger: TriggerInstance,
+): GameState => {
+  const remaining = state.pendingTriggers.filter((candidate) => candidate !== trigger);
+  const dequeued = updateState(state, { pendingTriggers: remaining });
+
+  if (!evaluateCondition(dequeued, trigger.interveningIf, trigger)) return dequeued;
+
+  return putTriggerOnStack(dequeued, emitter, {
+    abilityId: trigger.abilityId,
+    source: trigger.source,
+    controller: trigger.controller,
+    definitionId: trigger.lastKnown.definitionId,
+  });
 };
 
 /** Hand a player priority and stop for their decision (CR 117.1). */
@@ -377,6 +450,12 @@ export const advanceToDecision = (
     const settled = checkStateBasedActions(current, emitter);
     if (settled !== current) {
       current = settled;
+      continue;
+    }
+
+    const stacked = putPendingTriggersOnStack(current, emitter);
+    if (stacked !== current) {
+      current = stacked;
       continue;
     }
 
@@ -423,6 +502,8 @@ export const applyDecision = (
     next = declareAttackers(cleared, emitter, response.attackers);
   } else if (decision.kind === 'declareBlockers' && response.kind === 'declareBlockers') {
     next = askForBlockerOrder(declareBlockers(cleared, emitter, response.blocks));
+  } else if (decision.kind === 'orderTriggers' && response.kind === 'orderTriggers') {
+    next = stackTriggersInOrder(cleared, emitter, decision.player, response.order);
   } else if (decision.kind === 'chooseOption' && response.kind === 'chooseOption') {
     next = applyLegendRule(cleared, emitter, decision.options, response.chosen);
   } else if (decision.kind === 'orderBlockers' && response.kind === 'orderBlockers') {
@@ -459,6 +540,33 @@ const applyPriority = (
   return grantPriority(resolved, resolved.activePlayer);
 };
 
+/** Put one player's queued triggers on the stack in the order they chose. */
+const stackTriggersInOrder = (
+  state: GameState,
+  emitter: EventEmitter,
+  player: PlayerId,
+  order: readonly string[],
+): GameState => {
+  const mine = state.pendingTriggers.filter((trigger) => trigger.controller === player);
+  if (order.length !== mine.length) {
+    throw new UnexpectedDecisionError(
+      `expected an order over ${mine.length} trigger(s), got ${order.length}`,
+    );
+  }
+
+  const remaining = [...mine];
+  let current = state;
+  for (const abilityId of order) {
+    const index = remaining.findIndex((trigger) => trigger.abilityId === abilityId);
+    if (index === -1) {
+      throw new UnexpectedDecisionError(`no queued trigger with id "${abilityId}"`);
+    }
+    const [trigger] = remaining.splice(index, 1);
+    if (trigger) current = stackOneTrigger(current, emitter, trigger);
+  }
+  return current;
+};
+
 // --- Driving a whole game, for tests and the random agent ---
 
 export interface AutoPlayOptions {
@@ -469,7 +577,13 @@ export interface AutoPlayOptions {
   readonly limit?: number;
 }
 
-/** Answer the pending decision by passing, or by discarding, until the game ends. */
+/**
+ * Drive a game to its end, answering every decision in the simplest legal way: pass
+ * priority, discard the first cards in hand, decline to attack or block, and take
+ * whatever order is offered. Used by tests and, in roadmap 1.13, by the invariant fuzzer,
+ * so it must be able to answer *every* decision kind rather than the couple it started
+ * with — an unanswerable decision would look like an engine hang.
+ */
 export const runUntilGameOver = (
   state: GameState,
   emitter: EventEmitter,
@@ -477,21 +591,42 @@ export const runUntilGameOver = (
 ): GameState => {
   const limit = options.limit ?? 100_000;
   let current = state;
+
   for (let i = 0; i < limit && !isGameOver(current); i += 1) {
     const decision = current.pendingDecision;
     if (!decision) {
       current = advanceToDecision(current, emitter);
       continue;
     }
-    current =
-      decision.kind === 'discard'
-        ? applyDecision(current, emitter, {
-            kind: 'discard',
-            cards: (options.chooseDiscards ?? ((d) => d.from.slice(0, d.count)))(decision),
-          })
-        : applyDecision(current, emitter, { kind: 'priority', action: { kind: 'pass' } });
+
+    current = applyDecision(current, emitter, defaultAnswer(decision, options));
   }
   return current;
+};
+
+const defaultAnswer = (decision: Decision, options: AutoPlayOptions): DecisionResponse => {
+  switch (decision.kind) {
+    case 'discard':
+      return {
+        kind: 'discard',
+        cards: (options.chooseDiscards ?? ((d) => d.from.slice(0, d.count)))(decision),
+      };
+    case 'declareAttackers':
+      return { kind: 'declareAttackers', attackers: [] };
+    case 'declareBlockers':
+      return { kind: 'declareBlockers', blocks: [] };
+    case 'orderBlockers':
+      return { kind: 'orderBlockers', order: decision.blockers };
+    case 'orderTriggers':
+      return { kind: 'orderTriggers', order: decision.triggers };
+    case 'chooseOption': {
+      const [first] = decision.options;
+      if (first === undefined) throw new Error('a chooseOption decision offered nothing');
+      return { kind: 'chooseOption', chosen: first };
+    }
+    default:
+      return { kind: 'priority', action: { kind: 'pass' } };
+  }
 };
 
 /** Drive the game forward, passing priority, until `step` begins. For tests. */

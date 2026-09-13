@@ -12,6 +12,7 @@ import type { Decision } from '../decision.js';
 import { emptyManaPool, type ManaPool } from '../mana/pool.js';
 import type { RngState } from '../rng.js';
 import { type Keywords, noKeywords } from '../targeting.js';
+import type { DelayedTrigger, TriggerInstance } from '../triggers.js';
 import type { GameObject } from './object.js';
 
 /**
@@ -77,6 +78,12 @@ export interface GameState {
   readonly pendingDecision: Decision | null;
   /** Non-null only during the combat phase (CR 506). */
   readonly combat: CombatState | null;
+  /** Triggers that have fired and go on the stack next time a player would get priority. */
+  readonly pendingTriggers: readonly TriggerInstance[];
+  /** Triggers set up to fire at a later step (CR 603.7). */
+  readonly delayedTriggers: readonly DelayedTrigger[];
+  /** `source:abilityId` for each once-each-turn ability that has already fired. */
+  readonly triggersFiredThisTurn: readonly string[];
   /**
    * Players owed an extra turn (CR 500.7), oldest first. The next turn goes to the
    * front of this queue if it has one, otherwise to the other player.
@@ -158,6 +165,9 @@ export const createGameState = (options: CreateGameStateOptions): GameState => {
     extraTurns: [],
     pendingDecision: null,
     combat: null,
+    pendingTriggers: [],
+    delayedTriggers: [],
+    triggersFiredThisTurn: [],
     result: null,
   };
 };

@@ -18,6 +18,7 @@ import {
   updateObject,
   updateState,
 } from './state/update.js';
+import { queueTriggers, triggersFromZoneChange } from './triggers.js';
 
 /**
  * State-based actions (CR 704).
@@ -250,7 +251,12 @@ const applyActions = (
   for (const { id, kind } of actions.destroyed) {
     const object = getObject(next, id);
     const graveyard = playerZone(object.owner, 'graveyard');
-    next = moveObject(next, id, graveyard);
+
+    // Capture what died before it leaves: a dies trigger has to remember the creature as
+    // it last was on the battlefield (CR 603.10).
+    const fired = triggersFromZoneChange(next, id, object, 'dies');
+
+    next = queueTriggers(moveObject(next, id, graveyard), fired);
     emitter.emit(next, { type: 'sba', kind, objects: [id] });
     emitter.emit(next, {
       type: 'moveZone',
