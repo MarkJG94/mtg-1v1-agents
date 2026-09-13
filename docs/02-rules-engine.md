@@ -69,7 +69,7 @@ The engine pauses with a `pendingDecision` whenever a player must choose. Decisi
 
 - After a spell/ability is put on the stack, and after each resolution, SBAs are checked and repeated until none apply, then pending triggers go on the stack (APNAP, controller orders), then the active player receives priority (CR 117.3c, 117.5).
 - Both players passing in succession with an empty stack advances the step; with a non-empty stack resolves the top item.
-- Mana abilities never use the stack. The engine auto-activates mana abilities during cost payment through the mana solver; the solver prefers colourless-only sources first and keeps the most flexible sources untapped, but the AI can override with an explicit `payCost` decision.
+- Mana abilities never use the stack. The engine auto-activates mana abilities during cost payment through the mana solver; the solver prefers colourless-only sources first and keeps the most flexible sources untapped, but the AI can override with an explicit `payCost` decision. The pool holds individual mana units carrying their type, snow provenance and any spend restriction, and payment is an exact backtracking search; see ADR 0003.
 
 ## Continuous effects and layers
 

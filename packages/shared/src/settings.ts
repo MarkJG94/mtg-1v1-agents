@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { colours } from './game/colour.js';
 
 /**
  * Run settings (docs/05-evolution.md). Every knob that changes how a run plays out
@@ -20,10 +21,6 @@ export type ChangeSize = (typeof changeSizes)[number];
 /** Scryfall legality used as the base card pool, before the run's own ban list. */
 export const legalityFilters = ['vintage', 'legacy', 'modern', 'pioneer', 'pauper'] as const;
 export type LegalityFilter = (typeof legalityFilters)[number];
-
-/** Magic's five colours, in WUBRG order. */
-export const colours = ['W', 'U', 'B', 'R', 'G'] as const;
-export type Colour = (typeof colours)[number];
 
 /**
  * Seeds are 64-bit and arrive from JSON, so they are carried as decimal strings

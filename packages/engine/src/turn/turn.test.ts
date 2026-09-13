@@ -1,6 +1,7 @@
 import { asOracleId, type ObjectId, type PlayerId, playerIds, playerZone } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
 import { createEventEmitter, type EventEmitter } from '../events/emitter.js';
+import { addMana, emptyManaPool } from '../mana/pool.js';
 import { stateFromSeed } from '../rng.js';
 import {
   type CreateGameStateOptions,
@@ -454,5 +455,34 @@ describe('the event stream', () => {
     expect(emitter.events.map((event) => event.seq)).toEqual(
       emitter.events.map((_event, index) => index),
     );
+  });
+});
+
+describe('mana empties between steps (CR 500.4)', () => {
+  it('clears both pools as the next step begins', () => {
+    const { state, emitter } = setup();
+    let current = startFirstTurn(state, emitter);
+    current = updatePlayer(current, 'A', { manaPool: addMana(emptyManaPool, 'G', 2) });
+    current = updatePlayer(current, 'B', { manaPool: addMana(emptyManaPool, 'U', 1) });
+
+    const next = advanceStep(current, emitter);
+    expect(next.players.A.manaPool).toEqual([]);
+    expect(next.players.B.manaPool).toEqual([]);
+  });
+
+  it('leaves mana alone within the step that produced it', () => {
+    const { state, emitter } = setup();
+    const started = startFirstTurn(state, emitter);
+    const withMana = updatePlayer(started, 'A', { manaPool: addMana(emptyManaPool, 'G', 2) });
+    expect(withMana.players.A.manaPool).toHaveLength(2);
+  });
+
+  it('is empty again after a turn rolls over', () => {
+    const { state, emitter } = setup();
+    let current = updatePlayer(startFirstTurn(state, emitter), 'A', {
+      manaPool: addMana(emptyManaPool, 'G', 2),
+    });
+    while (current.turn === 1) current = advanceStep(current, emitter);
+    expect(current.players.A.manaPool).toEqual([]);
   });
 });

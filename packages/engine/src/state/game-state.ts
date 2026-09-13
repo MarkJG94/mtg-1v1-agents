@@ -7,8 +7,8 @@ import {
   type Step,
   type ZoneId,
 } from '@mtg/shared';
+import { emptyManaPool, type ManaPool } from '../mana/pool.js';
 import type { RngState } from '../rng.js';
-import { emptyManaPool, type ManaPool } from './mana.js';
 import type { GameObject } from './object.js';
 
 /**

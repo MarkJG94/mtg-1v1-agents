@@ -1,6 +1,7 @@
 export * from './eventlog/events.js';
 export * from './eventlog/log.js';
 export * from './eventlog/migrations.js';
+export * from './game/colour.js';
 export * from './game/decisions.js';
 export * from './game/player.js';
 export * from './game/result.js';

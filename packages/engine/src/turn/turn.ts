@@ -8,6 +8,7 @@ import {
   steps,
 } from '@mtg/shared';
 import type { EventEmitter } from '../events/emitter.js';
+import { emptyManaPool, isManaPoolEmpty } from '../mana/pool.js';
 import type { GameState } from '../state/game-state.js';
 import { isGameOver } from '../state/game-state.js';
 import {
@@ -216,7 +217,15 @@ const enterStep = (
   step: Step,
   options: TurnOptions,
 ): GameState => {
-  const entered = updateState(state, { step, passesInARow: 0 });
+  // Unused mana empties as a step or phase ends (CR 500.4). Clearing it as the next step
+  // begins is the same thing, and keeps mana available for the whole step that made it.
+  let entered = updateState(state, { step, passesInARow: 0 });
+  for (const id of playerIds) {
+    if (!isManaPoolEmpty(entered.players[id].manaPool)) {
+      entered = updatePlayer(entered, id, { manaPool: emptyManaPool });
+    }
+  }
+
   emitter.emit(entered, { type: 'stepStart' });
   return performTurnBasedActions(entered, emitter, options);
 };

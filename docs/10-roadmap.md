@@ -16,7 +16,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done.
 
 - [x] 1.1 State model, object ids, zones, seeded RNG, structural-sharing update helper, event emitter. *(Zone and state shape settled in ADR 0002. `GameState` gains its per-subsystem fields in 1.4/1.6/1.8/1.9.)*
 - [x] 1.2 Turn structure with all steps; untap/draw/cleanup; land drops; turn cap. *(Also extra turns. The first-strike damage step is skipped until combat exists in 1.6. Cleanup's discard-to-hand-size is a real player choice, so it takes an injected `chooseDiscards` hook for now and fails loudly without one; 1.4 replaces the hook with a `pendingDecision`. Timing and land-drop limits are enforced; "is this card actually a land" waits on card definitions in 2.1.)*
-- [ ] 1.3 Mana: pool, costs (incl. hybrid/phyrexian/X), payment solver, mana abilities of basic and simple nonbasic lands.
+- [x] 1.3 Mana: pool, costs (incl. hybrid/phyrexian/X), payment solver, mana abilities of basic and simple nonbasic lands. *(Pool reshaped to carry snow and spend restrictions per unit, and phyrexian mana folded into hybrid; see ADR 0003. The solver is exact, including {S} and {X}. Spend restrictions are carried but enforced in 1.4, when the engine knows what is being cast. `ManaAbility` is modelled and resolves without the stack; wiring real lands' abilities waits on card scripts in 2.1.)*
 - [ ] 1.4 Priority, stack, casting/activating, resolution, countering, fizzling, split second.
 - [ ] 1.5 Targeting and legality (`legalActions`), hexproof/shroud/protection/ward.
 - [ ] 1.6 Combat with all evergreen keywords, damage assignment, first-strike step.
