@@ -20,6 +20,8 @@ Decks are not curated: the seed deck is drawn at random from the whole of Scryfa
 | [docs/09-testing.md](docs/09-testing.md) | Test strategy, fixtures, fuzzing, CI |
 | [docs/10-roadmap.md](docs/10-roadmap.md) | Phased plan and task board |
 
+[CLAUDE.md](CLAUDE.md) holds the working notes for AI-assisted sessions: the commands, what "a phase is finished" means, and the engine invariants that are easy to break by accident.
+
 ## Stack (decided)
 
 TypeScript monorepo (pnpm workspaces). `packages/engine` (pure TS rules engine), `packages/cards` (card scripts + Scryfall data tooling), `packages/agents` (play AI, deck-change AI), `apps/server` (Node + Fastify + WebSocket, SQLite), `apps/web` (React + Vite). Docker Compose for the homelab.
