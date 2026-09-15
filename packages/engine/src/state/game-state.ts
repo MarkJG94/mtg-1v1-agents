@@ -13,6 +13,7 @@ import type { ContinuousEffect } from '../layers.js';
 import { emptyManaPool, type ManaPool } from '../mana/pool.js';
 import type { ReplacementEffect, ReplacementProgress } from '../replacement.js';
 import type { RngState } from '../rng.js';
+import type { MulliganState } from '../setup.js';
 import { type Keywords, noKeywords } from '../targeting.js';
 import type { DelayedTrigger, TriggerInstance } from '../triggers.js';
 import type { GameObject } from './object.js';
@@ -109,6 +110,18 @@ export interface GameState {
    * front of this queue if it has one, otherwise to the other player.
    */
   readonly extraTurns: readonly PlayerId[];
+  /**
+   * Where the game is in the London mulligan (CR 103.4); `null` once the opening hands
+   * are settled, which is every moment after the game has actually begun.
+   */
+  readonly mulligans: MulliganState | null;
+  /**
+   * Hashes of the states reached this turn. A repeat is a loop and so a draw (CR 726).
+   * Cleared as each turn begins, because a position recurring across turns is ordinary.
+   */
+  readonly statesThisTurn: readonly number[];
+  /** Decisions answered so far, against `config.decisionCap`. */
+  readonly decisionsMade: number;
   /** Non-null once the game is over. */
   readonly result: GameResult | null;
 }
@@ -116,6 +129,15 @@ export interface GameState {
 export const DEFAULT_STARTING_LIFE = 20;
 export const DEFAULT_TURN_CAP = 40;
 export const DEFAULT_MAX_HAND_SIZE = 7;
+export const DEFAULT_OPENING_HAND_SIZE = 7;
+/** Seven mulligans leaves a hand of nothing, so there is no eighth worth taking. */
+export const DEFAULT_MAX_MULLIGANS = 7;
+/**
+ * The backstop docs/02 asks for. Generous: a 40-turn game of real Magic answers a few
+ * hundred decisions, so reaching this means something is looping that loop detection
+ * could not see.
+ */
+export const DEFAULT_DECISION_CAP = 20_000;
 
 /**
  * Fixed for the whole game. `turnCap` comes from run settings (docs/05) and makes an
@@ -126,6 +148,14 @@ export interface GameConfig {
   readonly turnCap: number;
   /** Maximum hand size, enforced in cleanup (CR 514.1). */
   readonly maxHandSize: number;
+  /** Cards dealt to each player at the start (CR 103.2). */
+  readonly openingHandSize: number;
+  /** How many times a player may mulligan before they must keep (CR 103.4). */
+  readonly maxMulligans: number;
+  /** Decisions after which an unfinished game is a draw; the loop-detection backstop. */
+  readonly decisionCap: number;
+  /** Whether a state repeating within a turn ends the game as a draw (CR 726). */
+  readonly detectLoops: boolean;
   /** Who took the first turn. Needed for the CR 103.7a first-draw skip. */
   readonly playerOnPlay: PlayerId;
 }
@@ -153,6 +183,10 @@ export interface CreateGameStateOptions {
   readonly startingLife?: number;
   readonly turnCap?: number;
   readonly maxHandSize?: number;
+  readonly openingHandSize?: number;
+  readonly maxMulligans?: number;
+  readonly decisionCap?: number;
+  readonly detectLoops?: boolean;
 }
 
 /**
@@ -180,6 +214,10 @@ export const createGameState = (options: CreateGameStateOptions): GameState => {
     config: {
       turnCap: options.turnCap ?? DEFAULT_TURN_CAP,
       maxHandSize: options.maxHandSize ?? DEFAULT_MAX_HAND_SIZE,
+      openingHandSize: options.openingHandSize ?? DEFAULT_OPENING_HAND_SIZE,
+      maxMulligans: options.maxMulligans ?? DEFAULT_MAX_MULLIGANS,
+      decisionCap: options.decisionCap ?? DEFAULT_DECISION_CAP,
+      detectLoops: options.detectLoops ?? true,
       playerOnPlay: options.onPlay,
     },
     extraTurns: [],
@@ -193,6 +231,9 @@ export const createGameState = (options: CreateGameStateOptions): GameState => {
     replacements: [],
     nextEffectId: 1,
     pendingReplacement: null,
+    mulligans: null,
+    statesThisTurn: [],
+    decisionsMade: 0,
     result: null,
   };
 };

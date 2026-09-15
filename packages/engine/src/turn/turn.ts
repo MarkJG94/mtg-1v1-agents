@@ -32,9 +32,12 @@ import {
 import type { EventEmitter } from '../events/emitter.js';
 import { resumeBatch, runBatch, runEvent } from '../events/perform.js';
 import type { MoveZoneEvent } from '../events/rules-event.js';
+import { drawGame } from '../game-end.js';
+import { hashState, isRepeatedState, rememberState } from '../loop.js';
 import { emptyManaPool, isManaPoolEmpty } from '../mana/pool.js';
 import { expireEndOfTurnReplacements } from '../replacement.js';
 import { applyLegendRule, checkStateBasedActions } from '../sba.js';
+import { applyBottomCards, applyMulligan } from '../setup.js';
 import { isStackEmpty, putTriggerOnStack, resolveTopOfStack } from '../stack.js';
 import type { GameState } from '../state/game-state.js';
 import { isGameOver } from '../state/game-state.js';
@@ -324,14 +327,7 @@ const beginTurn = (
   extraTurns: readonly PlayerId[],
 ): GameState => {
   const turn = state.turn + 1;
-  if (turn > state.config.turnCap) {
-    const ended = updateState(state, {
-      result: { winner: null, reason: 'turnCap', turn: state.turn },
-      pendingDecision: null,
-    });
-    emitter.emit(ended, { type: 'gameEnd', winner: null, reason: 'turnCap' });
-    return ended;
-  }
+  if (turn > state.config.turnCap) return drawGame(state, emitter, 'turnCap');
 
   // "This turn" bookkeeping resets for both players, not only the active one: effects
   // can let a player play lands on someone else's turn.
@@ -342,6 +338,8 @@ const beginTurn = (
     passesInARow: 0,
     triggersFiredThisTurn: [],
     loyaltyActivatedThisTurn: [],
+    // A position recurring across turns is ordinary; only within one is it a loop.
+    statesThisTurn: [],
   });
   for (const id of playerIds) started = updatePlayer(started, id, { landsPlayedThisTurn: 0 });
 
@@ -426,9 +424,12 @@ export const advanceToDecision = (
 ): GameState => {
   let current = state;
   for (let i = 0; i < limit; i += 1) {
-    if (isGameOver(current) || current.pendingDecision !== null) return current;
+    if (isGameOver(current)) return current;
+    // Every decision point passes through here, which makes this the one place that sees
+    // each distinct position exactly once — and so the only place loop detection can sit.
+    if (current.pendingDecision !== null) return checkForLoop(current, emitter);
     if (current.turn === 0) {
-      throw new Error('the game has not started; call startGame first');
+      throw new Error('the game has not started; call startGame or setUpGame first');
     }
 
     if (skipsPriority(current.step)) {
@@ -482,7 +483,16 @@ export const applyDecision = (
     );
   }
 
-  const cleared = updateState(state, { pendingDecision: null });
+  // The backstop for a loop that repeated-state detection cannot see, such as one that
+  // shuffles a library and so never reaches the same position twice (docs/02).
+  if (state.decisionsMade + 1 > state.config.decisionCap) {
+    return drawGame(state, emitter, 'decisionCap');
+  }
+
+  const cleared = updateState(state, {
+    pendingDecision: null,
+    decisionsMade: state.decisionsMade + 1,
+  });
   let next: GameState;
 
   if (decision.kind === 'discard' && response.kind === 'discard') {
@@ -499,12 +509,39 @@ export const applyDecision = (
     next = askForBlockerOrder(orderBlockers(cleared, decision.attacker, response.order));
   } else if (decision.kind === 'chooseReplacement' && response.kind === 'chooseReplacement') {
     next = resumeBatch(cleared, emitter, response.effect);
+  } else if (decision.kind === 'mulligan' && response.kind === 'mulligan') {
+    next = afterSetup(applyMulligan(cleared, emitter, decision.player, response.action), emitter);
+  } else if (decision.kind === 'bottomCards' && response.kind === 'bottomCards') {
+    next = afterSetup(applyBottomCards(cleared, emitter, decision.player, response.cards), emitter);
   } else {
     next = applyPriority(cleared, emitter, decision as Extract<Decision, { kind: 'priority' }>);
   }
 
   return advanceToDecision(next, emitter);
 };
+
+/**
+ * A position the turn has already been in means nothing has changed and nothing will, so
+ * the game is a draw (CR 726). Checked as the engine settles on a decision, which is the
+ * one moment a position is fully formed and can be compared with another.
+ */
+const checkForLoop = (state: GameState, emitter: EventEmitter): GameState => {
+  if (!state.config.detectLoops || state.turn === 0) return state;
+
+  const hash = hashState(state);
+  if (isRepeatedState(state, hash)) return drawGame(state, emitter, 'loop');
+  return updateState(state, { statesThisTurn: rememberState(state, hash) });
+};
+
+/**
+ * Once the opening hands are settled, turn 1 begins (CR 103.7). Mulligans are the only
+ * thing that happens on "turn 0", so this is the one place where a state with no turn
+ * yet becomes a game in progress.
+ */
+const afterSetup = (state: GameState, emitter: EventEmitter): GameState =>
+  state.turn === 0 && state.mulligans === null && state.pendingDecision === null
+    ? beginTurn(state, emitter, state.config.playerOnPlay, state.extraTurns)
+    : state;
 
 /**
  * A pass. Two passes in a row resolve the top of the stack, or end the step when the
@@ -572,6 +609,8 @@ export interface AutoPlayOptions {
   readonly chooseDiscards?: (
     decision: Extract<Decision, { kind: 'discard' }>,
   ) => readonly ObjectId[];
+  /** Whether to mulligan a given opening hand; defaults to keeping whatever is dealt. */
+  readonly mulligan?: (decision: Extract<Decision, { kind: 'mulligan' }>) => 'keep' | 'mulligan';
   readonly limit?: number;
 }
 
@@ -627,6 +666,10 @@ const defaultAnswer = (decision: Decision, options: AutoPlayOptions): DecisionRe
       if (first === undefined) throw new Error('a chooseReplacement decision offered nothing');
       return { kind: 'chooseReplacement', effect: first };
     }
+    case 'mulligan':
+      return { kind: 'mulligan', action: options.mulligan?.(decision) ?? 'keep' };
+    case 'bottomCards':
+      return { kind: 'bottomCards', cards: decision.from.slice(0, decision.count) };
     default:
       return { kind: 'priority', action: { kind: 'pass' } };
   }

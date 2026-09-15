@@ -13,7 +13,7 @@ import type { RulesEvent } from './events/rules-event.js';
  * Only the kinds the engine can currently raise are modelled. The rest listed in docs/02
  * arrive with the subsystems that need them: `chooseTargets` in 1.5, `declareAttackers`
  * and friends in 1.6, `orderTriggers` in 1.8, `chooseReplacement` in 1.10,
- * `mulligan` in 1.12.
+ * `mulligan` and `bottomCards` in 1.12.
  */
 
 /** What a player may do while holding priority. */
@@ -28,6 +28,26 @@ export interface PriorityDecision {
    * then a driver holding priority calls `putOnStack` directly.
    */
   readonly options: readonly PriorityAction[];
+}
+
+/** Keeping or mulliganing an opening hand (CR 103.4). */
+export interface MulliganDecision {
+  readonly kind: 'mulligan';
+  readonly player: PlayerId;
+  readonly hand: readonly ObjectId[];
+  /** Mulligans already taken, which is how many cards keeping will cost (CR 103.4b). */
+  readonly taken: number;
+  /** `'mulligan'` is absent once the player has taken as many as the game allows. */
+  readonly options: readonly ('keep' | 'mulligan')[];
+}
+
+/** Paying for a kept mulligan by putting cards under the library (CR 103.4b). */
+export interface BottomCardsDecision {
+  readonly kind: 'bottomCards';
+  readonly player: PlayerId;
+  readonly count: number;
+  /** The cards that may be chosen — the player's hand. */
+  readonly from: readonly ObjectId[];
 }
 
 /** Discarding to maximum hand size in cleanup (CR 514.1). */
@@ -107,6 +127,8 @@ export interface ChooseReplacementDecision {
 }
 
 export type Decision =
+  | MulliganDecision
+  | BottomCardsDecision
   | ChooseOptionDecision
   | ChooseReplacementDecision
   | OrderTriggersDecision
@@ -118,6 +140,8 @@ export type Decision =
 
 export type DecisionResponse =
   | { readonly kind: 'priority'; readonly action: PriorityAction }
+  | { readonly kind: 'mulligan'; readonly action: 'keep' | 'mulligan' }
+  | { readonly kind: 'bottomCards'; readonly cards: readonly ObjectId[] }
   | { readonly kind: 'discard'; readonly cards: readonly ObjectId[] }
   | {
       readonly kind: 'declareAttackers';

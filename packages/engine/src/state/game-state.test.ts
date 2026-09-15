@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { stateFromSeed } from '../rng.js';
 import {
   createGameState,
+  DEFAULT_DECISION_CAP,
   DEFAULT_MAX_HAND_SIZE,
+  DEFAULT_MAX_MULLIGANS,
+  DEFAULT_OPENING_HAND_SIZE,
   DEFAULT_STARTING_LIFE,
   DEFAULT_TURN_CAP,
   isGameOver,
@@ -72,18 +75,34 @@ describe('createGameState', () => {
     expect(state().config).toEqual({
       turnCap: DEFAULT_TURN_CAP,
       maxHandSize: DEFAULT_MAX_HAND_SIZE,
+      openingHandSize: DEFAULT_OPENING_HAND_SIZE,
+      maxMulligans: DEFAULT_MAX_MULLIGANS,
+      decisionCap: DEFAULT_DECISION_CAP,
+      detectLoops: true,
       playerOnPlay: 'A',
     });
   });
 
-  it('honours a custom turn cap and hand size', () => {
+  it('honours custom caps and hand sizes', () => {
     const game = createGameState({
       rng: stateFromSeed('1'),
       onPlay: 'B',
       turnCap: 12,
       maxHandSize: 5,
+      openingHandSize: 6,
+      maxMulligans: 2,
+      decisionCap: 99,
+      detectLoops: false,
     });
-    expect(game.config).toEqual({ turnCap: 12, maxHandSize: 5, playerOnPlay: 'B' });
+    expect(game.config).toEqual({
+      turnCap: 12,
+      maxHandSize: 5,
+      openingHandSize: 6,
+      maxMulligans: 2,
+      decisionCap: 99,
+      detectLoops: false,
+      playerOnPlay: 'B',
+    });
   });
 
   it('starts with nobody owed an extra turn', () => {

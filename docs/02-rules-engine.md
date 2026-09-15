@@ -18,8 +18,8 @@
 - Counters (+1/+1, −1/−1, loyalty, charge, generic), tokens, copies of permanents.
 - Replacement and prevention effects (CR 614–615): "enters tapped", "if X would die instead", damage prevention, "as enters" choices, applying in order chosen by the affected player/controller.
 - Card types: creature, instant, sorcery, artifact, enchantment (incl. auras and equipment), land, planeswalker. Kindred/tribal as a supertype-like flag.
-- Mulligans: London mulligan (CR 103.4), configurable.
-- Game end: life ≤ 0, drawing from empty library, poison ≥ 10, "wins/loses the game" effects, turn cap → draw (default 40 turns), and a per-game decision cap to guard against infinite loops.
+- Mulligans: London mulligan (CR 103.4), configurable. Every mulligan draws a fresh seven; the price is paid on keeping, one card under the library per mulligan taken.
+- Game end: life ≤ 0, drawing from empty library, poison ≥ 10, conceding, "wins/loses the game" effects, turn cap → draw (default 40 turns), and a per-game decision cap to guard against infinite loops. Everything goes through `endGame`, which is the only thing that writes `state.result`.
 
 **v2 and later (see roadmap):** double-faced and modal double-faced cards, adventures, split/fuse, morph/manifest, sagas, battles, dungeons/initiative, day/night, the monarch, companion, mutate, level up, suspend, cascade, storm and other high-complexity mechanics; commander-only rules; multiplayer.
 
@@ -39,7 +39,7 @@ interface GameState {
   zones: Record<ZoneId, ObjectId[]>;        // library/hand/graveyard per player; battlefield/stack/exile/command shared
   nextObjectId: number;
   nextTimestamp: number;                    // layer-system timestamps (CR 613.7)
-  config: GameConfig;                       // turnCap, maxHandSize, playerOnPlay
+  config: GameConfig;                       // turnCap, hand sizes, mulligan and decision caps
   extraTurns: PlayerId[];                   // owed extra turns, oldest first (CR 500.7)
   effects: ContinuousEffect[];              // active continuous effects with timestamps
   replacements: ReplacementEffect[];        // replacement and prevention effects (CR 614-616)
@@ -49,6 +49,9 @@ interface GameState {
   pendingTriggers: TriggerInstance[];       // fired, waiting to go on the stack
   triggersFiredThisTurn: string[];          // for once-each-turn abilities
   loyaltyActivatedThisTurn: ObjectId[];     // one loyalty ability per planeswalker per turn
+  mulligans: MulliganState | null;          // null once the opening hands are settled
+  statesThisTurn: number[];                 // state hashes, for loop detection (CR 726)
+  decisionsMade: number;                    // against config.decisionCap
   combat: CombatState | null;               // non-null only during the combat phase
   pendingDecision: Decision | null;         // set when a player must choose; null while it can run
   result: GameResult | null;
@@ -64,7 +67,9 @@ Fields marked with a roadmap number are added by the phase that designs them. Se
 
 A `GameObject` holds `definitionId`, `owner`, `controller`, `zone`, `timestamp`, `tapped`, `counters`, `damage`, `attachedTo`, `attachments`, `chosen` (colour/type/name choices), `lastKnownInfo`, and the per-object continuous-effect cache. Characteristics (name, types, colours, P/T, abilities) are **never** stored directly; they are computed by `characteristics(state, objectId)` which starts from the printed definition (or copiable values) and applies the layer system. The result is memoised per state version.
 
-## Decisions
+## Setting up and decisions
+
+`setUpGame` shuffles, deals the opening hands and runs the mulligans before turn 1 begins; `startGame` skips all of it and takes a board as given, which is what scenario tests and the 1.13 builder want.
 
 The engine pauses with a `pendingDecision` whenever a player must choose. Decision kinds: `mulligan`, `bottomCards`, `priority` (pass or a list of legal actions: cast, activate, play land, special actions), `chooseTargets`, `chooseMode`, `payCost` (which permanents to sacrifice/tap, which mana to spend when ambiguous), `chooseX`, `declareAttackers`, `declareBlockers`, `orderBlockers`, `assignDamage`, `orderTriggers`, `chooseReplacement`, `chooseCardsFromLibrary`, `discard`, `distributeCounters`, `yesNo`, `chooseOption`. Every decision carries the full list of legal options so the AI never has to compute legality itself and fuzzers can pick uniformly.
 
@@ -115,4 +120,4 @@ Every state change emits an event (`GameEvent` in `packages/shared`), which is b
 - Mana payment with hybrid/phyrexian/snow/"spend only on" restrictions is a small constraint-satisfaction problem; the solver must be exact for legality but can be heuristic for choice.
 - "Last known information" for dies/LTB triggers and for effects that reference an object that left.
 - Dependency resolution in layers with cyclic dependencies (rare; cap and log).
-- Infinite loops (CR 726): detected by a repeated-state hash within a turn; the game is a draw and the loop is logged.
+- Infinite loops (CR 726): detected by a repeated-state hash within a turn; the game is a draw. The hash covers everything that makes two positions different — pass counts and the generator's position included — because a false positive is a game silently called a draw rather than a crash. It is 53 bits across two FNV passes for the same reason. A loop the hash cannot see, such as one that shuffles a library, is caught by the decision cap instead and ends the same way.

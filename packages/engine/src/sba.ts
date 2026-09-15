@@ -9,6 +9,7 @@ import {
 import type { EventEmitter } from './events/emitter.js';
 import { runBatch } from './events/perform.js';
 import type { MoveZoneEvent } from './events/rules-event.js';
+import { playersLoseGame } from './game-end.js';
 import type { GameState } from './state/game-state.js';
 import { withCounters } from './state/object.js';
 import { destroyObject, getObject, objectsIn, updateObject, updateState } from './state/update.js';
@@ -140,11 +141,6 @@ const applyLosses = (
   emitter: EventEmitter,
   losers: readonly PlayerId[],
 ): GameState => {
-  // Both players losing at once is a draw (CR 104.4b).
-  const winner =
-    losers.length === playerIds.length
-      ? null
-      : (playerIds.find((p) => !losers.includes(p)) ?? null);
   const loser = losers[0];
   const seat = loser === undefined ? undefined : state.players[loser];
 
@@ -155,12 +151,8 @@ const applyLosses = (
       : 'life';
 
   emitter.emit(state, { type: 'sba', kind: sbaKindForLoss(state, losers), objects: [] });
-  const ended = updateState(state, {
-    result: { winner, reason, turn: state.turn },
-    pendingDecision: null,
-  });
-  emitter.emit(ended, { type: 'gameEnd', winner, reason });
-  return ended;
+  // Both players losing at once is a draw (CR 104.4b).
+  return playersLoseGame(state, emitter, losers, reason);
 };
 
 const sbaKindForLoss = (state: GameState, losers: readonly PlayerId[]): SbaKind => {
