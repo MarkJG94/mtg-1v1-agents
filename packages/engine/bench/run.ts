@@ -18,6 +18,10 @@
  *
  * Usage:
  *   pnpm bench [--games N] [--json path] [--budget MS]
+ *
+ * `pnpm bench` runs this from the repository root, so `--json` is relative to there.
+ * Running the package's own `bench` script instead puts the working directory in
+ * `packages/engine`, which is where a relative path would then land.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';

@@ -15,7 +15,7 @@
     "typecheck": "pnpm -r typecheck && tsc -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "bench": "pnpm --filter @mtg/engine bench",
+    "bench": "tsx packages/engine/bench/run.ts",
     "bench:compare": "tsx scripts/compare-benchmarks.ts",
     "fetch:scryfall": "tsx scripts/fetch-scryfall.ts",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
