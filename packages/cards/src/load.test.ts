@@ -137,6 +137,33 @@ describe('loading a card script', () => {
 describe('what the loader refuses', () => {
   const broken = (abilities: unknown) => () => loadCardScript({ ...bolt, abilities });
 
+  /**
+   * A card has one spell ability however many sentences its text runs to (CR 112.3a), and
+   * the engine resolves the first one it finds. Two of them means everything in the
+   * second silently never happens — a card that does less than it says.
+   */
+  it('rejects a second spell ability, which would never resolve', () => {
+    expect(
+      broken([
+        { kind: 'spell', effects: [{ op: 'draw', player: 'you', count: 1 }] },
+        { kind: 'spell', effects: [{ op: 'draw', player: 'you', count: 1 }] },
+      ]),
+    ).toThrow(/spell abilities/);
+  });
+
+  /** A filter object with nothing in it used to mean "any permanent", quietly. */
+  it('rejects a filter that says nothing', () => {
+    expect(
+      broken([
+        {
+          kind: 'spell',
+          targets: [{ id: 't', filter: {} }],
+          effects: [{ op: 'destroy', object: '$t' }],
+        },
+      ]),
+    ).toThrow(ScriptError);
+  });
+
   it('rejects an op the engine does not implement', () => {
     expect(broken([{ kind: 'spell', effects: [{ op: 'transmogrify', object: '~' }] }])).toThrow(
       ScriptError,

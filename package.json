@@ -19,8 +19,10 @@
     "bench:compare": "tsx scripts/compare-benchmarks.ts",
     "cards:schema": "tsx scripts/write-card-schema.ts",
     "cards:new": "tsx scripts/new-card-script.ts",
+    "cards:corpus": "tsx scripts/fetch-corpus.ts",
+    "cards:goldens": "tsx scripts/write-goldens.ts",
     "fetch:scryfall": "tsx scripts/fetch-scryfall.ts",
-    "check": "pnpm lint && pnpm typecheck && pnpm cards:schema --check && pnpm test && pnpm build"
+    "check": "pnpm lint && pnpm typecheck && pnpm cards:schema --check && pnpm cards:goldens --check && pnpm test && pnpm build"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",

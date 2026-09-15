@@ -71,6 +71,17 @@ export const differentialTest = (
   }
 
   for (const test of tests) {
+    // A test that names an ability by id is written against one of the two scripts, and
+    // the other is free to call its abilities whatever it likes: an id is a label for the
+    // script's own use, not a characteristic of the card. Comparing through one of those
+    // would report a naming difference as a behavioural one, which is noise in the only
+    // report that is supposed to be all signal.
+    const named = test.activate ?? test.activateMana;
+    if (named !== undefined && !(hasAbility(hand, named) && hasAbility(auto, named))) {
+      skipped.push(`${test.name}: the two scripts name their abilities differently`);
+      continue;
+    }
+
     const left = attempt(() => playScenarioTest(hand, test).get());
     const right = attempt(() => playScenarioTest(auto, test).get());
     compared += 1;
@@ -79,6 +90,9 @@ export const differentialTest = (
 
   return { oracleId: hand.oracleId, compared, skipped, disagreements };
 };
+
+const hasAbility = (definition: CardDefinition, id: string): boolean =>
+  definition.abilities.some((ability) => 'id' in ability && ability.id === id);
 
 // --- Playing both sides ---
 

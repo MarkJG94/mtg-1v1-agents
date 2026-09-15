@@ -27,6 +27,18 @@ import type { Reader } from './reader.js';
  * at rather than approximated.
  */
 
+/**
+ * A printed number, as a number.
+ *
+ * `-0` is a real result of `Number('-0')`, it survives everywhere except JSON, and a
+ * golden file that reads back `0` would disagree with a parse that produced `-0` forever.
+ * "+2/-0" is printed on real cards, so this is not hypothetical.
+ */
+const asNumber = (text: string | undefined): number => {
+  const value = Number(text);
+  return Object.is(value, -0) ? 0 : value;
+};
+
 /** An effect in script form. Deliberately loose: the loader is what decides it is valid. */
 export type ScriptEffect = Readonly<Record<string, unknown>> & { readonly op: string };
 
@@ -101,7 +113,9 @@ const fight: Verb = (reader, bindings) => {
 
 /** "Draw a card", "target player draws two cards", "target player mills twenty cards". */
 const cards: Verb = (reader, bindings) => {
-  const who = reader.try(() => player(reader, bindings)) ?? 'you';
+  // "Each player draws three cards, then discards three cards at random" names the player
+  // once: the second clause is about the same one, not about you.
+  const who = reader.try(() => player(reader, bindings)) ?? bindings.subject ?? 'you';
   const word = reader.anyWord('draw', 'draws', 'mill', 'mills', 'discard', 'discards');
   if (word === null) return null;
   const count = quantity(reader);
@@ -161,8 +175,8 @@ const pump: Verb = (reader, bindings) => {
   const effects = forEachOf(what, (ref) => ({
     op: 'pump',
     object: ref,
-    power: Number(change[1]),
-    toughness: Number(change[2]),
+    power: asNumber(change[1]),
+    toughness: asNumber(change[2]),
     ...(until === null ? {} : { duration: until }),
   }));
 
@@ -351,8 +365,8 @@ const token: Verb = (reader, bindings) => {
         types: ['creature'],
         subtypes: [named[0].toLowerCase()],
         colours,
-        power: Number(size[1]),
-        toughness: Number(size[2]),
+        power: asNumber(size[1]),
+        toughness: asNumber(size[2]),
         ...(keywords.length > 0 ? { keywords } : {}),
       },
     },

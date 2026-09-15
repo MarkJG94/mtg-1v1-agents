@@ -79,6 +79,19 @@ export const loadCardScripts = (inputs: readonly unknown[]): readonly CardDefini
 const definitionFrom = (script: CardScript): CardDefinition => {
   const cost = parseManaCost(script.manaCost);
 
+  // A card has one spell ability, however many sentences its text runs to (CR 112.3a), and
+  // the engine resolves the first one it finds. A script with two would have everything in
+  // the second silently never happen — which is a card that does less than it says, and
+  // exactly what this loader exists to refuse.
+  const spells = script.abilities.filter((ability) => ability.kind === 'spell').length;
+  if (spells > 1) {
+    throw new ScriptError(
+      script.name,
+      'abilities',
+      `${spells} spell abilities: a card has one, and only the first would ever resolve`,
+    );
+  }
+
   return {
     oracleId: asOracleId(script.oracleId),
     name: script.name,

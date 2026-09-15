@@ -52,6 +52,10 @@ export const parseEffects = (sentences: readonly string[]): ParseResult => {
   let failure: ParseFailure | null = null;
 
   for (const sentence of sentences) {
+    // The subject carries between the clauses of one sentence and no further. "Target
+    // player discards a card. Draw a card." is two sentences, and the second one is about
+    // you however the first one began.
+    bindings.subject = null;
     const parsed = readSentence(sentence, bindings);
     if (parsed === null) {
       failure = lastFailure;
@@ -267,8 +271,8 @@ export const parseStatic = (sentence: string): ParsedStatic | null => {
     affects: { kind: 'creaturesControlledBy', player: 'sourceController' },
     change: {
       kind: 'modifyPowerToughness',
-      power: Number(change[1]),
-      toughness: Number(change[2]),
+      power: Number(change[1]) || 0,
+      toughness: Number(change[2]) || 0,
     },
   };
 };

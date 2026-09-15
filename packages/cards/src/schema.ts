@@ -108,6 +108,8 @@ const filterFromObject = (value: FilterObject): Filter => {
   if (value.or !== undefined) parts.push({ kind: 'or', filters: value.or as Filter[] });
 
   const first = parts[0];
+  // Unreachable: the schema below refuses a filter object with nothing in it, because a
+  // silent default here is a card that targets something other than what it says.
   if (first === undefined) return { kind: 'permanent' };
   return parts.length === 1 ? first : { kind: 'and', filters: parts };
 };
@@ -115,7 +117,13 @@ const filterFromObject = (value: FilterObject): Filter => {
 export const filterSchema: z.ZodType<Filter> = z.lazy(() =>
   z.union([
     filterShorthand.transform((kind): Filter => ({ kind })),
-    filterObject.transform(filterFromObject),
+    filterObject
+      .refine((value) => Object.values(value).some((each) => each !== undefined), {
+        message:
+          'a filter has to say something: an object with none of the filter keys in it ' +
+          'used to mean "any permanent", which is a different card from the one intended',
+      })
+      .transform(filterFromObject),
   ]),
 );
 

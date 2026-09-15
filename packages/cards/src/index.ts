@@ -7,6 +7,8 @@
  */
 
 export * from './auto/classify.js';
+export * from './auto/emit.js';
+export * from './auto/goldens.js';
 export * from './auto/normalise.js';
 export * from './auto/parse.js';
 export * from './checks.js';
