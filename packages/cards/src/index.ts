@@ -8,6 +8,7 @@
 
 export * from './auto/classify.js';
 export * from './auto/normalise.js';
+export * from './auto/parse.js';
 export * from './checks.js';
 export * from './differential.js';
 export * from './files.js';
