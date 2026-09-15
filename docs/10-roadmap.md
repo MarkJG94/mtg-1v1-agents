@@ -6,7 +6,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done.
 
 ## Phase 0 — Repository and scaffolding (≈ 2 sessions)
 
-- [~] 0.1 `git init` in the project folder; create the GitHub repo `mtg-1v1-agents`; push; branch protection on `main`. *(Repo created and pushed. Branch protection on `main` is still to be switched on in the GitHub settings — an operator action.)*
+- [x] 0.1 `git init` in the project folder; create the GitHub repo `mtg-1v1-agents`; push; branch protection on `main`. *(The repository is public, and `main` is protected by an active ruleset: a pull request is required before merging (zero approvals, since one maintainer cannot approve their own), all three CI jobs — lint/typecheck/test/build, benchmarks, Docker — must pass, deletions are restricted and force pushes blocked. The bypass list is empty, so the rules bind the owner too: `main` only moves through a green pull request. Required checks are matched **by job name**, so renaming a job in `ci.yml` silently stops gating the branch — rename the required check with it.)*
 - [x] 0.2 pnpm monorepo: `packages/{shared,engine,cards,agents,sim}`, `apps/{server,web}`, shared tsconfig, Biome, Vitest, tsup, Vite. *(Dependency versions are pinned centrally in the pnpm catalog in `pnpm-workspace.yaml`. Internal packages export TypeScript source and are bundled into the server by tsup, so there is no build ordering to manage.)*
 - [x] 0.3 GitHub Actions `ci.yml` (lint, typecheck, test, build), plus a job that builds the Docker image.
 - [x] 0.4 `scripts/fetch-scryfall.ts`: streams the gzipped `oracle_cards` JSONL to `data/scryfall/cards.jsonl`, skips non-card layouts, writes `meta.json` and prints counts. See ADR 0001.

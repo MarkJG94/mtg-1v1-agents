@@ -41,6 +41,9 @@ What runs today: `pnpm dev` starts the Fastify API and the Vite dev server toget
 plays fixed-seed games and reports the time they take, and `pnpm check` (lint, typecheck,
 test, build) is green.
 
+`main` is protected: every change lands through a pull request with all three CI jobs —
+lint/typecheck/test/build, benchmarks, and the Docker build — green.
+
 ## Getting started
 
 ```bash
