@@ -109,7 +109,22 @@ Combat is a sub-state machine: `declareAttackers` (legal attackers computed with
 - `characteristics()` memoisation invalidated only by state version bumps; effect lists are usually short so linear scans are fine.
 - No allocation-heavy patterns in the hot path (avoid spread on large arrays; zones as plain arrays; object pool for events).
 
-Benchmarks live in `packages/engine/bench` and run in CI to catch regressions greater than 20%.
+Measured (roadmap 1.14, `pnpm bench`): a median game with the random agent takes **2.2 ms**
+over ~510 decisions, about 400 games and 200,000 decisions a second on one core. Nothing is
+cast yet, so that is the framework's cost — the turn loop, priority, combat, the layer
+system, state-based actions, cleanup — and the floor under a real game rather than an
+estimate of one.
+
+Getting there meant fixing the engine's hottest function rather than the benchmark. Loop
+detection hashed a full position at every decision point and was nine tenths of a game's
+time; it now mixes integers as integers and, more importantly, only watches a turn once it
+has run longer than any ordinary turn (`config.loopCheckAfter`). A loop never stops being
+one, so a detector that starts late still catches it. The same investigation found the
+projection was ignoring `state.combat`, which was ending 36% of wide-board games as false
+draws. See ADR 0005.
+
+Benchmarks live in `packages/engine/bench` and run in CI, which compares each run against
+the last one recorded on `main` and fails on a regression greater than 20%.
 
 ## Event log
 

@@ -12,6 +12,7 @@ import {
   type GameState,
 } from './state/game-state.js';
 import { createObject, objectsIn } from './state/update.js';
+import { playRandomGame } from './testing/index.js';
 import { applyDecision, runUntilGameOver } from './turn/turn.js';
 
 const card = asOracleId('oracle-card');
@@ -262,7 +263,9 @@ describe('loop detection (CR 726) and the decision cap', () => {
    * reaching it is a genuine repeat rather than a hash poked in at random.
    */
   const primedWithNextPosition = (options: Partial<CreateGameStateOptions> = {}) => {
-    const { state, emitter } = started(options);
+    // `loopCheckAfter: 0` puts the detector on watch immediately; the default waits for a
+    // turn longer than any ordinary one, which these two-decision cases are not.
+    const { state, emitter } = started({ loopCheckAfter: 0, ...options });
     const reached = applyDecision(state, emitter, {
       kind: 'priority',
       action: { kind: 'pass' },
@@ -284,6 +287,68 @@ describe('loop detection (CR 726) and the decision cap', () => {
     const { state, emitter } = primedWithNextPosition({ detectLoops: false, turnCap: 2 });
     const finished = runUntilGameOver(state, emitter);
     expect(finished.result?.reason).toBe('turnCap');
+  });
+
+  /**
+   * The projection has to separate positions that differ only in combat. Ordering the
+   * blockers on one attacker changes nothing else at all, so when this was missing, a
+   * turn with two multiply-blocked attackers looked like a position repeating and the
+   * game was called a draw. The 1.14 benchmarks found it: 36% of the wider boards ended
+   * that way. See ADR 0005.
+   */
+  it('tells two positions apart when only the damage-assignment order differs', () => {
+    const base = started().state;
+    const [attacker, first, second] = objectsIn(base, playerZone('A', 'library'));
+    if (attacker === undefined || first === undefined || second === undefined) {
+      throw new Error('expected a library to draw three object ids from');
+    }
+
+    const withOrder = (blockedBy: readonly ObjectId[]): GameState => ({
+      ...base,
+      combat: {
+        attackers: [
+          {
+            attacker,
+            defender: { kind: 'player', player: 'B' },
+            blockedBy,
+            blocked: true,
+            orderSettled: true,
+          },
+        ],
+        firstStrikeDone: false,
+      },
+    });
+
+    expect(hashState(withOrder([first, second]))).not.toBe(hashState(withOrder([second, first])));
+    expect(hashState(withOrder([first, second]))).not.toBe(hashState(base));
+  });
+
+  /**
+   * Which is the other half of the same fix: watching only long turns must not change
+   * which games end how. If the projection is complete, a detector that watches every
+   * position finds nothing a deferred one misses — in games this size, no loop at all.
+   */
+  it('ends the same games the same way whether every position is watched or only long turns', () => {
+    for (let i = 0; i < 8; i += 1) {
+      const options = { creatures: 8, librarySize: 25, turnCap: 12 };
+      const eager = playRandomGame(`loops-${i}`, { ...options, loopCheckAfter: 0 });
+      const deferred = playRandomGame(`loops-${i}`, options);
+
+      expect(deferred.state.result).toEqual(eager.state.result);
+      expect(deferred.decisions.length).toBe(eager.decisions.length);
+    }
+  });
+
+  it('leaves a turn shorter than any real loop unhashed', () => {
+    const { state, emitter } = started({ loopCheckAfter: 4 });
+    let current = state;
+    for (let i = 0; i < 4; i += 1) {
+      expect(current.statesThisTurn).toEqual([]);
+      current = answer(current, emitter, { kind: 'priority', action: { kind: 'pass' } });
+    }
+
+    expect(current.decisionsThisTurn).toBeGreaterThanOrEqual(4);
+    expect(current.statesThisTurn).not.toEqual([]);
   });
 
   it('draws at the decision cap', () => {

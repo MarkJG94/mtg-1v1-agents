@@ -13,6 +13,8 @@ pnpm check           # lint, typecheck, test, build — the same gate CI runs
 pnpm test            # vitest
 pnpm format          # biome check --write (run before committing; lint is --error-on-warnings)
 pnpm dev             # server + web with HMR
+pnpm bench           # engine benchmarks; --json writes a report, --budget sets the ms/game ceiling
+pnpm bench:compare   # compare two benchmark reports; fails on a >20% regression
 pnpm fetch:scryfall  # build data/scryfall/cards.jsonl from the bulk data
 ```
 
@@ -26,7 +28,7 @@ until **all** of the following are true:
    deliberately left, and which later phase closes it. Update the other docs wherever the
    phase changed what they describe, and write an ADR for any decision that departed from
    them.
-3. The work is committed to the designated branch and pushed, and **both CI jobs are
+3. The work is committed to the designated branch and pushed, and **every CI job is
    confirmed green on the new head** — by reading the check runs, not by assuming.
 4. **The pull request's title and description are updated to match what the branch now
    contains.** Do this after every phase. A stale description on a large diff misleads

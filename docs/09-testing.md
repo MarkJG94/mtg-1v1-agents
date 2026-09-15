@@ -87,7 +87,13 @@ What this catches is **illegal states**, not wrong-but-legal outcomes. A rule th
 
 ### 8. Benchmarks
 
-`packages/engine/bench` and `packages/agents/bench` measure games/sec and decisions/sec on fixed seeds; CI compares against the previous main-branch run and fails on a > 20% regression.
+`packages/engine/bench` measures ms/game, games/sec and decisions/sec over fixed-seed random games, in four cases: a baseline board, a wide board where blocks and damage assignment do real work, a long game, and the baseline with loop detection switched off so its cost is visible rather than inferred. `pnpm bench` prints the table; `--json` writes it for CI. `packages/agents/bench` follows when there are agents to measure (phase 4).
+
+The numbers are the engine's, not a game's: invariant checking is off (that is the fuzzer's job and costs several times what playing the game does), and with no card definitions nothing is cast.
+
+CI runs the benchmarks and compares them against the last run recorded on `main`, failing on a regression greater than 20% in any case's median. The baseline travels through the Actions cache, which a branch can read from the default branch; a run with no baseline records one instead of failing. The comparison is on the median rather than the mean because a shared runner is noisy, and for the same reason CI's absolute budget is a ceiling against something going badly wrong rather than the 5 ms target, which is a one-core figure for a developer machine.
+
+A benchmark is also a test that reads a whole system at once. This one found that loop detection was nine tenths of a game's time *and* that it was ending 36% of wide-board games as false draws, neither of which any unit test had noticed. See ADR 0005.
 
 ## CI (GitHub Actions)
 

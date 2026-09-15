@@ -12,14 +12,17 @@
   },
   "scripts": {
     "build": "tsup",
-    "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.bench.json",
+    "test": "vitest run",
+    "bench": "tsx bench/run.ts"
   },
   "dependencies": {
     "@mtg/shared": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "tsup": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

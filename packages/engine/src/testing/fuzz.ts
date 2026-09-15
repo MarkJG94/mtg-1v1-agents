@@ -170,15 +170,26 @@ const buildBoard = (seed: string, options: FuzzOptions): GameState => {
   return state;
 };
 
-/** Play one random game from a seed, asserting the invariants after every decision. */
-export const fuzzGame = (seed: string, options: FuzzOptions = {}): FuzzResult => {
+/**
+ * Play one random game from a seed. `check` runs on the state after every decision: the
+ * fuzzer asserts the invariants there, and the benchmarks pass a no-op, because checking
+ * them costs several times what playing the game does and is not engine time.
+ *
+ * Both take the same path and draw from the same generator, so a benchmark game and a
+ * fuzz game from one seed are the same game.
+ */
+const playGame = (
+  seed: string,
+  options: FuzzOptions,
+  check: (state: GameState, decisionsMade: number) => void,
+): FuzzResult => {
   const rng = createRng(`${seed}:play`);
   const emitter = createEventEmitter();
   const decisions: DecisionResponse[] = [];
   const maxDecisions = options.maxDecisions ?? 5_000;
 
   let state = setUpGame(buildBoard(seed, options), emitter);
-  assertInvariants(state, seed, 0);
+  check(state, 0);
 
   while (!isGameOver(state) && decisions.length < maxDecisions) {
     const decision: Decision | null = state.pendingDecision;
@@ -194,7 +205,7 @@ export const fuzzGame = (seed: string, options: FuzzOptions = {}): FuzzResult =>
     const response = randomDecision(state, decision, rng);
     decisions.push(response);
     state = applyDecision(state, emitter, response);
-    assertInvariants(state, seed, decisions.length);
+    check(state, decisions.length);
   }
 
   if (!isGameOver(state)) {
@@ -208,6 +219,19 @@ export const fuzzGame = (seed: string, options: FuzzOptions = {}): FuzzResult =>
 
   return { seed, state, decisions, turns: state.turn };
 };
+
+const noCheck = (): void => {};
+
+/**
+ * Play a random game and check nothing, which is what `bench/` measures: the invariant
+ * checks are the fuzzer's job and would otherwise be most of the time recorded.
+ */
+export const playRandomGame = (seed: string, options: FuzzOptions = {}): FuzzResult =>
+  playGame(seed, options, noCheck);
+
+/** Play one random game from a seed, asserting the invariants after every decision. */
+export const fuzzGame = (seed: string, options: FuzzOptions = {}): FuzzResult =>
+  playGame(seed, options, (state, decisionsMade) => assertInvariants(state, seed, decisionsMade));
 
 /**
  * Replay a recorded game and check it lands in the same place.

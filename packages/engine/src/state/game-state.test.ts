@@ -4,6 +4,7 @@ import { stateFromSeed } from '../rng.js';
 import {
   createGameState,
   DEFAULT_DECISION_CAP,
+  DEFAULT_LOOP_CHECK_AFTER,
   DEFAULT_MAX_HAND_SIZE,
   DEFAULT_MAX_MULLIGANS,
   DEFAULT_OPENING_HAND_SIZE,
@@ -79,6 +80,7 @@ describe('createGameState', () => {
       maxMulligans: DEFAULT_MAX_MULLIGANS,
       decisionCap: DEFAULT_DECISION_CAP,
       detectLoops: true,
+      loopCheckAfter: DEFAULT_LOOP_CHECK_AFTER,
       playerOnPlay: 'A',
     });
   });
@@ -93,6 +95,7 @@ describe('createGameState', () => {
       maxMulligans: 2,
       decisionCap: 99,
       detectLoops: false,
+      loopCheckAfter: 25,
     });
     expect(game.config).toEqual({
       turnCap: 12,
@@ -101,6 +104,7 @@ describe('createGameState', () => {
       maxMulligans: 2,
       decisionCap: 99,
       detectLoops: false,
+      loopCheckAfter: 25,
       playerOnPlay: 'B',
     });
   });

@@ -27,9 +27,10 @@ import type { GameObject } from './object.js';
  * object spreads at the call site — are the only supported way to change state.
  *
  * `objects` is a plain `ReadonlyMap` copied on write. That is O(objects) per update,
- * which is fine at Magic's scale (a two-player game holds a few hundred objects) but is
- * the first thing to revisit if the 1.14 benchmarks miss the 5 ms/game target; every
- * read and write goes through this module, so the representation can change here alone.
+ * which is fine at Magic's scale (a two-player game holds a few hundred objects): the
+ * 1.14 benchmarks put a whole game at 2.2 ms with copying like this in it, so it is not
+ * what to reach for first. If that changes, every read and write goes through this
+ * module, so the representation can change here alone.
  */
 
 type StatePatch = Partial<Omit<GameState, 'version'>>;

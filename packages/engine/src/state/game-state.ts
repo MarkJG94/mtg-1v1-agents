@@ -122,6 +122,8 @@ export interface GameState {
   readonly statesThisTurn: readonly number[];
   /** Decisions answered so far, against `config.decisionCap`. */
   readonly decisionsMade: number;
+  /** Decisions answered in the current turn, against `config.loopCheckAfter`. */
+  readonly decisionsThisTurn: number;
   /** Non-null once the game is over. */
   readonly result: GameResult | null;
 }
@@ -138,6 +140,13 @@ export const DEFAULT_MAX_MULLIGANS = 7;
  * could not see.
  */
 export const DEFAULT_DECISION_CAP = 20_000;
+/**
+ * Decisions into a turn before loop detection starts hashing (CR 726). Ordinary turns
+ * are far shorter than this — the 1.14 benchmarks put the 99th percentile at 22 — and a
+ * loop by definition never ends, so a detector that starts late still catches it. See
+ * ADR 0005: hashing every position of every turn was nine tenths of a game's time.
+ */
+export const DEFAULT_LOOP_CHECK_AFTER = 200;
 
 /**
  * Fixed for the whole game. `turnCap` comes from run settings (docs/05) and makes an
@@ -156,6 +165,11 @@ export interface GameConfig {
   readonly decisionCap: number;
   /** Whether a state repeating within a turn ends the game as a draw (CR 726). */
   readonly detectLoops: boolean;
+  /**
+   * How many decisions a turn must run before positions are hashed and compared. A turn
+   * shorter than this cannot be an endless loop, and a loop never stops being one.
+   */
+  readonly loopCheckAfter: number;
   /** Who took the first turn. Needed for the CR 103.7a first-draw skip. */
   readonly playerOnPlay: PlayerId;
 }
@@ -187,6 +201,7 @@ export interface CreateGameStateOptions {
   readonly maxMulligans?: number;
   readonly decisionCap?: number;
   readonly detectLoops?: boolean;
+  readonly loopCheckAfter?: number;
 }
 
 /**
@@ -218,6 +233,7 @@ export const createGameState = (options: CreateGameStateOptions): GameState => {
       maxMulligans: options.maxMulligans ?? DEFAULT_MAX_MULLIGANS,
       decisionCap: options.decisionCap ?? DEFAULT_DECISION_CAP,
       detectLoops: options.detectLoops ?? true,
+      loopCheckAfter: options.loopCheckAfter ?? DEFAULT_LOOP_CHECK_AFTER,
       playerOnPlay: options.onPlay,
     },
     extraTurns: [],
@@ -234,6 +250,7 @@ export const createGameState = (options: CreateGameStateOptions): GameState => {
     mulligans: null,
     statesThisTurn: [],
     decisionsMade: 0,
+    decisionsThisTurn: 0,
     result: null,
   };
 };

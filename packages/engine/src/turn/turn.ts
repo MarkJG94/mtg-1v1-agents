@@ -340,6 +340,7 @@ const beginTurn = (
     loyaltyActivatedThisTurn: [],
     // A position recurring across turns is ordinary; only within one is it a loop.
     statesThisTurn: [],
+    decisionsThisTurn: 0,
   });
   for (const id of playerIds) started = updatePlayer(started, id, { landsPlayedThisTurn: 0 });
 
@@ -492,6 +493,7 @@ export const applyDecision = (
   const cleared = updateState(state, {
     pendingDecision: null,
     decisionsMade: state.decisionsMade + 1,
+    decisionsThisTurn: state.decisionsThisTurn + 1,
   });
   let next: GameState;
 
@@ -524,9 +526,15 @@ export const applyDecision = (
  * A position the turn has already been in means nothing has changed and nothing will, so
  * the game is a draw (CR 726). Checked as the engine settles on a decision, which is the
  * one moment a position is fully formed and can be compared with another.
+ *
+ * Not every decision, though: a turn is only watched once it has run longer than any
+ * ordinary turn does (`config.loopCheckAfter`). A loop never stops looping, so a detector
+ * that starts late still catches it — it just does not charge every normal turn for the
+ * privilege, which the 1.14 benchmarks showed was nine tenths of a game. ADR 0005.
  */
 const checkForLoop = (state: GameState, emitter: EventEmitter): GameState => {
   if (!state.config.detectLoops || state.turn === 0) return state;
+  if (state.decisionsThisTurn < state.config.loopCheckAfter) return state;
 
   const hash = hashState(state);
   if (isRepeatedState(state, hash)) return drawGame(state, emitter, 'loop');
