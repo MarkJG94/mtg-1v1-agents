@@ -6,6 +6,7 @@
  * here knows how to play Magic — that is the engine's job.
  */
 
+export * from './auto/classify.js';
 export * from './auto/normalise.js';
 export * from './checks.js';
 export * from './differential.js';
