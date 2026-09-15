@@ -8,6 +8,10 @@ Cards are data, not code. A **card script** is a YAML/JSON document that describ
 2. **Hand scripts** in `packages/cards/scripts/<first-letter>/<slug>.yaml`, keyed by oracle id. These win over auto-generated scripts.
 3. **Auto scripts** produced by the parser at request time and cached in the `card_scripts` table together with the parser version and validation result. Bumping the parser version invalidates the cache.
 
+`ScriptResolver` (roadmap 2.4) is what walks those three in order: a hand script wins, then a cached verdict *reached by the version that is running now*, then the auto-scripter, and otherwise the card is unsupported and the request is logged. Whatever the answer, it is cached — including "unsupported", because re-running a parser and a smoke test for a card that was unplayable an hour ago is the cost the cache exists to avoid. A **partial script is never played**; it is logged like any other card the run could not have.
+
+The cache and the log are ports (`ScriptStore`), shaped exactly like docs/06's `card_scripts` and `unsupported_requests` rows. An in-memory implementation runs today; the SQLite one arrives with the server's persistence in phase 5 and the resolver does not change. The auto-scripter is likewise a port: until phase 3 builds it, the resolver simply has no third step, which is a legitimate configuration — everything outside the bootstrap set is unsupported and says so.
+
 Card identity everywhere in the system is the Scryfall **oracle id** (stable across printings); the UI resolves an oracle id to a preferred printing for images.
 
 ## Script schema (abridged)
