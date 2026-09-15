@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!**/dist", "!**/data", "!**/coverage"]
+    "includes": ["**", "!**/dist", "!**/data", "!**/coverage", "!packages/cards/schema"]
   },
   "formatter": {
     "enabled": true,
