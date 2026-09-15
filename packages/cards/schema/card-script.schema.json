@@ -1,0 +1,877 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "oracleId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "manaCost": {
+      "default": "",
+      "type": "string"
+    },
+    "types": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "artifact",
+          "battle",
+          "creature",
+          "enchantment",
+          "instant",
+          "land",
+          "planeswalker",
+          "sorcery"
+        ]
+      }
+    },
+    "supertypes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "basic",
+          "legendary",
+          "snow",
+          "world"
+        ]
+      }
+    },
+    "subtypes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "colours": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "W",
+          "U",
+          "B",
+          "R",
+          "G"
+        ]
+      }
+    },
+    "power": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "toughness": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "loyalty": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "keywords": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "flying",
+          "reach",
+          "menace",
+          "vigilance",
+          "haste",
+          "defender",
+          "firstStrike",
+          "doubleStrike",
+          "trample",
+          "deathtouch",
+          "lifelink",
+          "indestructible",
+          "shroud",
+          "hexproof"
+        ]
+      }
+    },
+    "flash": {
+      "type": "boolean"
+    },
+    "splitSecond": {
+      "type": "boolean"
+    },
+    "abilities": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "spell"
+              },
+              "targets": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "filter": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "upTo": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "filter"
+                  ]
+                }
+              },
+              "effects": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "op": {
+                      "type": "string",
+                      "enum": [
+                        "addCounters",
+                        "addMana",
+                        "attach",
+                        "becomesCreature",
+                        "bounce",
+                        "counter",
+                        "createToken",
+                        "damage",
+                        "delayedTrigger",
+                        "destroy",
+                        "discardAtRandom",
+                        "draw",
+                        "exile",
+                        "extraTurn",
+                        "fight",
+                        "forEach",
+                        "gainControl",
+                        "gainLife",
+                        "grantKeyword",
+                        "if",
+                        "loseGame",
+                        "loseLife",
+                        "mill",
+                        "moveZone",
+                        "poison",
+                        "preventDamage",
+                        "pump",
+                        "regenerate",
+                        "removeAbilities",
+                        "removeCounters",
+                        "sacrifice",
+                        "sequence",
+                        "setColours",
+                        "setPowerToughness",
+                        "shuffle",
+                        "switchPowerToughness",
+                        "tap",
+                        "untap",
+                        "winGame"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "op"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "triggered"
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "when": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": {}
+              },
+              "interveningIf": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": {}
+              },
+              "onceEachTurn": {
+                "type": "boolean"
+              },
+              "targets": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "filter": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "upTo": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "filter"
+                  ]
+                }
+              },
+              "effects": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "op": {
+                      "type": "string",
+                      "enum": [
+                        "addCounters",
+                        "addMana",
+                        "attach",
+                        "becomesCreature",
+                        "bounce",
+                        "counter",
+                        "createToken",
+                        "damage",
+                        "delayedTrigger",
+                        "destroy",
+                        "discardAtRandom",
+                        "draw",
+                        "exile",
+                        "extraTurn",
+                        "fight",
+                        "forEach",
+                        "gainControl",
+                        "gainLife",
+                        "grantKeyword",
+                        "if",
+                        "loseGame",
+                        "loseLife",
+                        "mill",
+                        "moveZone",
+                        "poison",
+                        "preventDamage",
+                        "pump",
+                        "regenerate",
+                        "removeAbilities",
+                        "removeCounters",
+                        "sacrifice",
+                        "sequence",
+                        "setColours",
+                        "setPowerToughness",
+                        "shuffle",
+                        "switchPowerToughness",
+                        "tap",
+                        "untap",
+                        "winGame"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "op"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "id",
+              "when"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "activated"
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "cost": {
+                "type": "object",
+                "properties": {
+                  "mana": {
+                    "type": "string"
+                  },
+                  "tap": {
+                    "type": "boolean"
+                  },
+                  "sacrificeSelf": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "sorceryOnly": {
+                "type": "boolean"
+              },
+              "targets": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "filter": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "upTo": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "filter"
+                  ]
+                }
+              },
+              "effects": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "op": {
+                      "type": "string",
+                      "enum": [
+                        "addCounters",
+                        "addMana",
+                        "attach",
+                        "becomesCreature",
+                        "bounce",
+                        "counter",
+                        "createToken",
+                        "damage",
+                        "delayedTrigger",
+                        "destroy",
+                        "discardAtRandom",
+                        "draw",
+                        "exile",
+                        "extraTurn",
+                        "fight",
+                        "forEach",
+                        "gainControl",
+                        "gainLife",
+                        "grantKeyword",
+                        "if",
+                        "loseGame",
+                        "loseLife",
+                        "mill",
+                        "moveZone",
+                        "poison",
+                        "preventDamage",
+                        "pump",
+                        "regenerate",
+                        "removeAbilities",
+                        "removeCounters",
+                        "sacrifice",
+                        "sequence",
+                        "setColours",
+                        "setPowerToughness",
+                        "shuffle",
+                        "switchPowerToughness",
+                        "tap",
+                        "untap",
+                        "winGame"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "op"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "id",
+              "cost"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "static"
+              },
+              "affects": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": {}
+              },
+              "change": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": {}
+              },
+              "duration": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": {}
+              }
+            },
+            "required": [
+              "kind",
+              "affects",
+              "change"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "mana"
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "requiresTap": {
+                "type": "boolean"
+              },
+              "modes": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "W",
+                          "U",
+                          "B",
+                          "R",
+                          "G",
+                          "C"
+                        ]
+                      },
+                      "amount": {
+                        "default": 1,
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "snow": {
+                        "type": "boolean"
+                      },
+                      "restriction": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ]
+                  }
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "id",
+              "modes"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "loyalty"
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "cost": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "targets": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "filter": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "upTo": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "filter"
+                  ]
+                }
+              },
+              "effects": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "op": {
+                      "type": "string",
+                      "enum": [
+                        "addCounters",
+                        "addMana",
+                        "attach",
+                        "becomesCreature",
+                        "bounce",
+                        "counter",
+                        "createToken",
+                        "damage",
+                        "delayedTrigger",
+                        "destroy",
+                        "discardAtRandom",
+                        "draw",
+                        "exile",
+                        "extraTurn",
+                        "fight",
+                        "forEach",
+                        "gainControl",
+                        "gainLife",
+                        "grantKeyword",
+                        "if",
+                        "loseGame",
+                        "loseLife",
+                        "mill",
+                        "moveZone",
+                        "poison",
+                        "preventDamage",
+                        "pump",
+                        "regenerate",
+                        "removeAbilities",
+                        "removeCounters",
+                        "sacrifice",
+                        "sequence",
+                        "setColours",
+                        "setPowerToughness",
+                        "shuffle",
+                        "switchPowerToughness",
+                        "tap",
+                        "untap",
+                        "winGame"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "op"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "id",
+              "cost"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "replacement"
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "applies": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": {}
+              },
+              "change": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": {}
+              },
+              "selfReplacement": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "kind",
+              "id",
+              "applies",
+              "change"
+            ]
+          }
+        ]
+      }
+    },
+    "covers": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "text": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "oracleId",
+    "name",
+    "types"
+  ],
+  "$defs": {
+    "__schema0": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "any",
+            "player",
+            "creature",
+            "permanent",
+            "planeswalker",
+            "spell",
+            "attacking",
+            "blocking"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "artifact",
+                "battle",
+                "creature",
+                "enchantment",
+                "instant",
+                "land",
+                "planeswalker",
+                "sorcery"
+              ]
+            },
+            "subtype": {
+              "type": "string"
+            },
+            "colour": {
+              "type": "string",
+              "enum": [
+                "W",
+                "U",
+                "B",
+                "R",
+                "G"
+              ]
+            },
+            "controller": {
+              "type": "string",
+              "enum": [
+                "you",
+                "opponent",
+                "any"
+              ]
+            },
+            "zone": {
+              "type": "string"
+            },
+            "tapped": {
+              "type": "boolean"
+            },
+            "keyword": {
+              "type": "string",
+              "enum": [
+                "flying",
+                "reach",
+                "menace",
+                "vigilance",
+                "haste",
+                "defender",
+                "firstStrike",
+                "doubleStrike",
+                "trample",
+                "deathtouch",
+                "lifelink",
+                "indestructible",
+                "shroud",
+                "hexproof"
+              ]
+            },
+            "powerAtLeast": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "powerAtMost": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "toughnessAtMost": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "manaValueAtMost": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "token": {
+              "type": "boolean"
+            },
+            "name": {
+              "type": "string"
+            },
+            "is": {
+              "type": "string",
+              "enum": [
+                "any",
+                "player",
+                "creature",
+                "permanent",
+                "planeswalker",
+                "spell",
+                "attacking",
+                "blocking"
+              ]
+            },
+            "not": {
+              "$ref": "#/$defs/__schema0"
+            },
+            "and": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            },
+            "or": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

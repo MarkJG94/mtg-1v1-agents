@@ -195,7 +195,12 @@ export type EffectOp =
   | {
       readonly op: 'if';
       readonly condition: Condition;
-      readonly then: readonly EffectOp[];
+      /**
+       * Named `thenDo` rather than `then`, which a script may still write: an object with
+       * a `then` property is a thenable, and anything that awaited one of these — or put
+       * it through `Promise.resolve` — would call it.
+       */
+      readonly thenDo: readonly EffectOp[];
       readonly otherwise?: readonly EffectOp[];
     };
 

@@ -15,6 +15,7 @@ pnpm format          # biome check --write (run before committing; lint is --err
 pnpm dev             # server + web with HMR
 pnpm bench           # engine benchmarks; --json writes a report, --budget sets the ms/game ceiling
 pnpm bench:compare   # compare two benchmark reports; fails on a >20% regression
+pnpm cards:schema    # regenerate the card-script JSON Schema; --check fails if it is stale
 pnpm fetch:scryfall  # build data/scryfall/cards.jsonl from the bulk data
 ```
 

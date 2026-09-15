@@ -1,5 +1,6 @@
 import type { ObjectId, PlayerId } from '@mtg/shared';
 import { staticEffects } from './cards/statics.js';
+import { noKeywords } from './keywords.js';
 import {
   type Characteristics,
   type ContinuousEffect,
@@ -11,7 +12,6 @@ import {
 import type { GameState } from './state/game-state.js';
 import type { GameObject } from './state/object.js';
 import { updateState } from './state/update.js';
-import { noKeywords } from './targeting.js';
 
 /**
  * `characteristics(state, id)` — what an object actually is right now (CR 613).

@@ -86,11 +86,36 @@ export type EffectChange =
   /** Layer 7e: switching them. */
   | { readonly kind: 'switchPowerToughness' };
 
+export const effectSelectorKinds = [
+  'self',
+  'object',
+  'allCreatures',
+  'allPermanents',
+  'creaturesControlledBy',
+] as const satisfies readonly EffectSelector['kind'][];
+
+export const effectChangeKinds = [
+  'changeControl',
+  'becomesCreature',
+  'setColours',
+  'addKeyword',
+  'removeAllAbilities',
+  'setPowerToughness',
+  'modifyPowerToughness',
+  'switchPowerToughness',
+] as const satisfies readonly EffectChange['kind'][];
+
 export type EffectDuration =
   | { readonly kind: 'permanent' }
   | { readonly kind: 'untilEndOfTurn' }
   /** The usual duration for a static ability: it lasts while its source is in play. */
   | { readonly kind: 'whileSourceOnBattlefield' };
+
+export const effectDurationKinds = [
+  'permanent',
+  'untilEndOfTurn',
+  'whileSourceOnBattlefield',
+] as const satisfies readonly EffectDuration['kind'][];
 
 export interface ContinuousEffect {
   readonly id: number;

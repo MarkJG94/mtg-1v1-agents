@@ -28,13 +28,17 @@ TypeScript monorepo (pnpm workspaces). `packages/engine` (pure TS rules engine),
 
 ## Status
 
-Phase 1 (engine core) is **done**, along with phase 0 (repository and scaffolding): the
+Phases 0 and 1 are **done**, and phase 2 has begun: cards are data now, and the engine
+plays them — a script is YAML in a closed vocabulary, `@mtg/cards` turns it into a card
+definition, and the engine casts it, pays for it and resolves it. What is here from
+phase 1 is the
 state model, turn structure, mana, the stack and priority, targeting, combat, state-based
 actions, triggered abilities, the layer system, replacement and prevention effects,
 planeswalkers, game setup with the London mulligan, a scenario builder and invariant
 fuzzer, and benchmarks — a game plays in about 2.2 ms with the random agent, inside the
-5 ms target. Card definitions arrive in phase 2, which is what turns the engine into a
-game. The first milestone is the end-to-end thin slice described in the roadmap.
+5 ms target. Next in phase 2: the validator, a bootstrap set of hand-written scripts, and
+the resolver that puts them together. The first milestone is the end-to-end thin slice
+described in the roadmap.
 
 What runs today: `pnpm dev` starts the Fastify API and the Vite dev server together,
 `pnpm fetch:scryfall` builds the card projection from Scryfall's bulk data, `pnpm bench`

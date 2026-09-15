@@ -74,7 +74,19 @@ abilities:
 - **Quantities** are numbers or expressions: `{ count: <selector> }`, `{ x }`, `{ add|mul|sub }`, `{ devotion: colour }`, `{ lifeTotal }`, `{ cardsInHand }`, etc.
 - **Targets** declare id, filter, count (`1`, `upTo: 2`, `any`), and `distinct` flags; the engine validates targets on cast and on resolution.
 
-The schema is enforced with zod (`packages/cards/src/schema.ts`), which also generates JSON Schema for editor completion in YAML files.
+The schema is enforced with zod (`packages/cards/src/schema.ts`), which also generates JSON Schema for editor completion in YAML files — `pnpm cards:schema` writes `packages/cards/schema/card-script.schema.json`, and CI fails if the committed file has drifted from the schema.
+
+### What is implemented (roadmap 2.1)
+
+The vocabulary above is the target; this is where it stands.
+
+- **39 effect ops**, each implemented once in `packages/engine/src/cards/effects.ts`, every one of them proposing `RulesEvent`s so replacement effects apply without either side knowing about the other. `packages/cards/src/ops-spec.ts` is the table of what each op takes, and is what the loader converts against and the validator will check.
+- **Ops that need a player choice mid-resolution are not among them**: `search`, `scry`, `surveil`, `may`, `choose` (modal), `unless ... pays`, and a discard the player picks. They need the effect list to pause and resume the way a replacement batch does, and land with that machinery — see ADR 0006. A batch that pauses mid-effects throws rather than dropping the rest.
+- **Seven ability kinds** — spell, triggered, activated, static, mana, loyalty, replacement. A keyword line is expanded into the engine's keywords at load time, as the vocabulary says.
+- **Dynamic characteristics are not there yet**: a static ability sets power and toughness to fixed numbers, so a card whose P/T counts something (the `*`/`*+1` example above) waits for quantity-valued layer changes.
+- Filters and quantities are written in the short forms above (`filter: any`, `to: $t`, `{ type: creature, controller: opponent }`) and the loader turns them into the engine's tagged unions. An object with several keys reads as "all of these at once".
+
+The loader checks what a shape check cannot: that every op exists, that it has the arguments it needs and none it does not, that a `$target` was actually declared by the ability that mentions it, and that a `when`, an `affects` or a `change` names something the engine really has — all against the engine's own exported lists, so the two can never drift.
 
 ## Validation
 

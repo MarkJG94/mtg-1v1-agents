@@ -17,11 +17,13 @@
     "test:watch": "vitest",
     "bench": "tsx packages/engine/bench/run.ts",
     "bench:compare": "tsx scripts/compare-benchmarks.ts",
+    "cards:schema": "tsx scripts/write-card-schema.ts",
     "fetch:scryfall": "tsx scripts/fetch-scryfall.ts",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
+    "@mtg/cards": "workspace:*",
     "@types/node": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",

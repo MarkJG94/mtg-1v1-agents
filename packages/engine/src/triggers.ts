@@ -30,6 +30,22 @@ export type TriggerWhen =
   | { readonly kind: 'beginningOfEndStep'; readonly whose: 'self' | 'any' };
 
 /**
+ * Every trigger condition the engine knows, as data. The card-script schema checks a
+ * script's `when` against this rather than keeping a list of its own, so the two can
+ * never drift (docs/03).
+ */
+export const triggerWhenKinds = [
+  'selfEntersBattlefield',
+  'anotherEntersBattlefield',
+  'selfDies',
+  'anotherDies',
+  'selfAttacks',
+  'selfBlocks',
+  'beginningOfUpkeep',
+  'beginningOfEndStep',
+] as const satisfies readonly TriggerWhen['kind'][];
+
+/**
  * An intervening-if clause (CR 603.4): the "if" in "at the beginning of your upkeep, if
  * you have 5 or less life, ...". Checked twice — once when the ability would go on the
  * stack, and again as it resolves — and the ability does nothing if it is false either

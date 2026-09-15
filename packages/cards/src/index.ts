@@ -1,8 +1,11 @@
 /**
- * Card-script schema, hand-written scripts, the Scryfall loader and the
- * oracle-text auto-scripter. See docs/03-card-scripts.md.
+ * Card scripts: the schema, the loader and (in roadmap 2.4) the auto-scripter.
  *
- * Nothing is implemented yet; phase 2 of docs/10-roadmap.md fills this in,
- * starting with the zod card-script schema and the `ScriptResolver`.
+ * Cards are data, not code (docs/03). A script is YAML in a closed vocabulary; the engine
+ * plays `CardDefinition`s. Everything in here is the path between the two, and nothing in
+ * here knows how to play Magic — that is the engine's job.
  */
-export {};
+export * from './json-schema.js';
+export * from './load.js';
+export * from './ops-spec.js';
+export * from './schema.js';

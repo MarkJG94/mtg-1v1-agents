@@ -126,6 +126,22 @@ draws. See ADR 0005.
 Benchmarks live in `packages/engine/bench` and run in CI, which compares each run against
 the last one recorded on `main` and fails on a regression greater than 20%.
 
+## Cards
+
+The game's card definitions live in `GameState`, keyed by oracle id, and every object
+points at its own through `definitionId` (ADR 0006). `createObject` fills an object's
+printed characteristics and the abilities it carries from its card; a token has no card
+and states everything itself.
+
+Casting is the rest of CR 601.2 — timing, targets checked against what the ability asks
+for, and paying, with mana sources tapped in object order when the pool is short.
+Resolution runs the card's effects and then lets the stack finish the move, so a card
+with no script resolves exactly as it did before definitions existed.
+
+Static and replacement abilities are *derived* from what is on the battlefield rather
+than registered as a permanent enters and unregistered as it leaves, which is why a
+blink or a control change needs no special case.
+
 ## Event log
 
 Every state change emits an event (`GameEvent` in `packages/shared`), which is both the replay source and the statistics source. Events are compact and typed: `gameStart`, `mulligan`, `keep`, `turnStart`, `stepStart`, `draw`, `playLand`, `cast`, `activate`, `trigger`, `putOnStack`, `resolve`, `counter`, `fizzle`, `moveZone`, `tap`, `untap`, `damage`, `lifeChange`, `counterChange`, `attack`, `block`, `combatDamage`, `sba`, `effectStart`, `effectEnd`, `decision` (what was chosen, with the AI's evaluation score attached for debugging), `gameEnd`. Hidden information (library order, opponent's hand) is included in the stored log; the UI chooses what to reveal.

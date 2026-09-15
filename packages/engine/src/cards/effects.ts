@@ -535,7 +535,7 @@ const applyOp = (
 
     case 'if':
       return holds(state, context, effect.condition)
-        ? applyEffects(state, emitter, context, effect.then)
+        ? applyEffects(state, emitter, context, effect.thenDo)
         : applyEffects(state, emitter, context, effect.otherwise ?? []);
   }
 };

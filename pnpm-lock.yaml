@@ -92,6 +92,9 @@ importers:
       '@biomejs/biome':
         specifier: 'catalog:'
         version: 2.5.13
+      '@mtg/cards':
+        specifier: workspace:*
+        version: link:packages/cards
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.2

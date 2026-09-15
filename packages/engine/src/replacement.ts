@@ -67,6 +67,16 @@ export type EventMatcher =
       readonly onEntry?: boolean;
     };
 
+export const eventMatcherKinds = [
+  'damageToPlayer',
+  'damageToObject',
+  'draw',
+  'entersBattlefield',
+  'movesToZone',
+  'lifeChange',
+  'addCounters',
+] as const satisfies readonly EventMatcher['kind'][];
+
 export type ReplacementChange =
   /** CR 615. A numeric amount is a shield that is used up as it absorbs damage. */
   | { readonly kind: 'preventDamage'; readonly amount: number | 'all' }
@@ -89,6 +99,19 @@ export type ReplacementChange =
   | { readonly kind: 'modifyCounters'; readonly multiply?: number; readonly add?: number }
   /** "Instead, nothing happens." Also how a skipped draw is expressed. */
   | { readonly kind: 'skip' };
+
+export const replacementChangeKinds = [
+  'preventDamage',
+  'modifyDamage',
+  'redirectDamage',
+  'entersTapped',
+  'entersWithCounters',
+  'moveToZoneInstead',
+  'regenerate',
+  'modifyLife',
+  'modifyCounters',
+  'skip',
+] as const satisfies readonly ReplacementChange['kind'][];
 
 export type ReplacementDuration =
   | { readonly kind: 'permanent' }
