@@ -20,7 +20,19 @@ One suite per subsystem, organised by Comprehensive Rules section, each test cit
 - planeswalkers: loyalty activation once per turn, damage redirection removed, loyalty as a cost;
 - mulligans; game end conditions; turn cap; loop detection.
 
-Tests use a **scenario builder**: `game().player('A').hand('Lightning Bolt').battlefield('Mountain').player('B').battlefield('Grizzly Bears').start().cast('Lightning Bolt', { target: 'Grizzly Bears' }).resolveAll().expect(...)`. The builder drives decisions explicitly so tests never depend on the AI.
+Tests use a **scenario builder** in `@mtg/engine/testing`, which drives decisions explicitly so a test never depends on the AI:
+
+```ts
+game().player('A').battlefield({ name: 'attacker', power: 3, toughness: 3 })
+      .player('B').battlefield({ name: 'blocker', power: 1, toughness: 1 })
+      .start().to('declareAttackers').attack('attacker')
+      .to('declareBlockers').block({ blocker: 'blocker', blocking: 'attacker' })
+      .to('end');
+```
+
+Permanents are described by what the engine can read off them rather than by card name, because names need card definitions (roadmap 2.1); `name` is a label for readability and for finding the object again, and the legend rule is the one rule that reads it. Once card scripts exist the builder gains the `hand('Lightning Bolt')` form this doc originally sketched.
+
+It lives behind a separate entry point so it never reaches the engine's runtime bundle, which carries no third-party dependencies and is small enough to run inside a search loop.
 
 ### 2. Card tests
 
@@ -51,7 +63,9 @@ Thousands of random games per CI run with random supported decks. After every en
 - `legalActions` never returns an action the engine subsequently rejects, and every pending decision has at least one option;
 - games terminate within the turn/decision cap, and the event log replays to an identical final state (`replay(log) == state`).
 
-Failures are minimised automatically to the shortest decision prefix and stored as new regression fixtures.
+A failure reports the seed, the turn and the number of decisions taken, which is enough to replay it exactly; every decision is recorded on the result for the same reason. Automatic minimisation to the shortest failing prefix wants the shrinking a property-testing library gives and is the next refinement.
+
+What this catches is **illegal states**, not wrong-but-legal outcomes. A rule that quietly stops applying — damage that is never cleared in cleanup, say — leaves every position legal and the fuzzer silent; that class is what the unit suites and the seeded regression games above are for. Worth knowing before trusting a green fuzz run.
 
 ### 5. Agent tests
 

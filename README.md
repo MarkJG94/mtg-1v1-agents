@@ -31,9 +31,9 @@ TypeScript monorepo (pnpm workspaces). `packages/engine` (pure TS rules engine),
 Phase 0 (repository and scaffolding) is done. Phase 1 (engine core) is through 1.12: the
 state model, turn structure, mana, the stack and priority, targeting, combat, state-based
 actions, triggered abilities, the layer system, replacement and prevention effects,
-planeswalkers, and game setup with the London mulligan. Card definitions arrive in phase
-2, which is what turns the engine into a game. The first milestone is the end-to-end thin
-slice described in the roadmap.
+planeswalkers, game setup with the London mulligan, and a scenario builder and invariant
+fuzzer. Card definitions arrive in phase 2, which is what turns the engine into a game.
+The first milestone is the end-to-end thin slice described in the roadmap.
 
 What runs today: `pnpm dev` starts the Fastify API and the Vite dev server together,
 `pnpm fetch:scryfall` builds the card projection from Scryfall's bulk data, and

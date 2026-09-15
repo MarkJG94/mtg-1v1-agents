@@ -5,6 +5,7 @@ import {
   type ObjectId,
   type OracleId,
   type PlayerId,
+  playerIds,
   type ZoneId,
 } from '@mtg/shared';
 import type { LoyaltyAbility } from '../planeswalker.js';
@@ -283,6 +284,12 @@ export const updatePlayer = (
  * Check the structural invariants the fuzzer asserts after every step (docs/09).
  * Returns a list of human-readable problems; empty means the state is well formed.
  * Cheap enough for tests, too slow for the hot path.
+ *
+ * These are the *structural* ones — objects in exactly one zone, filed under their own
+ * id, nothing negative. The rules invariants that need the layer system and the
+ * state-based actions to have run (nothing on the battlefield with toughness at or below
+ * zero, no two same-name legends under one controller) live in `@mtg/engine/testing`,
+ * because checking them from here would make this module depend on half the engine.
  */
 export const checkStateInvariants = (state: GameState): string[] => {
   const problems: string[] = [];
@@ -310,6 +317,25 @@ export const checkStateInvariants = (state: GameState): string[] => {
     if (object.id !== id) problems.push(`object ${id} is filed under the wrong key`);
     if (object.damage < 0) problems.push(`object ${id} has negative damage`);
     if (id >= state.nextObjectId) problems.push(`object ${id} was issued beyond nextObjectId`);
+    for (const [kind, count] of Object.entries(object.counters)) {
+      if (count < 0) problems.push(`object ${id} has ${count} ${kind} counters`);
+      if (count === 0) problems.push(`object ${id} keeps a zero entry for ${kind} counters`);
+    }
+  }
+
+  for (const player of playerIds) {
+    const seat = state.players[player];
+    if (seat.poison < 0) problems.push(`${player} has negative poison`);
+    if (seat.landsPlayedThisTurn < 0) problems.push(`${player} has played a negative land count`);
+  }
+
+  // A decision nobody can answer is an engine hang wearing a decision's clothes.
+  const decision = state.pendingDecision;
+  if (decision && state.result !== null) {
+    problems.push(`the game is over but a ${decision.kind} decision is still pending`);
+  }
+  if (decision && 'options' in decision && decision.options.length === 0) {
+    problems.push(`the pending ${decision.kind} decision offers no options`);
   }
 
   return problems;
