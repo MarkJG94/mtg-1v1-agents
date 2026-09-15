@@ -118,6 +118,14 @@
                 "type": "string",
                 "const": "spell"
               },
+              "covers": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
               "targets": {
                 "type": "array",
                 "items": {
@@ -213,6 +221,14 @@
               "kind": {
                 "type": "string",
                 "const": "triggered"
+              },
+              "covers": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
               },
               "id": {
                 "type": "string",
@@ -343,6 +359,14 @@
                 "type": "string",
                 "const": "activated"
               },
+              "covers": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
               "id": {
                 "type": "string",
                 "minLength": 1
@@ -462,6 +486,14 @@
                 "type": "string",
                 "const": "static"
               },
+              "covers": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
               "affects": {
                 "type": "object",
                 "properties": {
@@ -511,6 +543,14 @@
               "kind": {
                 "type": "string",
                 "const": "mana"
+              },
+              "covers": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
               },
               "id": {
                 "type": "string",
@@ -570,6 +610,14 @@
               "kind": {
                 "type": "string",
                 "const": "loyalty"
+              },
+              "covers": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
               },
               "id": {
                 "type": "string",
@@ -678,6 +726,14 @@
                 "type": "string",
                 "const": "replacement"
               },
+              "covers": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
               "id": {
                 "type": "string",
                 "minLength": 1
@@ -718,14 +774,6 @@
             ]
           }
         ]
-      }
-    },
-    "covers": {
-      "type": "array",
-      "items": {
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 9007199254740991
       }
     },
     "text": {

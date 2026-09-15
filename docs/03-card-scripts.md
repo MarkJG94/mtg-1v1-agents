@@ -90,15 +90,45 @@ The loader checks what a shape check cannot: that every op exists, that it has t
 
 ## Validation
 
-`validateScript(script, scryfallCard)` checks:
+`validateScript(script, scryfallCard)` runs four checks and returns one of three verdicts.
+The difference between the verdicts is the point:
 
-1. Schema validity and that every referenced op/filter/trigger exists in the engine's registry.
-2. **Characteristic agreement** with Scryfall: name, mana cost, types, P/T, loyalty, colours must match exactly. A script can't accidentally make a card cheaper.
-3. **Text coverage**: every sentence of the oracle text must be claimed by exactly one ability in the script (`covers: [sentenceIndex...]`). Reminder text (in parentheses) is ignored. An unclaimed sentence makes the script `partial`, and partial scripts are never played (decision: skip and log).
-4. **Executability smoke test**: the card is put into a synthetic game (cast from hand with infinite mana against an empty board, and against a board with a vanilla 2/2, and with the opponent holding priority) and the engine must reach a stable state without throwing, without an unfulfillable decision, and within a step budget.
-5. Optional hand-written **scenario tests** (see 09) for cards with hand scripts.
+- **unsupported** — the script is wrong: it does not load, it disagrees with the printed
+  card, or the engine falls over when the card is played. Nothing plays it.
+- **partial** — the script is right about what it does but does not do everything the card
+  says. Partial scripts are never played; they are listed so somebody can finish them.
+- **supported** — loads, agrees, claims every sentence, and survives being played.
 
-Result: `{ status: 'supported' | 'partial' | 'unsupported', reasons[], parserVersion }`.
+The checks:
+
+1. **It loads.** The schema, and then the loader's own checks: every op exists, has the
+   arguments it needs and none it does not, every `$target` was declared, and every
+   `when`/`affects`/`change` names a rule the engine has. All against the engine's own
+   exported lists.
+2. **Characteristic agreement** with Scryfall: oracle id, name, mana cost, types,
+   supertypes, subtypes, power, toughness, loyalty and colours, all exact. This is the
+   check that matters most — a script that gets a cost wrong is not one broken card, it is
+   a card quietly better than the one everyone else is playing with, and a run of thousands
+   of games would build on it unnoticed. Costs are compared as parsed costs, so `{1}{G}`
+   and `{G}{1}` agree; a printed `*` power is a disagreement, because the script vocabulary
+   cannot say it yet.
+3. **Text coverage**: `covers:` on each ability lists the sentences of the oracle text it
+   claims, and every sentence must be claimed by exactly one. Reminder text is dropped
+   before splitting — it is in parentheses precisely because it restates rules that are
+   true anyway (CR 207.2). A sentence claimed twice, or one that does not exist, is an
+   error; a sentence claimed by nobody makes the script partial.
+4. **Executability smoke test**: the card is put into three synthetic games — an empty
+   board, a 2/2 opposite, and the opponent's turn — with enough any-colour lands that its
+   own cost is never what stops it, and cast where there is a legal way to. What is checked
+   is not that it did the right thing, which no validator can know, but that the engine came
+   out the other side in a legal, answerable state without throwing. A card with no legal
+   target in a scenario is **skipped** there rather than failed: having no target is a
+   normal fact about Magic. A sorcery-speed card skips the opponent's turn for the same
+   reason.
+
+Result: `{ status, reasons[], validatorVersion, definition, skipped[] }`. The version is
+part of the answer because verdicts are cached (2.4): a cached "unsupported" from an older
+validator has to be re-earned rather than believed.
 
 ## Auto-scripter
 

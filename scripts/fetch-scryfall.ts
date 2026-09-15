@@ -18,6 +18,7 @@ import { createInterface } from 'node:readline';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { createGunzip } from 'node:zlib';
+import type { CardProjection } from '@mtg/cards';
 
 const BULK_DATA_INDEX = 'https://api.scryfall.com/bulk-data';
 
@@ -40,41 +41,6 @@ const NON_CARD_LAYOUTS = new Set([
   'vanguard',
 ]);
 const USER_AGENT = 'mtg-1v1-agents/0.1 (https://github.com/MarkJG94/mtg-1v1-agents)';
-
-/** The subset of a Scryfall card the rest of the system uses. */
-export interface CardProjection {
-  id: string;
-  oracleId: string;
-  name: string;
-  manaCost: string | null;
-  manaValue: number;
-  colors: string[];
-  colorIdentity: string[];
-  typeLine: string;
-  oracleText: string;
-  power: string | null;
-  toughness: string | null;
-  loyalty: string | null;
-  keywords: string[];
-  layout: string;
-  /** Legality per format, straight from Scryfall (`legal`, `not_legal`, `banned`, `restricted`). */
-  legalities: Record<string, string>;
-  /** Present on multi-faced cards; the auto-scripter needs the per-face text. */
-  faces?: Array<{
-    name: string;
-    manaCost: string | null;
-    typeLine: string;
-    oracleText: string;
-    power: string | null;
-    toughness: string | null;
-    loyalty: string | null;
-  }>;
-  setCode: string;
-  rarity: string;
-  reserved: boolean;
-  /** Digital-only cards (Alchemy, Arena-only sets) are excluded from play. */
-  digital: boolean;
-}
 
 interface ScryfallFace {
   name: string;

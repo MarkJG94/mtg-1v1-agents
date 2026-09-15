@@ -268,14 +268,23 @@ const costSchema = z.object({
 
 const effectsField = z.array(effectSchema).default([]);
 
+/**
+ * Which sentences of the oracle text this ability claims (docs/03 "Text coverage"). Per
+ * ability rather than per card: the validator's rule is that every sentence is claimed by
+ * exactly one of them, and a card-level list could not say which.
+ */
+const coverage = { covers: z.array(z.number().int().nonnegative()).optional() };
+
 export const abilitySchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('spell'),
+    ...coverage,
     targets: z.array(targetSpecSchema).optional(),
     effects: effectsField,
   }),
   z.object({
     kind: z.literal('triggered'),
+    ...coverage,
     id: z.string().min(1),
     when: z.looseObject({ kind: z.string() }),
     interveningIf: z.looseObject({ kind: z.string() }).optional(),
@@ -285,6 +294,7 @@ export const abilitySchema = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('activated'),
+    ...coverage,
     id: z.string().min(1),
     cost: costSchema,
     sorceryOnly: z.boolean().optional(),
@@ -293,18 +303,21 @@ export const abilitySchema = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('static'),
+    ...coverage,
     affects: z.looseObject({ kind: z.string() }),
     change: z.looseObject({ kind: z.string() }),
     duration: z.looseObject({ kind: z.string() }).optional(),
   }),
   z.object({
     kind: z.literal('mana'),
+    ...coverage,
     id: z.string().min(1),
     requiresTap: z.boolean().optional(),
     modes: z.array(z.array(manaProductionSchema)).min(1),
   }),
   z.object({
     kind: z.literal('loyalty'),
+    ...coverage,
     id: z.string().min(1),
     cost: z.number().int(),
     targets: z.array(targetSpecSchema).optional(),
@@ -312,6 +325,7 @@ export const abilitySchema = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('replacement'),
+    ...coverage,
     id: z.string().min(1),
     applies: z.looseObject({ kind: z.string() }),
     change: z.looseObject({ kind: z.string() }),
@@ -339,11 +353,7 @@ export const cardScriptSchema = z.object({
   flash: z.boolean().optional(),
   splitSecond: z.boolean().optional(),
   abilities: z.array(abilitySchema).default([]),
-  /**
-   * Which sentences of the oracle text each ability claims (docs/03 "Text coverage").
-   * Carried but not checked here: the validator in roadmap 2.2 is what reads it.
-   */
-  covers: z.array(z.number().int().nonnegative()).optional(),
+  /** The oracle text this script was written against, for the validator to check. */
   text: z.string().optional(),
 });
 
