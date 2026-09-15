@@ -15,3 +15,13 @@ abilities:
     covers: [0]
     targets: [{ id: t, filter: creature }]
     effects: [{ op: pump, object: $t, power: 3, toughness: 3 }]
+
+tests:
+  - name: makes a 2/2 a 5/5 until end of turn
+    setup:
+      you:
+        creatures: [{ name: bear, power: 2, toughness: 2 }]
+    targets: [bear]
+    expect:
+      power: { bear: 5 }
+      toughness: { bear: 5 }

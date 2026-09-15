@@ -19,3 +19,21 @@ abilities:
     covers: [0]
     when: { kind: anotherDies, controlledBy: you }
     effects: [{ op: addCounters, object: "~", counter: "+1/+1", amount: 1 }]
+
+tests:
+  - name: grows when a creature you control dies
+    setup:
+      lands: 2
+      you:
+        creatures: [{ name: friend, power: 1, toughness: 1 }]
+    kill: friend
+    expect:
+      counters: { this: { "+1/+1": 1 } }
+  - name: does not grow when the opponent loses one
+    setup:
+      lands: 2
+      opponent:
+        creatures: [{ name: theirs, power: 1, toughness: 1 }]
+    kill: theirs
+    expect:
+      counters: { this: { "+1/+1": 0 } }

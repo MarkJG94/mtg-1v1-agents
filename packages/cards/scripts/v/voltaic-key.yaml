@@ -17,3 +17,11 @@ abilities:
     cost: { mana: "{1}", tap: true }
     targets: [{ id: t, filter: { type: artifact } }]
     effects: [{ op: untap, object: $t }]
+
+tests:
+  - name: untaps an artifact
+    setup: { lands: 2 }
+    activate: untap-artifact
+    targets: [this]
+    expect:
+      tapped: { this: false }

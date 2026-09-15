@@ -17,3 +17,13 @@ abilities:
       - op: forEach
         of: creature
         effects: [{ op: damage, to: $each, amount: 2 }]
+
+tests:
+  - name: deals two to each creature, killing the small ones
+    setup:
+      you:
+        creatures: [{ name: small, power: 1, toughness: 1 }]
+      opponent:
+        creatures: [{ name: big, power: 4, toughness: 4 }]
+    expect:
+      zone: { small: "A:graveyard", big: battlefield }

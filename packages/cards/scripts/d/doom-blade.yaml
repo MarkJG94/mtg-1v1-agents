@@ -15,3 +15,12 @@ abilities:
     covers: [0]
     targets: [{ id: t, filter: { is: creature, not: { colour: B } } }]
     effects: [{ op: destroy, object: $t }]
+
+tests:
+  - name: destroys a creature that is not black
+    setup:
+      opponent:
+        creatures: [{ name: bear, power: 2, toughness: 2 }]
+    targets: [bear]
+    expect:
+      zone: { bear: "B:graveyard" }

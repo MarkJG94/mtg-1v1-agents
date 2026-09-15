@@ -16,3 +16,9 @@ abilities:
     covers: [0]
     targets: [{ id: t, filter: { or: [player, planeswalker] } }]
     effects: [{ op: damage, to: $t, amount: 3 }]
+
+tests:
+  - name: deals three to a player
+    targets: [opponent]
+    expect:
+      life: { opponent: 17 }

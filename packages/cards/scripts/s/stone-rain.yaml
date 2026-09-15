@@ -15,3 +15,10 @@ abilities:
     covers: [0]
     targets: [{ id: t, filter: { type: land } }]
     effects: [{ op: destroy, object: $t }]
+
+tests:
+  - name: destroys a land
+    setup: { lands: 4 }
+    targets: [land0]
+    expect:
+      permanents: { you: 3 }

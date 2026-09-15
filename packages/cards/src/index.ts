@@ -7,12 +7,14 @@
  */
 
 export * from './checks.js';
+export * from './differential.js';
 export * from './files.js';
 export * from './json-schema.js';
 export * from './load.js';
 export * from './ops-spec.js';
 export * from './oracle-text.js';
 export * from './resolver.js';
+export * from './scenario-tests.js';
 export * from './schema.js';
 export * from './scryfall.js';
 export * from './smoke.js';

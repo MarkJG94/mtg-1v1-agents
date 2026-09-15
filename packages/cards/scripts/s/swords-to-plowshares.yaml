@@ -16,3 +16,12 @@ abilities:
     covers: [0]
     targets: [{ id: t, filter: creature }]
     effects: [{ op: exile, object: $t }]
+
+tests:
+  - name: exiles a creature
+    setup:
+      opponent:
+        creatures: [{ name: bear, power: 2, toughness: 2 }]
+    targets: [bear]
+    expect:
+      zone: { bear: exile }

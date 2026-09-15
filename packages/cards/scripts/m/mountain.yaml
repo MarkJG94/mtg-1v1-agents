@@ -16,3 +16,10 @@ abilities:
   - kind: mana
     id: tap-for-r
     modes: [[{ type: R }]]
+
+tests:
+  - name: taps for one mana
+    activateMana: tap-for-r
+    expect:
+      manaPool: 1
+      tapped: { this: true }

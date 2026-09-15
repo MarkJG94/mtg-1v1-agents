@@ -20,3 +20,11 @@ abilities:
     cost: { tap: true }
     targets: [{ id: t, filter: any }]
     effects: [{ op: damage, to: $t, amount: 1 }]
+
+tests:
+  - name: pings the opponent and taps to do it
+    activate: ping
+    targets: [opponent]
+    expect:
+      life: { opponent: 19 }
+      tapped: { this: true }

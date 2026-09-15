@@ -15,3 +15,11 @@ keywords: [indestructible]
 text: "Indestructible (Damage and effects that say \"destroy\" don't destroy this creature. If its toughness is 0 or less, it still dies.)"
 
 abilities: []
+
+tests:
+  - name: resolves as a 0/1 with its keywords
+    expect:
+      zone: { this: battlefield }
+      power: { this: 0 }
+      toughness: { this: 1 }
+      keywords: { this: [indestructible] }

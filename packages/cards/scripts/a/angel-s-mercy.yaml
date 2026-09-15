@@ -14,3 +14,8 @@ abilities:
   - kind: spell
     covers: [0]
     effects: [{ op: gainLife, player: you, amount: 7 }]
+
+tests:
+  - name: gains seven life
+    expect:
+      life: { you: 27 }

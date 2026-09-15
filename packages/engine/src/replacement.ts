@@ -1,6 +1,6 @@
 import type { CounterKind, EventTarget, ObjectId, PlayerId, ZoneId } from '@mtg/shared';
 import { opponentOf } from '@mtg/shared';
-import { staticReplacements } from './cards/statics.js';
+import { enteringReplacements, staticReplacements } from './cards/statics.js';
 import type { CombatState } from './combat.js';
 import { affectedPlayer, type RulesEvent } from './events/rules-event.js';
 import type { GameState } from './state/game-state.js';
@@ -477,12 +477,19 @@ export const applicableReplacements = (
   state: GameState,
   pending: PendingEvent,
 ): readonly ReplacementEffect[] => {
-  const candidates = activeReplacements(state).filter(
+  const candidates = [...activeReplacements(state), ...selfEntering(state, pending.event)].filter(
     (effect) => !pending.applied.includes(effect.id) && matches(state, effect, pending.event),
   );
   const self = candidates.filter((effect) => effect.selfReplacement === true);
   return self.length > 0 ? self : candidates;
 };
+
+/**
+ * A permanent's own "as this enters" replacements, which it still has while it is on the
+ * stack or in hand (CR 614.12) and `activeReplacements` therefore cannot see.
+ */
+const selfEntering = (state: GameState, event: RulesEvent): readonly ReplacementEffect[] =>
+  event.kind === 'entersBattlefield' ? enteringReplacements(state, event.object) : [];
 
 const afterApplying = (
   applied: Applied,

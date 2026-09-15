@@ -333,6 +333,106 @@ export const abilitySchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
+// --- Scenario tests ---
+
+/**
+ * A card's own tests, in the same file as the script (docs/09 "Card tests").
+ *
+ * Deliberately small and declarative: a board, one action, and what to expect. Somebody
+ * who has never written TypeScript should be able to add one by copying the card above
+ * theirs, and the auto-scripter's future LLM-assisted mode should be able to emit one.
+ *
+ * Everything is optional and has a sensible default — enough lands to cast the card, both
+ * players at twenty — so a test says only what the card is about.
+ */
+const permanentFields = {
+  name: z.string().min(1),
+  keywords: z.array(keywordSchema).optional(),
+  tapped: z.boolean().optional(),
+};
+
+const creatureSchema = z.object({
+  ...permanentFields,
+  power: z.number().int().default(2),
+  toughness: z.number().int().default(2),
+});
+
+/**
+ * Something on the battlefield that is not (only) a creature: the artifact for a
+ * Shatter, the enchantment for a Naturalize. It needs its types spelled out because a
+ * type is a characteristic of a card, and a board full of anonymous 2/2s cannot stand in
+ * for one.
+ */
+const permanentSchema = z.object({
+  ...permanentFields,
+  types: z.array(typeSchema).min(1),
+  power: z.number().int().optional(),
+  toughness: z.number().int().optional(),
+});
+
+const sideSchema = z.object({
+  creatures: z.array(creatureSchema).optional(),
+  permanents: z.array(permanentSchema).optional(),
+  life: z.number().int().optional(),
+  handSize: z.number().int().optional(),
+});
+
+export const scenarioTestSchema = z.object({
+  name: z.string().min(1),
+  setup: z
+    .object({
+      you: sideSchema.optional(),
+      opponent: sideSchema.optional(),
+      /** Any-colour lands for the caster. Defaults to enough for the card's cost. */
+      lands: z.number().int().nonnegative().optional(),
+      /**
+       * A spell the opponent casts first, so the card can be cast in response to it. What
+       * a counterspell needs, and the only way to get a real spell on the stack. A bare
+       * name is a creature spell; a card that cares what it counters says so.
+       */
+      opponentSpell: z
+        .union([
+          z.string(),
+          z.object({ name: z.string().min(1), types: z.array(typeSchema).min(1) }),
+        ])
+        .optional(),
+    })
+    .optional(),
+  /** Activate this ability of the card instead of casting it: an id, or a loyalty one. */
+  activate: z.string().optional(),
+  /** Activate one of the card's mana abilities, for a land. */
+  activateMana: z.string().optional(),
+  /** Destroy a permanent after the action, for the cards that care about dying. */
+  kill: z.string().optional(),
+  /** What the spell or ability targets: a creature by name, or `you` / `opponent`. */
+  targets: z.array(z.string()).optional(),
+  expect: z.object({
+    life: z
+      .object({ you: z.number().int().optional(), opponent: z.number().int().optional() })
+      .optional(),
+    handSize: z
+      .object({ you: z.number().int().optional(), opponent: z.number().int().optional() })
+      .optional(),
+    /** Where a named creature — or the card itself, `this` — ended up. */
+    zone: z.record(z.string(), z.string()).optional(),
+    power: z.record(z.string(), z.number().int()).optional(),
+    toughness: z.record(z.string(), z.number().int()).optional(),
+    tapped: z.record(z.string(), z.boolean()).optional(),
+    counters: z.record(z.string(), z.record(z.string(), z.number().int())).optional(),
+    /** Permanents each player controls, for tokens and for board wipes. */
+    permanents: z
+      .object({ you: z.number().int().optional(), opponent: z.number().int().optional() })
+      .optional(),
+    /** Mana left in the caster's pool, for the cards that make some. */
+    manaPool: z.number().int().optional(),
+    /** Turns the caster is owed, for the ones that give an extra. */
+    extraTurns: z.number().int().optional(),
+    keywords: z.record(z.string(), z.array(keywordSchema)).optional(),
+  }),
+});
+
+export type ScenarioTest = z.infer<typeof scenarioTestSchema>;
+
 // --- The card ---
 
 export const cardScriptSchema = z.object({
@@ -355,6 +455,8 @@ export const cardScriptSchema = z.object({
   abilities: z.array(abilitySchema).default([]),
   /** The oracle text this script was written against, for the validator to check. */
   text: z.string().optional(),
+  /** The card's own scenario tests (docs/09). */
+  tests: z.array(scenarioTestSchema).default([]),
 });
 
 export type CardScript = z.infer<typeof cardScriptSchema>;

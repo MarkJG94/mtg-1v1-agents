@@ -154,6 +154,14 @@ Realistic expectations: vanilla/keyword creatures, burn, pump, simple removal, c
 
 Every script is then validated as a test (`packages/cards/src/scripts.test.ts`), which is what keeps the set honest: a script that stops agreeing with its card, or stops being playable because the engine changed underneath it, fails there rather than in a game a thousand cycles into a run. The UI's coverage page lists the most-requested unsupported cards so hand-scripting effort follows demand.
 
+Every script also carries its own tests under `tests:`, in the small declarative
+vocabulary docs/09 describes — a board, one action and an expectation. At least one is
+required: docs/09's definition of done for a hand script is that somebody has checked the
+card does what its text says, and validation cannot do that for you. Writing them is where
+the set earns its keep — the first run of the sixty found that a land played from hand
+never got its "enters tapped" replacement, and that the engine would let "destroy target
+artifact" be cast at a creature.
+
 One trap worth knowing: **a bare `~` is `null` in YAML**. Write `object: "~"` when an op acts on the card itself. The loader says so by name rather than making you work it out from a schema error.
 
 ## The bootstrap set (roadmap 2.3)

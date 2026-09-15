@@ -15,3 +15,9 @@ abilities:
     covers: [0]
     targets: [{ id: t, filter: any }]
     effects: [{ op: damage, to: $t, amount: 2 }]
+
+tests:
+  - name: deals two to a player
+    targets: [opponent]
+    expect:
+      life: { opponent: 18 }

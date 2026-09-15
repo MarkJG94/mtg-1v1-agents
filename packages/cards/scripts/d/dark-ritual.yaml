@@ -14,3 +14,9 @@ abilities:
   - kind: spell
     covers: [0]
     effects: [{ op: addMana, player: you, produce: [{ type: B, amount: 3 }] }]
+
+tests:
+  - name: adds three black mana
+    setup: { lands: 1 }
+    expect:
+      manaPool: 3

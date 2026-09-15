@@ -74,7 +74,7 @@ const vanilla: CardDefinition = {
   abilities: [],
 };
 
-interface SmokeScenario {
+export interface SmokeScenario {
   readonly name: string;
   /** Creatures the opponent has out when the card is cast. */
   readonly opposing: number;
@@ -82,7 +82,8 @@ interface SmokeScenario {
   readonly onOpponentsTurn: boolean;
 }
 
-const scenarios: readonly SmokeScenario[] = [
+/** Exported so the differential harness (docs/09) can play the same three boards. */
+export const smokeScenarios: readonly SmokeScenario[] = [
   { name: 'an empty board', opposing: 0, onOpponentsTurn: false },
   { name: 'a 2/2 opposite', opposing: 1, onOpponentsTurn: false },
   { name: "the opponent's turn", opposing: 1, onOpponentsTurn: true },
@@ -93,14 +94,15 @@ export const smokeTest = (definition: CardDefinition): SmokeResult => {
   const skipped: string[] = [];
   let cast = 0;
 
-  for (const scenario of scenarios) {
+  for (const scenario of smokeScenarios) {
     if (scenario.onOpponentsTurn && isSorcerySpeed(definition)) {
       skipped.push(`${scenario.name}: sorcery speed`);
       continue;
     }
 
     try {
-      const outcome = runScenario(definition, scenario);
+      const played = playSmokeScenario(definition, scenario);
+      const outcome = played === 'skipped' ? 'skipped' : checkSettled(played);
       if (outcome === 'skipped') {
         skipped.push(`${scenario.name}: nothing legal to target`);
         continue;
@@ -118,10 +120,16 @@ export const smokeTest = (definition: CardDefinition): SmokeResult => {
   return { problems, skipped, cast };
 };
 
-const runScenario = (
+/**
+ * Play one scenario and hand back the game it left behind, or `'skipped'` when there was
+ * nothing legal to target. The state rather than a verdict, because the differential
+ * harness judges the same game by a different standard: not "is this legal" but "did the
+ * two scripts do the same thing".
+ */
+export const playSmokeScenario = (
   definition: CardDefinition,
   scenario: SmokeScenario,
-): readonly CheckProblem[] | 'skipped' => {
+): GameState | 'skipped' => {
   // Enough lands to pay for anything the bootstrap set will hold, and a library each so
   // nobody decks while the card is being tried.
   const lands = Math.max(6, manaValue(definition.manaCost) + 2);
@@ -146,13 +154,12 @@ const runScenario = (
 
   // A land is played, not cast (CR 305.1), and playing it is the whole of its behaviour
   // until an ability of it is activated.
-  if (hasType(definition, 'land')) return checkSettled(started.get());
+  if (hasType(definition, 'land')) return started.get();
 
   const targets = chooseTargets(started.get(), started.ref('subject'), caster, definition);
   if (targets === null) return 'skipped';
 
-  const resolved = started.cast('subject', { targets }).resolve();
-  return checkSettled(resolved.get());
+  return started.cast('subject', { targets }).resolve().get();
 };
 
 /**

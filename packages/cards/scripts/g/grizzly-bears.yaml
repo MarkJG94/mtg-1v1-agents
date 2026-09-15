@@ -14,3 +14,10 @@ toughness: 2
 text: ""
 
 abilities: []
+
+tests:
+  - name: resolves as a 2/2
+    expect:
+      zone: { this: battlefield }
+      power: { this: 2 }
+      toughness: { this: 2 }

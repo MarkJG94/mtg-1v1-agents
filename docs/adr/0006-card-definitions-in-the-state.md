@@ -35,6 +35,13 @@ and every path that does not is a leak or a ghost.
    effects the game has registered *plus* the ones the static abilities of permanents in
    play are making right now, computed from the battlefield each time it is asked.
 
+   With one addition, made in 2.5 when a gate refused to enter tapped: a replacement that
+   modifies how its *own source* enters has to be read off the card while it is still in
+   hand or on the stack, because by the time it is a permanent the event it modifies is
+   over (CR 614.12). Those are derived per entering object rather than folded into the
+   battlefield walk — the alternative is scanning every card in both libraries on every
+   event, and only the entering card's own self-replacements can possibly apply.
+
 ## Consequences
 
 - Nothing to leak and nothing to unregister. A permanent that changes controller, is

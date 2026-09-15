@@ -33,3 +33,16 @@ abilities:
     covers: [2]
     targets: [{ id: p, filter: player }]
     effects: [{ op: mill, player: $p, count: 20 }]
+
+tests:
+  - name: the plus two draws both players a card
+    activate: plus-two
+    expect:
+      handSize: { you: 1, opponent: 1 }
+      counters: { this: { loyalty: 5 } }
+  - name: the minus one draws the target a card
+    activate: minus-one
+    targets: [opponent]
+    expect:
+      handSize: { opponent: 1 }
+      counters: { this: { loyalty: 2 } }

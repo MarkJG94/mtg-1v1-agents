@@ -1,8 +1,9 @@
 import { isMainPhase, type ObjectId, type PlayerId, playerZone } from '@mtg/shared';
 import type { EventEmitter } from '../events/emitter.js';
+import { runEvent } from '../events/perform.js';
 import type { GameState } from '../state/game-state.js';
 import { isGameOver } from '../state/game-state.js';
-import { getObject, moveObject, objectsIn, updatePlayer } from '../state/update.js';
+import { getObject, objectsIn, updatePlayer } from '../state/update.js';
 
 /**
  * Playing lands (CR 305).
@@ -36,7 +37,13 @@ export class IllegalLandPlayError extends Error {
   }
 }
 
-/** Put a land from a player's hand onto the battlefield and spend their land drop. */
+/**
+ * Put a land from a player's hand onto the battlefield and spend their land drop.
+ *
+ * The land *enters* (CR 305.1), so this goes through the rules event rather than moving
+ * the object: "this land enters tapped" is a replacement effect (CR 614.1c) and only gets
+ * its say if something proposes an event for it to replace (ADR 0004).
+ */
 export const playLand = (
   state: GameState,
   emitter: EventEmitter,
@@ -56,8 +63,15 @@ export const playLand = (
     throw new IllegalLandPlayError(`object ${id} is in ${object.zone}, not ${player}'s hand`);
   }
 
-  const played = updatePlayer(moveObject(state, id, 'battlefield'), player, {
+  const spent = updatePlayer(state, player, {
     landsPlayedThisTurn: state.players[player].landsPlayedThisTurn + 1,
+  });
+  const played = runEvent(spent, emitter, {
+    kind: 'entersBattlefield',
+    object: id,
+    from: hand,
+    tapped: false,
+    counters: {},
   });
   emitter.emit(played, { type: 'playLand', player, object: id });
   return played;

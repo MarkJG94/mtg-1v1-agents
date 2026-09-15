@@ -15,3 +15,11 @@ abilities:
     covers: [0]
     targets: [{ id: p, filter: player }]
     effects: [{ op: discardAtRandom, player: $p, count: 2 }]
+
+tests:
+  - name: the target discards two at random
+    setup:
+      opponent: { handSize: 3 }
+    targets: [opponent]
+    expect:
+      handSize: { opponent: 1 }

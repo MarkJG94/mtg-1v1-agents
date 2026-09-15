@@ -37,16 +37,33 @@ It lives behind a separate entry point so it never reaches the engine's runtime 
 ### 2. Card tests
 
 - **Validation** of every hand script runs as a test (`packages/cards/test/scripts.test.ts`): schema, characteristic agreement with Scryfall, full text coverage, executability smoke.
-- **Scenario tests per hand-scripted card**, in the same YAML as the script under `tests:`, written with the scenario builder vocabulary so non-programmers (or the auto-scripter's future LLM-assisted mode) can add them:
+- **Scenario tests per hand-scripted card**, in the same YAML as the script under `tests:`, written in a small declarative vocabulary so non-programmers (or the auto-scripter's future LLM-assisted mode) can add them:
   ```yaml
   tests:
     - name: kills a 3/3
-      setup: { A: { hand: [~], battlefield: [Mountain] }, B: { battlefield: [Centaur Courser] } }
-      actions: [{ cast: ~, target: Centaur Courser }, resolveAll]
-      expect: { B.graveyard: [Centaur Courser] }
+      setup:
+        opponent:
+          creatures: [{ name: courser, power: 3, toughness: 3 }]
+      targets: [courser]
+      expect:
+        zone: { courser: "B:graveyard" }
   ```
+  A test is a board, one action and an expectation, and everything has a default: enough
+  any-colour lands to cast the card, both players at twenty, the card in hand (on the
+  battlefield instead when the test activates one of its abilities). `setup` takes
+  `creatures`, `permanents` (for the artifact a Shatter needs — a type is a characteristic
+  of a card, and an anonymous 2/2 cannot stand in for one), `life`, `handSize`, `lands`
+  and `opponentSpell` (a real spell on the stack, for the counterspells; a bare name is a
+  creature spell, and `{ name: x, types: [instant] }` when the card cares what it
+  counters). The action is casting the card, or `activate` / `activateMana` for an
+  ability, with `targets` by name and `kill` for the cards that care about something
+  dying. `expect` covers life, hand size, zones, power, toughness, tapped, counters,
+  keywords, permanent counts, mana in the pool and extra turns owed. Failures come back as
+  sentences rather than as a thrown assertion, so one run reports every card that broke.
+  `packages/cards/src/card-tests.test.ts` runs them all and also fails a card that has no
+  test at all.
 - **Auto-scripter golden tests**: a corpus of oracle texts with their expected scripts; any parser change must keep the corpus green or update goldens deliberately. The parser's coverage report is published as a CI artifact and the pipeline fails if coverage on the corpus drops.
-- **Differential test**: for cards that have both a hand script and a passing auto script, the two must produce identical behaviour in the smoke scenarios; disagreements are bugs in one or the other and are triaged.
+- **Differential test**: for cards that have both a hand script and a passing auto script, the two must produce identical behaviour in the smoke scenarios; disagreements are bugs in one or the other and are triaged. `differentialTest(hand, auto, tests)` plays both scripts through the validator's three smoke boards and through the card's own scenario tests, and compares the *whole* resulting position — life, zones, characteristics as the layer system sees them, counters, the lot — rather than the expectations the hand script happened to declare. That is the point of it: an auto script that also drew a card is caught by a test nobody thought to write. A run that threw or could not be played is reported as one line rather than as a diff of a position it never reached. The real comparison waits on the auto-scripter in phase 3; what runs today is the harness against deliberately altered copies of a script, plus every bootstrap card compared with itself.
 
 ### 3. Seeded regression games
 

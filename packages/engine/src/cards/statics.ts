@@ -1,4 +1,4 @@
-import type { ObjectId } from '@mtg/shared';
+import type { ObjectId, PlayerId } from '@mtg/shared';
 import type { ContinuousEffect } from '../layers.js';
 import type { ReplacementEffect } from '../replacement.js';
 import type { GameState } from '../state/game-state.js';
@@ -61,24 +61,58 @@ export const staticReplacements = (state: GameState): readonly ReplacementEffect
   for (const { object, definition } of definitionsOnBattlefield(state)) {
     const controller = state.objects.get(object)?.controller;
     if (controller === undefined) continue;
-    definition.abilities.forEach((ability, index) => {
-      if (ability.kind !== 'replacement') return;
-      replacements.push({
-        id: idFor(object, index),
-        source: object,
-        controller,
-        applies: ability.applies,
-        change: ability.change,
-        duration: { kind: 'whileSourceOnBattlefield' },
-        ...(ability.selfReplacement !== undefined
-          ? { selfReplacement: ability.selfReplacement }
-          : {}),
-      });
-    });
+    replacements.push(...replacementsOf(object, definition, controller));
   }
 
   return replacements;
 };
+
+/**
+ * The replacements of something that is entering the battlefield but is not there yet
+ * (CR 614.12).
+ *
+ * "This land enters tapped" has to be read off the card while it is still in hand or on
+ * the stack: by the time it is a permanent the event it modifies is over, so
+ * `staticReplacements` would never see it. Only the card's own self-replacements count
+ * here (CR 616.1a) — anything that replaces how *other* things enter is already in play
+ * and comes from `staticReplacements` as usual. Derived per event rather than folded into
+ * that function, which would mean walking every card in both libraries on every event.
+ */
+export const enteringReplacements = (
+  state: GameState,
+  entering: ObjectId,
+): readonly ReplacementEffect[] => {
+  const object = state.objects.get(entering);
+  if (object === undefined || object.zone === 'battlefield') return [];
+  const definition = state.definitions.get(object.definitionId);
+  if (definition === undefined) return [];
+  return replacementsOf(entering, definition, object.controller).filter(
+    (effect) => effect.selfReplacement === true && effect.applies.kind === 'entersBattlefield',
+  );
+};
+
+const replacementsOf = (
+  object: ObjectId,
+  definition: CardDefinition,
+  controller: PlayerId,
+): readonly ReplacementEffect[] =>
+  definition.abilities.flatMap((ability, index) =>
+    ability.kind === 'replacement'
+      ? [
+          {
+            id: idFor(object, index),
+            source: object,
+            controller,
+            applies: ability.applies,
+            change: ability.change,
+            duration: { kind: 'whileSourceOnBattlefield' },
+            ...(ability.selfReplacement !== undefined
+              ? { selfReplacement: ability.selfReplacement }
+              : {}),
+          } satisfies ReplacementEffect,
+        ]
+      : [],
+  );
 
 /**
  * Which layer a change belongs in. Imported lazily as a plain switch rather than through

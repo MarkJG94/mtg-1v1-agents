@@ -15,3 +15,12 @@ abilities:
     covers: [0]
     targets: [{ id: t, filter: { type: artifact } }]
     effects: [{ op: destroy, object: $t }]
+
+tests:
+  - name: destroys an artifact
+    setup:
+      opponent:
+        permanents: [{ name: golem, types: [artifact, creature], power: 2, toughness: 2 }]
+    targets: [golem]
+    expect:
+      zone: { golem: "B:graveyard" }

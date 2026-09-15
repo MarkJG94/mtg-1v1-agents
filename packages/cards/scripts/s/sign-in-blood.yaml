@@ -17,3 +17,10 @@ abilities:
     effects:
       - { op: draw, player: $p, count: 2 }
       - { op: loseLife, player: $p, amount: 2 }
+
+tests:
+  - name: the target draws two and loses two
+    targets: [opponent]
+    expect:
+      life: { opponent: 18 }
+      handSize: { opponent: 2 }

@@ -17,3 +17,14 @@ abilities:
     effects:
       - { op: pump, object: $t, power: 1, toughness: 1 }
       - { op: grantKeyword, object: $t, keyword: doubleStrike }
+
+tests:
+  - name: pumps and grants double strike
+    setup:
+      you:
+        creatures: [{ name: bear, power: 2, toughness: 2 }]
+    targets: [bear]
+    expect:
+      power: { bear: 3 }
+      toughness: { bear: 3 }
+      keywords: { bear: [doubleStrike] }

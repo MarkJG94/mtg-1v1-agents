@@ -1,4 +1,4 @@
-import type { Colour, OracleId } from '@mtg/shared';
+import type { Colour, EventTarget, OracleId } from '@mtg/shared';
 import type { EffectChange, EffectDuration, EffectSelector } from '../layers.js';
 import type { ManaProduction } from '../mana/ability.js';
 import type { ManaCost } from '../mana/cost.js';
@@ -174,3 +174,30 @@ export const effectsOf = (ability: CardAbility): readonly EffectOp[] =>
 /** The targets an ability takes, or none. */
 export const targetsOf = (ability: CardAbility): readonly TargetSpec[] =>
   'targets' in ability ? (ability.targets ?? []) : [];
+
+/**
+ * Match a flat list of targets back to the ability's named ones.
+ *
+ * They were chosen in the order the ability declares them, so they are handed back out
+ * the same way: the first spec takes its `count`, the next takes the ones after that. An
+ * "up to" spec takes what is left rather than demanding its full number. Casting reads
+ * this to check each target against the spec that asked for it, and resolution reads it
+ * to hand `$id` to the effects, which is why the two can never disagree about which
+ * target was which.
+ */
+export const bindTargets = (
+  specs: readonly TargetSpec[],
+  chosen: readonly EventTarget[],
+): Record<string, readonly EventTarget[]> => {
+  const bound: Record<string, readonly EventTarget[]> = {};
+  let index = 0;
+
+  for (const spec of specs) {
+    const wanted = spec.count ?? 1;
+    const take = spec.upTo === true ? Math.min(wanted, chosen.length - index) : wanted;
+    bound[spec.id] = chosen.slice(index, index + Math.max(0, take));
+    index += Math.max(0, take);
+  }
+
+  return bound;
+};

@@ -23,3 +23,8 @@ abilities:
     id: tap-for-ub
     covers: [1]
     modes: [[{ type: U }], [{ type: B }]]
+
+tests:
+  - name: enters tapped, and taps for one mana once untapped
+    expect:
+      tapped: { this: true }

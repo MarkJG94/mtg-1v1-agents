@@ -15,3 +15,19 @@ abilities:
     covers: [0]
     targets: [{ id: t, filter: { or: [{ type: artifact }, { type: enchantment }] } }]
     effects: [{ op: destroy, object: $t }]
+
+tests:
+  - name: destroys an artifact
+    setup:
+      opponent:
+        permanents: [{ name: relic, types: [artifact] }]
+    targets: [relic]
+    expect:
+      zone: { relic: "B:graveyard" }
+  - name: destroys an enchantment too
+    setup:
+      opponent:
+        permanents: [{ name: charm, types: [enchantment] }]
+    targets: [charm]
+    expect:
+      zone: { charm: "B:graveyard" }

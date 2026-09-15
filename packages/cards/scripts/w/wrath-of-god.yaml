@@ -18,3 +18,13 @@ abilities:
       - op: forEach
         of: creature
         effects: [{ op: destroy, object: $each }]
+
+tests:
+  - name: destroys every creature
+    setup:
+      you:
+        creatures: [{ name: mine, power: 2, toughness: 2 }]
+      opponent:
+        creatures: [{ name: theirs, power: 3, toughness: 3 }]
+    expect:
+      zone: { mine: "A:graveyard", theirs: "B:graveyard" }

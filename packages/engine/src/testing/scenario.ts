@@ -10,13 +10,15 @@ import {
   type ZoneId,
 } from '@mtg/shared';
 import { activateAbility, type CastOptions, castSpell } from '../cards/cast.js';
+import { manaAbilitiesOf } from '../cards/registry.js';
 import { addEffect, characteristicsOf } from '../characteristics.js';
 import type { BlockDeclaration } from '../combat.js';
 import type { DecisionResponse } from '../decision.js';
 import { createEventEmitter, type EventEmitter } from '../events/emitter.js';
 import { runEvent } from '../events/perform.js';
 import type { ContinuousEffect } from '../layers.js';
-import type { LoyaltyAbility } from '../planeswalker.js';
+import { activateManaAbility } from '../mana/ability.js';
+import { activateLoyaltyAbility, type LoyaltyAbility } from '../planeswalker.js';
 import { addReplacement, type ReplacementEffect } from '../replacement.js';
 import { stateFromSeed } from '../rng.js';
 import { putOnStack } from '../stack.js';
@@ -28,6 +30,7 @@ import {
 import { createObject, getObject, moveObject, objectsIn, updateObject } from '../state/update.js';
 import { type Keywords, keywords } from '../targeting.js';
 import type { TriggeredAbility } from '../triggers.js';
+import { playLand } from '../turn/land.js';
 import { applyDecision, startGame } from '../turn/turn.js';
 
 /**
@@ -223,6 +226,41 @@ export class Scenario {
     return this;
   }
 
+  /**
+   * Play a land from the current player's hand (CR 305.1). Different from putting one on
+   * the battlefield: a land that is *played* enters, so "this land enters tapped" applies.
+   */
+  playLand(name: string): this {
+    this.state = playLand(this.state, this.emitter, this.current, this.ref(name));
+    return this;
+  }
+
+  /** Activate a mana ability of a permanent, by label and ability id (CR 605). */
+  activateMana(name: string, ability: string, mode = 0): this {
+    const source = this.ref(name);
+    const found = manaAbilitiesOf(this.state, this.current).find(
+      (candidate) => candidate.source === source,
+    );
+    if (found === undefined) {
+      throw new ScenarioError(`"${name}" has no mana ability "${ability}"`);
+    }
+    this.state = activateManaAbility(this.state, this.emitter, this.current, found, mode);
+    return this;
+  }
+
+  /** Activate a loyalty ability of a planeswalker (CR 606). */
+  activateLoyalty(name: string, ability: string, targets: readonly EventTarget[] = []): this {
+    this.state = activateLoyaltyAbility(
+      this.state,
+      this.emitter,
+      this.current,
+      this.ref(name),
+      ability,
+      targets,
+    );
+    return this;
+  }
+
   /** Activate an ability of a permanent, by label and ability id. */
   activate(name: string, ability: string, options: CastOptions = {}): this {
     this.state = activateAbility(
@@ -353,9 +391,12 @@ export class Scenario {
 
     // A planeswalker put straight onto the battlefield never resolved off the stack, so
     // it has to be given the loyalty counters entering would have brought (CR 306.5b).
+    // The printed loyalty may come from the spec or from the card, and a planeswalker
+    // that arrives with none dies to a state-based action before anyone can use it.
+    const loyalty = spec.loyalty ?? created.object.loyalty;
     const counters =
       spec.counters ??
-      (zone === 'battlefield' && spec.loyalty !== undefined ? { loyalty: spec.loyalty } : {});
+      (zone === 'battlefield' && loyalty !== null && loyalty !== undefined ? { loyalty } : {});
 
     this.state = updateObject(created.state, created.object.id, {
       tapped: spec.tapped ?? false,

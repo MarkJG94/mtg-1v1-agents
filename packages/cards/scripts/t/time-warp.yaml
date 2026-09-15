@@ -15,3 +15,9 @@ abilities:
     covers: [0]
     targets: [{ id: p, filter: player }]
     effects: [{ op: extraTurn, player: $p }]
+
+tests:
+  - name: owes the target an extra turn
+    targets: [you]
+    expect:
+      extraTurns: 1

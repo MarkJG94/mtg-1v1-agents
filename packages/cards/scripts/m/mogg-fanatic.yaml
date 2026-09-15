@@ -20,3 +20,11 @@ abilities:
     cost: { sacrificeSelf: true }
     targets: [{ id: t, filter: any }]
     effects: [{ op: damage, to: $t, amount: 1 }]
+
+tests:
+  - name: sacrifices itself to deal one damage
+    activate: fling
+    targets: [opponent]
+    expect:
+      life: { opponent: 19 }
+      zone: { this: "A:graveyard" }

@@ -17,6 +17,7 @@ import { getObject, updateObject, updatePlayer } from '../state/update.js';
 import { canBeTargeted } from '../targeting.js';
 import {
   type ActivatedAbilityDef,
+  bindTargets,
   type CardDefinition,
   hasType,
   isPermanentCard,
@@ -24,6 +25,7 @@ import {
   spellAbilityOf,
   type TargetSpec,
 } from './definition.js';
+import { type EffectContext, matchesFilter } from './evaluate.js';
 import { manaAbilitiesOf } from './registry.js';
 
 /**
@@ -79,7 +81,7 @@ export const castSpell = (
 
   const targets = options.targets ?? [];
   const x = options.x ?? 0;
-  checkTargets(state, player, definition, spellAbilityOf(definition)?.targets ?? [], targets);
+  checkTargets(state, player, id, definition, spellAbilityOf(definition)?.targets ?? [], targets);
 
   const paid = payFor(state, emitter, player, definition.manaCost, x, options.autoTap !== false);
 
@@ -128,7 +130,7 @@ export const activateAbility = (
 
   const targets = options.targets ?? [];
   const x = options.x ?? 0;
-  checkTargets(state, player, definition, ability.targets ?? [], targets);
+  checkTargets(state, player, id, definition, ability.targets ?? [], targets);
 
   let current = state;
   if (ability.cost.mana !== undefined) {
@@ -169,10 +171,17 @@ const atSorcerySpeed = (state: GameState, player: PlayerId): boolean =>
 /**
  * CR 601.2c: the right number of legal targets, chosen as the spell is cast. "Up to"
  * allows fewer, including none; anything else demands exactly what it asks for.
+ *
+ * Three things have to hold, and each is a different rule. The count is CR 601.2c. Each
+ * target has to be something the ability actually asks for — "target creature" cannot be
+ * aimed at a player — which is the *target requirement* in the same rule, checked against
+ * the spec that asked for it. And it has to be targetable at all: shroud, protection and
+ * the rest, which is CR 115.
  */
 const checkTargets = (
   state: GameState,
   player: PlayerId,
+  source: ObjectId,
   definition: CardDefinition,
   specs: readonly TargetSpec[],
   chosen: readonly EventTarget[],
@@ -186,9 +195,23 @@ const checkTargets = (
     );
   }
 
-  const source = { controller: player, colours: definition.colours };
+  // The same binding resolution uses, so the target checked against a requirement is the
+  // one the effects will be handed under that name.
+  const context: EffectContext = { source, controller: player, targets: {}, x: 0 };
+  const bound = bindTargets(specs, chosen);
+  for (const spec of specs) {
+    for (const target of bound[spec.id] ?? []) {
+      if (!matchesFilter(state, context, spec.filter, target)) {
+        throw new IllegalCastError(
+          `illegal target for ${definition.name}: it is not what "${spec.id}" asks for`,
+        );
+      }
+    }
+  }
+
+  const card = { controller: player, colours: definition.colours };
   for (const target of chosen) {
-    const legality = canBeTargeted(state, target, source);
+    const legality = canBeTargeted(state, target, card);
     if (!legality.legal) {
       throw new IllegalCastError(`illegal target for ${definition.name}: ${legality.reason}`);
     }

@@ -20,3 +20,14 @@ abilities:
       - { op: gainControl, object: $t, player: you, duration: untilEndOfTurn }
       - { op: untap, object: $t }
       - { op: grantKeyword, object: $t, keyword: haste }
+
+tests:
+  - name: takes the creature, untaps it and gives it haste
+    setup:
+      opponent:
+        creatures: [{ name: bear, power: 2, toughness: 2, tapped: true }]
+    targets: [bear]
+    expect:
+      tapped: { bear: false }
+      keywords: { bear: [haste] }
+      permanents: { opponent: 0 }

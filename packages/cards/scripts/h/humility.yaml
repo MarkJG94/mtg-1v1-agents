@@ -18,3 +18,12 @@ abilities:
   - kind: static
     affects: { kind: allCreatures }
     change: { kind: setPowerToughness, power: 1, toughness: 1 }
+
+tests:
+  - name: makes every creature a 1/1 with no abilities
+    setup:
+      opponent:
+        creatures: [{ name: angel, power: 4, toughness: 4, keywords: [flying] }]
+    expect:
+      power: { angel: 1 }
+      toughness: { angel: 1 }

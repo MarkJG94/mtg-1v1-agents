@@ -14,3 +14,8 @@ abilities:
   - kind: spell
     covers: [0]
     effects: [{ op: draw, player: you, count: 2 }]
+
+tests:
+  - name: draws two cards
+    expect:
+      handSize: { you: 2 }

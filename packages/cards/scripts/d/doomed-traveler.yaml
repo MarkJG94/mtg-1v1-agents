@@ -29,3 +29,11 @@ abilities:
           power: 1
           toughness: 1
           keywords: [flying]
+
+tests:
+  - name: leaves a flying Spirit behind when it dies
+    setup: { lands: 1 }
+    kill: this
+    expect:
+      zone: { this: "A:graveyard" }
+      permanents: { you: 2 }

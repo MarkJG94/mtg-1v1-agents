@@ -19,3 +19,12 @@ abilities:
     covers: [0]
     cost: { mana: "{B}" }
     effects: [{ op: regenerate, object: "~" }]
+
+tests:
+  - name: regenerating it survives being destroyed
+    setup: { lands: 2 }
+    activate: regenerate
+    kill: this
+    expect:
+      zone: { this: battlefield }
+      tapped: { this: true }

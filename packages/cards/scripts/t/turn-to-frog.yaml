@@ -17,3 +17,13 @@ abilities:
       - { op: removeAbilities, object: $t }
       - { op: setColours, object: $t, colours: [U] }
       - { op: setPowerToughness, object: $t, power: 1, toughness: 1 }
+
+tests:
+  - name: makes a big creature a 1/1
+    setup:
+      opponent:
+        creatures: [{ name: giant, power: 6, toughness: 6, keywords: [trample] }]
+    targets: [giant]
+    expect:
+      power: { giant: 1 }
+      toughness: { giant: 1 }

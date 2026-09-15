@@ -21,3 +21,10 @@ abilities:
     covers: [1]
     when: { kind: selfEntersBattlefield }
     effects: [{ op: draw, player: you, count: 1 }]
+
+tests:
+  - name: draws a card as it enters
+    expect:
+      zone: { this: battlefield }
+      handSize: { you: 1 }
+      keywords: { this: [defender] }

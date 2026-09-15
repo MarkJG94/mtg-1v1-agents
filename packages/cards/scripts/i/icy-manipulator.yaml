@@ -19,3 +19,14 @@ abilities:
       - id: t
         filter: { or: [{ type: artifact }, creature, { type: land }] }
     effects: [{ op: tap, object: $t }]
+
+tests:
+  - name: taps a creature
+    setup:
+      lands: 2
+      opponent:
+        creatures: [{ name: bear, power: 2, toughness: 2 }]
+    activate: tap-something
+    targets: [bear]
+    expect:
+      tapped: { bear: true, this: true }

@@ -15,3 +15,11 @@ abilities:
     covers: [0]
     targets: [{ id: t, filter: { is: spell, type: creature } }]
     effects: [{ op: counter, object: $t }]
+
+tests:
+  - name: counters a creature spell
+    setup:
+      opponentSpell: theirs
+    targets: [theirs]
+    expect:
+      zone: { theirs: "B:graveyard" }

@@ -778,6 +778,500 @@
     },
     "text": {
       "type": "string"
+    },
+    "tests": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "setup": {
+            "type": "object",
+            "properties": {
+              "you": {
+                "type": "object",
+                "properties": {
+                  "creatures": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "keywords": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "flying",
+                              "reach",
+                              "menace",
+                              "vigilance",
+                              "haste",
+                              "defender",
+                              "firstStrike",
+                              "doubleStrike",
+                              "trample",
+                              "deathtouch",
+                              "lifelink",
+                              "indestructible",
+                              "shroud",
+                              "hexproof"
+                            ]
+                          }
+                        },
+                        "tapped": {
+                          "type": "boolean"
+                        },
+                        "power": {
+                          "default": 2,
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "toughness": {
+                          "default": 2,
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    }
+                  },
+                  "permanents": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "keywords": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "flying",
+                              "reach",
+                              "menace",
+                              "vigilance",
+                              "haste",
+                              "defender",
+                              "firstStrike",
+                              "doubleStrike",
+                              "trample",
+                              "deathtouch",
+                              "lifelink",
+                              "indestructible",
+                              "shroud",
+                              "hexproof"
+                            ]
+                          }
+                        },
+                        "tapped": {
+                          "type": "boolean"
+                        },
+                        "types": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "artifact",
+                              "battle",
+                              "creature",
+                              "enchantment",
+                              "instant",
+                              "land",
+                              "planeswalker",
+                              "sorcery"
+                            ]
+                          }
+                        },
+                        "power": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "toughness": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "types"
+                      ]
+                    }
+                  },
+                  "life": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "handSize": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                }
+              },
+              "opponent": {
+                "type": "object",
+                "properties": {
+                  "creatures": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "keywords": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "flying",
+                              "reach",
+                              "menace",
+                              "vigilance",
+                              "haste",
+                              "defender",
+                              "firstStrike",
+                              "doubleStrike",
+                              "trample",
+                              "deathtouch",
+                              "lifelink",
+                              "indestructible",
+                              "shroud",
+                              "hexproof"
+                            ]
+                          }
+                        },
+                        "tapped": {
+                          "type": "boolean"
+                        },
+                        "power": {
+                          "default": 2,
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "toughness": {
+                          "default": 2,
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    }
+                  },
+                  "permanents": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "keywords": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "flying",
+                              "reach",
+                              "menace",
+                              "vigilance",
+                              "haste",
+                              "defender",
+                              "firstStrike",
+                              "doubleStrike",
+                              "trample",
+                              "deathtouch",
+                              "lifelink",
+                              "indestructible",
+                              "shroud",
+                              "hexproof"
+                            ]
+                          }
+                        },
+                        "tapped": {
+                          "type": "boolean"
+                        },
+                        "types": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "artifact",
+                              "battle",
+                              "creature",
+                              "enchantment",
+                              "instant",
+                              "land",
+                              "planeswalker",
+                              "sorcery"
+                            ]
+                          }
+                        },
+                        "power": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "toughness": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "types"
+                      ]
+                    }
+                  },
+                  "life": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "handSize": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                }
+              },
+              "lands": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "opponentSpell": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "types": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "artifact",
+                            "battle",
+                            "creature",
+                            "enchantment",
+                            "instant",
+                            "land",
+                            "planeswalker",
+                            "sorcery"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "types"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "activate": {
+            "type": "string"
+          },
+          "activateMana": {
+            "type": "string"
+          },
+          "kill": {
+            "type": "string"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expect": {
+            "type": "object",
+            "properties": {
+              "life": {
+                "type": "object",
+                "properties": {
+                  "you": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "opponent": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                }
+              },
+              "handSize": {
+                "type": "object",
+                "properties": {
+                  "you": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "opponent": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                }
+              },
+              "zone": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "power": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "toughness": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "tapped": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "boolean"
+                }
+              },
+              "counters": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                }
+              },
+              "permanents": {
+                "type": "object",
+                "properties": {
+                  "you": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "opponent": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                }
+              },
+              "manaPool": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "extraTurns": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "keywords": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "flying",
+                      "reach",
+                      "menace",
+                      "vigilance",
+                      "haste",
+                      "defender",
+                      "firstStrike",
+                      "doubleStrike",
+                      "trample",
+                      "deathtouch",
+                      "lifelink",
+                      "indestructible",
+                      "shroud",
+                      "hexproof"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "name",
+          "expect"
+        ]
+      }
     }
   },
   "required": [
