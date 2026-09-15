@@ -35,12 +35,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "enum": [
-          "basic",
-          "legendary",
-          "snow",
-          "world"
-        ]
+        "enum": ["basic", "legendary", "snow", "world"]
       }
     },
     "subtypes": {
@@ -54,13 +49,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "enum": [
-          "W",
-          "U",
-          "B",
-          "R",
-          "G"
-        ]
+        "enum": ["W", "U", "B", "R", "G"]
       }
     },
     "power": {
@@ -139,10 +128,7 @@
                       "type": "boolean"
                     }
                   },
-                  "required": [
-                    "id",
-                    "filter"
-                  ]
+                  "required": ["id", "filter"]
                 }
               },
               "effects": {
@@ -196,16 +182,12 @@
                       ]
                     }
                   },
-                  "required": [
-                    "op"
-                  ],
+                  "required": ["op"],
                   "additionalProperties": {}
                 }
               }
             },
-            "required": [
-              "kind"
-            ]
+            "required": ["kind"]
           },
           {
             "type": "object",
@@ -225,9 +207,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "kind"
-                ],
+                "required": ["kind"],
                 "additionalProperties": {}
               },
               "interveningIf": {
@@ -237,9 +217,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "kind"
-                ],
+                "required": ["kind"],
                 "additionalProperties": {}
               },
               "onceEachTurn": {
@@ -266,10 +244,7 @@
                       "type": "boolean"
                     }
                   },
-                  "required": [
-                    "id",
-                    "filter"
-                  ]
+                  "required": ["id", "filter"]
                 }
               },
               "effects": {
@@ -323,18 +298,12 @@
                       ]
                     }
                   },
-                  "required": [
-                    "op"
-                  ],
+                  "required": ["op"],
                   "additionalProperties": {}
                 }
               }
             },
-            "required": [
-              "kind",
-              "id",
-              "when"
-            ]
+            "required": ["kind", "id", "when"]
           },
           {
             "type": "object",
@@ -385,10 +354,7 @@
                       "type": "boolean"
                     }
                   },
-                  "required": [
-                    "id",
-                    "filter"
-                  ]
+                  "required": ["id", "filter"]
                 }
               },
               "effects": {
@@ -442,18 +408,12 @@
                       ]
                     }
                   },
-                  "required": [
-                    "op"
-                  ],
+                  "required": ["op"],
                   "additionalProperties": {}
                 }
               }
             },
-            "required": [
-              "kind",
-              "id",
-              "cost"
-            ]
+            "required": ["kind", "id", "cost"]
           },
           {
             "type": "object",
@@ -469,9 +429,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "kind"
-                ],
+                "required": ["kind"],
                 "additionalProperties": {}
               },
               "change": {
@@ -481,9 +439,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "kind"
-                ],
+                "required": ["kind"],
                 "additionalProperties": {}
               },
               "duration": {
@@ -493,17 +449,11 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "kind"
-                ],
+                "required": ["kind"],
                 "additionalProperties": {}
               }
             },
-            "required": [
-              "kind",
-              "affects",
-              "change"
-            ]
+            "required": ["kind", "affects", "change"]
           },
           {
             "type": "object",
@@ -529,14 +479,7 @@
                     "properties": {
                       "type": {
                         "type": "string",
-                        "enum": [
-                          "W",
-                          "U",
-                          "B",
-                          "R",
-                          "G",
-                          "C"
-                        ]
+                        "enum": ["W", "U", "B", "R", "G", "C"]
                       },
                       "amount": {
                         "default": 1,
@@ -551,18 +494,12 @@
                         "type": "string"
                       }
                     },
-                    "required": [
-                      "type"
-                    ]
+                    "required": ["type"]
                   }
                 }
               }
             },
-            "required": [
-              "kind",
-              "id",
-              "modes"
-            ]
+            "required": ["kind", "id", "modes"]
           },
           {
             "type": "object",
@@ -601,10 +538,7 @@
                       "type": "boolean"
                     }
                   },
-                  "required": [
-                    "id",
-                    "filter"
-                  ]
+                  "required": ["id", "filter"]
                 }
               },
               "effects": {
@@ -658,18 +592,12 @@
                       ]
                     }
                   },
-                  "required": [
-                    "op"
-                  ],
+                  "required": ["op"],
                   "additionalProperties": {}
                 }
               }
             },
-            "required": [
-              "kind",
-              "id",
-              "cost"
-            ]
+            "required": ["kind", "id", "cost"]
           },
           {
             "type": "object",
@@ -689,9 +617,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "kind"
-                ],
+                "required": ["kind"],
                 "additionalProperties": {}
               },
               "change": {
@@ -701,21 +627,14 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "kind"
-                ],
+                "required": ["kind"],
                 "additionalProperties": {}
               },
               "selfReplacement": {
                 "type": "boolean"
               }
             },
-            "required": [
-              "kind",
-              "id",
-              "applies",
-              "change"
-            ]
+            "required": ["kind", "id", "applies", "change"]
           }
         ]
       }
@@ -732,11 +651,7 @@
       "type": "string"
     }
   },
-  "required": [
-    "oracleId",
-    "name",
-    "types"
-  ],
+  "required": ["oracleId", "name", "types"],
   "$defs": {
     "__schema0": {
       "anyOf": [
@@ -774,21 +689,11 @@
             },
             "colour": {
               "type": "string",
-              "enum": [
-                "W",
-                "U",
-                "B",
-                "R",
-                "G"
-              ]
+              "enum": ["W", "U", "B", "R", "G"]
             },
             "controller": {
               "type": "string",
-              "enum": [
-                "you",
-                "opponent",
-                "any"
-              ]
+              "enum": ["you", "opponent", "any"]
             },
             "zone": {
               "type": "string"

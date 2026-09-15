@@ -231,24 +231,20 @@ const opFrom = (
   const spec = opSpecs[name];
   const converted: Record<string, unknown> = { op: name };
 
-  for (const [key, value] of Object.entries(raw)) {
-    if (key === 'op') continue;
+  for (const [written, value] of Object.entries(raw)) {
+    if (written === 'op') continue;
+    const key = spec.aliases?.find(([script]) => script === written)?.[1] ?? written;
     const kind = spec.args[key];
     if (kind === undefined) {
-      throw new ScriptError(script.name, path, `op "${name}" takes no argument "${key}"`);
+      throw new ScriptError(script.name, path, `op "${name}" takes no argument "${written}"`);
     }
-    converted[spec.rename?.[key] ?? key] = convertArg(
-      script,
-      value,
-      kind,
-      declared,
-      `${path}.${key}`,
-    );
+    converted[key] = convertArg(script, value, kind, declared, `${path}.${written}`);
   }
 
   for (const required of spec.required) {
-    if (converted[spec.rename?.[required] ?? required] === undefined) {
-      throw new ScriptError(script.name, path, `op "${name}" needs "${required}"`);
+    if (converted[required] === undefined) {
+      const written = spec.aliases?.find(([, engine]) => engine === required)?.[0] ?? required;
+      throw new ScriptError(script.name, path, `op "${name}" needs "${written}"`);
     }
   }
 

@@ -25,10 +25,12 @@ export interface OpSpec {
   readonly args: Readonly<Record<string, ArgKind>>;
   readonly required: readonly string[];
   /**
-   * Script argument names the engine spells differently. Only `if`'s `then` so far, which
-   * the engine calls `thenDo` because an object with a `then` property is a thenable.
+   * Script spellings for arguments the engine names differently, as pairs rather than an
+   * object — the only one so far is `if`'s `then`, which the engine calls `thenDo`
+   * because an object with a `then` property is a thenable, and a table with one as a
+   * *key* would be the same hazard in a different place.
    */
-  readonly rename?: Readonly<Record<string, string>>;
+  readonly aliases?: readonly (readonly [script: string, engine: string])[];
 }
 
 export const opSpecs: Readonly<Record<OpName, OpSpec>> = {
@@ -122,14 +124,9 @@ export const opSpecs: Readonly<Record<OpName, OpSpec>> = {
   // Control flow
   sequence: { args: { effects: 'effects' }, required: ['effects'] },
   forEach: { args: { of: 'filter', effects: 'effects' }, required: ['of', 'effects'] },
-  // The keys here are the names a *script* uses, and `then:` is what reads best in YAML.
-  // These two objects are lookup tables, never values anything awaits; the engine's own op
-  // avoids the name, which is what the rule is guarding against.
   if: {
-    // biome-ignore lint/suspicious/noThenProperty: a table of script argument names
-    args: { condition: 'condition', then: 'effects', otherwise: 'effects' },
-    required: ['then'],
-    // biome-ignore lint/suspicious/noThenProperty: a table of script argument names
-    rename: { then: 'thenDo' },
+    args: { condition: 'condition', thenDo: 'effects', otherwise: 'effects' },
+    required: ['thenDo'],
+    aliases: [['then', 'thenDo']],
   },
 };

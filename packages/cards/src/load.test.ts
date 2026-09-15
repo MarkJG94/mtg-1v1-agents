@@ -117,6 +117,7 @@ describe('loading a card script', () => {
             {
               op: 'if',
               condition: { atLeast: { amount: { lifeTotal: 'opponent' }, than: 10 } },
+              // biome-ignore lint/suspicious/noThenProperty: the script spelling is the point
               then: [{ op: 'loseLife', player: 'opponent', amount: 2 }],
               otherwise: [{ op: 'gainLife', player: 'you', amount: 2 }],
             },
