@@ -19,6 +19,7 @@ import {
   emptyCombat,
   endCombat,
   legalAttackers,
+  legalDefenders,
   needsFirstStrikeStep,
   orderBlockers,
 } from '../combat.js';
@@ -213,7 +214,7 @@ const performDeclareAttackers = (state: GameState): GameState => {
       kind: 'declareAttackers',
       player: state.activePlayer,
       legal,
-      defender: { kind: 'player', player: defendingPlayer(state) },
+      defenders: legalDefenders(state),
     },
   });
 };
@@ -340,6 +341,7 @@ const beginTurn = (
     extraTurns,
     passesInARow: 0,
     triggersFiredThisTurn: [],
+    loyaltyActivatedThisTurn: [],
   });
   for (const id of playerIds) started = updatePlayer(started, id, { landsPlayedThisTurn: 0 });
 

@@ -287,6 +287,7 @@ const standInFor = (delayed: DelayedTrigger): GameObject => ({
   attachment: null,
   deathtouched: false,
   triggers: [],
+  loyaltyAbilities: [],
   summoningSick: false,
 });
 

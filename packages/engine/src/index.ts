@@ -10,6 +10,7 @@ export * from './mana/ability.js';
 export * from './mana/cost.js';
 export * from './mana/payment.js';
 export * from './mana/pool.js';
+export * from './planeswalker.js';
 export * from './replacement.js';
 export * from './rng.js';
 export * from './sba.js';

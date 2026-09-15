@@ -206,7 +206,10 @@ export const resolveTopOfStack = (state: GameState, emitter: EventEmitter): Game
       object: id,
       from: 'stack',
       tapped: false,
-      counters: {},
+      // A planeswalker arrives with loyalty counters equal to its printed loyalty
+      // (CR 306.5b). Seeding them into the event rather than setting them afterwards is
+      // what lets a Doubling Season see them, since that is a replacement effect.
+      counters: object.loyalty === null ? {} : { loyalty: object.loyalty },
     });
   }
 
@@ -271,45 +274,84 @@ export const counterObject = (
   });
 };
 
+/** Identifies an ability being put on the stack as an object in its own right. */
+export interface AbilityOnStack {
+  readonly abilityId: string;
+  readonly source: ObjectId;
+  readonly controller: PlayerId;
+  readonly definitionId: OracleId;
+}
+
 /**
- * Put a triggered ability on the stack (CR 603.3). It becomes an object on the stack in
- * its own right, controlled by the ability's controller, and is destroyed rather than
- * buried when it resolves.
+ * An ability becomes an object on the stack (CR 113.7), controlled by the ability's
+ * controller and destroyed rather than buried when it resolves (CR 608.2m).
  */
-export const putTriggerOnStack = (
+const createAbilityOnStack = (
   state: GameState,
-  emitter: EventEmitter,
-  trigger: {
-    readonly abilityId: string;
-    readonly source: ObjectId;
-    readonly controller: PlayerId;
-    readonly definitionId: OracleId;
-  },
-): GameState => {
+  ability: AbilityOnStack,
+): { readonly state: GameState; readonly id: ObjectId } => {
   const created = createObject(state, {
-    definitionId: trigger.definitionId,
-    owner: trigger.controller,
-    controller: trigger.controller,
+    definitionId: ability.definitionId,
+    owner: ability.controller,
+    controller: ability.controller,
     zone: 'stack',
   });
 
-  const next = updateObject(created.state, created.object.id, {
-    stack: {
-      resolvesTo: 'exile',
-      splitSecond: false,
-      targets: [],
-      colours: [],
-      isAbility: true,
-      abilityId: trigger.abilityId,
-    },
-  });
+  return {
+    state: updateObject(created.state, created.object.id, {
+      stack: {
+        resolvesTo: 'exile',
+        splitSecond: false,
+        targets: [],
+        colours: [],
+        isAbility: true,
+        abilityId: ability.abilityId,
+      },
+    }),
+    id: created.object.id,
+  };
+};
 
+/** Put a triggered ability on the stack (CR 603.3). */
+export const putTriggerOnStack = (
+  state: GameState,
+  emitter: EventEmitter,
+  trigger: AbilityOnStack,
+): GameState => {
+  const { state: next, id } = createAbilityOnStack(state, trigger);
   emitter.emit(next, {
     type: 'trigger',
     controller: trigger.controller,
     source: trigger.source,
     abilityIndex: 0,
   });
-  emitter.emit(next, { type: 'putOnStack', object: created.object.id });
+  emitter.emit(next, { type: 'putOnStack', object: id });
   return next;
+};
+
+/**
+ * Put an activated ability on the stack (CR 602.2), and hand priority back to the player
+ * who activated it (CR 117.3c) — the same shape as casting a spell, so a driver is never
+ * left holding a state with nothing to answer.
+ */
+export const putActivatedAbilityOnStack = (
+  state: GameState,
+  emitter: EventEmitter,
+  ability: AbilityOnStack,
+): GameState => {
+  const { state: created, id } = createAbilityOnStack(state, ability);
+  emitter.emit(created, {
+    type: 'activate',
+    player: ability.controller,
+    source: ability.source,
+    abilityIndex: 0,
+    targets: [],
+  });
+  emitter.emit(created, { type: 'putOnStack', object: id });
+
+  return updateState(created, {
+    passesInARow: 0,
+    priority: ability.controller,
+    pendingDecision: priorityDecision(ability.controller),
+  });
 };

@@ -552,7 +552,7 @@ describe('combat through the decision flow', () => {
       kind: 'declareAttackers',
       player: 'A',
       legal: mine,
-      defender: { kind: 'player', player: 'B' },
+      defenders: [{ kind: 'player', player: 'B' }],
     });
   });
 

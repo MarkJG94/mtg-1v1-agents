@@ -45,8 +45,11 @@ export interface DeclareAttackersDecision {
   readonly player: PlayerId;
   /** Creatures that could attack. */
   readonly legal: readonly ObjectId[];
-  /** Who they would attack; planeswalkers join this in roadmap 1.11. */
-  readonly defender: EventTarget;
+  /**
+   * Who they may attack (CR 508.1a): the defending player, and each planeswalker they
+   * control. Every attacker picks from this list independently.
+   */
+  readonly defenders: readonly EventTarget[];
 }
 
 /** Declaring blockers (CR 509.1). Declaring none is a legal answer. */

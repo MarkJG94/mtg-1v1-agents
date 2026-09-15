@@ -62,6 +62,8 @@ export type EventMatcher =
       readonly kind: 'addCounters';
       readonly object: ObjectRef;
       readonly counter?: CounterKind;
+      /** Also watch the counters a permanent enters the battlefield with (CR 614.1c). */
+      readonly onEntry?: boolean;
     };
 
 export type ReplacementChange =
@@ -221,6 +223,16 @@ export const matches = (
         resolvePlayerRef(state, effect, matcher.player, event.player)
       );
     case 'addCounters':
+      if (event.kind === 'entersBattlefield') {
+        // Counters a permanent enters with are counters being placed, so an effect that
+        // watches for them sees this too — but only when the event actually has some.
+        return (
+          matcher.onEntry === true &&
+          Object.keys(event.counters).length > 0 &&
+          (matcher.counter === undefined || event.counters[matcher.counter] !== undefined) &&
+          resolveObjectRef(effect, matcher.object, event.object)
+        );
+      }
       return (
         event.kind === 'addCounters' &&
         (matcher.counter === undefined || event.counter === matcher.counter) &&
@@ -368,6 +380,18 @@ const applyChange = (state: GameState, effect: ReplacementEffect, event: RulesEv
     }
 
     case 'modifyCounters': {
+      // Doubling Season's shape. It applies to counters placed on a permanent *as it
+      // enters* too, which is how it doubles a planeswalker's starting loyalty
+      // (CR 306.5b, 614.1c) — so this reads both kinds of event.
+      if (event.kind === 'entersBattlefield') {
+        const counters = Object.fromEntries(
+          Object.entries(event.counters).map(([counter, amount]) => [
+            counter,
+            scale(amount, change.multiply, change.add),
+          ]),
+        );
+        return { state: consume(state, effect), events: [{ ...event, counters }] };
+      }
       if (event.kind !== 'addCounters') break;
       const amount = scale(event.amount, change.multiply, change.add);
       return {

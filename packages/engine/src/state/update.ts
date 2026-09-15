@@ -7,6 +7,7 @@ import {
   type PlayerId,
   type ZoneId,
 } from '@mtg/shared';
+import type { LoyaltyAbility } from '../planeswalker.js';
 import { type Keywords, noKeywords } from '../targeting.js';
 import type { TriggeredAbility } from '../triggers.js';
 import type { GameState, PlayerState } from './game-state.js';
@@ -108,6 +109,7 @@ export interface NewObjectSpec {
   readonly colours?: readonly Colour[];
   readonly attachment?: 'aura' | 'equipment';
   readonly triggers?: readonly TriggeredAbility[];
+  readonly loyaltyAbilities?: readonly LoyaltyAbility[];
   /** Where in the destination zone; defaults to the end of the array. */
   readonly position?: ZonePosition;
 }
@@ -142,6 +144,7 @@ export const createObject = (
     attachment: spec.attachment ?? null,
     deathtouched: false,
     triggers: spec.triggers ?? [],
+    loyaltyAbilities: spec.loyaltyAbilities ?? [],
     summoningSick: false,
   };
 

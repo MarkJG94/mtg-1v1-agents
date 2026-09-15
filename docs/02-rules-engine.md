@@ -14,7 +14,7 @@
 - State-based actions (CR 704) and the legend rule.
 - Triggered abilities (CR 603) with APNAP ordering, intervening-if, ETB/LTB/dies/attacks/blocks/upkeep/end-step/cast triggers, and delayed triggers.
 - Static abilities and continuous effects with the **layer system** (CR 613): copy, control, text-changing, type, colour, ability add/remove, P/T (set / modify / counters / switch), timestamps and dependency.
-- Planeswalkers (CR 306): loyalty abilities once per turn, damage to planeswalkers, redirect rule removed (post-2018 rules), loyalty SBA.
+- Planeswalkers (CR 306, 606): they enter with loyalty counters equal to their printed loyalty, damage to them removes that many counters, they can be attacked directly (CR 508.1a), the pre-2018 redirect rule is gone, loyalty abilities cost counters and are sorcery-speed and once per permanent per turn, and zero loyalty is a state-based action.
 - Counters (+1/+1, −1/−1, loyalty, charge, generic), tokens, copies of permanents.
 - Replacement and prevention effects (CR 614–615): "enters tapped", "if X would die instead", damage prevention, "as enters" choices, applying in order chosen by the affected player/controller.
 - Card types: creature, instant, sorcery, artifact, enchantment (incl. auras and equipment), land, planeswalker. Kindred/tribal as a supertype-like flag.
@@ -48,6 +48,7 @@ interface GameState {
   delayedTriggers: DelayedTrigger[];        // set up to fire at a later step (CR 603.7)
   pendingTriggers: TriggerInstance[];       // fired, waiting to go on the stack
   triggersFiredThisTurn: string[];          // for once-each-turn abilities
+  loyaltyActivatedThisTurn: ObjectId[];     // one loyalty ability per planeswalker per turn
   combat: CombatState | null;               // non-null only during the combat phase
   pendingDecision: Decision | null;         // set when a player must choose; null while it can run
   result: GameResult | null;
@@ -95,7 +96,7 @@ A state-based action logs the `sba` event that applied even when a replacement t
 
 ## Combat
 
-Combat is a sub-state machine: `declareAttackers` (legal attackers computed with summoning sickness, defender, restrictions and requirements), `declareBlockers` (legality: flying/reach, menace, protection, "can't be blocked", block requirements), damage-assignment ordering, first-strike damage step only if a first/double striker is involved, regular damage, then triggers. Damage is dealt simultaneously as one event batch so lifelink and deathtouch interact correctly with SBAs.
+Combat is a sub-state machine: `declareAttackers` (legal attackers computed with summoning sickness, defender, restrictions and requirements; each attacker also picks who it attacks from `legalDefenders` — the defending player and the planeswalkers they control, CR 508.1a), `declareBlockers` (legality: flying/reach, menace, protection, "can't be blocked", block requirements), damage-assignment ordering, first-strike damage step only if a first/double striker is involved, regular damage, then triggers. Damage is dealt simultaneously as one event batch so lifelink and deathtouch interact correctly with SBAs.
 
 ## Performance targets
 

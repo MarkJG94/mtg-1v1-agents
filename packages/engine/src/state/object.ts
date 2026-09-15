@@ -1,4 +1,5 @@
 import type { Colour, ObjectId, OracleId, PlayerId, ZoneId } from '@mtg/shared';
+import type { LoyaltyAbility } from '../planeswalker.js';
 import type { StackProperties } from '../stack.js';
 import type { Keywords } from '../targeting.js';
 import type { TriggeredAbility } from '../triggers.js';
@@ -60,6 +61,8 @@ export interface GameObject {
   readonly deathtouched: boolean;
   /** Triggered abilities this object has (CR 603). Seeded from card scripts in 2.1. */
   readonly triggers: readonly TriggeredAbility[];
+  /** Loyalty abilities, for a planeswalker (CR 606). Seeded from card scripts in 2.1. */
+  readonly loyaltyAbilities: readonly LoyaltyAbility[];
   /**
    * Set only while the object is on the stack: where it resolves to, and whether it has
    * split second. Cleared as it leaves.

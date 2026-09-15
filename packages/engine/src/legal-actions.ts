@@ -2,6 +2,7 @@ import { type Colour, isMainPhase, type ObjectId, type PlayerId, playerZone } fr
 import type { ManaAbility } from './mana/ability.js';
 import type { ManaCost } from './mana/cost.js';
 import { canPayFromSources, type PotentialMana } from './mana/payment.js';
+import { legalLoyaltyAbilities } from './planeswalker.js';
 import { isStackEmpty, splitSecondActive } from './stack.js';
 import type { GameState } from './state/game-state.js';
 import { isGameOver } from './state/game-state.js';
@@ -39,7 +40,14 @@ export interface CardInfoSource {
 export type LegalAction =
   | { readonly kind: 'pass' }
   | { readonly kind: 'playLand'; readonly object: ObjectId }
-  | { readonly kind: 'cast'; readonly object: ObjectId; readonly cost: ManaCost };
+  | { readonly kind: 'cast'; readonly object: ObjectId; readonly cost: ManaCost }
+  /** A planeswalker's loyalty ability (CR 606). Its cost is counters, not mana. */
+  | {
+      readonly kind: 'activateLoyalty';
+      readonly object: ObjectId;
+      readonly ability: string;
+      readonly cost: number;
+    };
 
 /**
  * Mana the player could still make by tapping what they control. A source that makes
@@ -110,6 +118,16 @@ export const legalActions = (
 
   // While a split-second spell waits, nothing else can be cast or activated (CR 702.61a).
   if (splitSecondActive(state)) return actions;
+
+  // Loyalty abilities need no card script: what they cost is on the permanent itself.
+  for (const { source, ability } of legalLoyaltyAbilities(state, player)) {
+    actions.push({
+      kind: 'activateLoyalty',
+      object: source,
+      ability: ability.id,
+      cost: ability.cost,
+    });
+  }
 
   const abilities = cards.manaAbilitiesFor?.(state, player) ?? [];
   const potential = potentialManaFor(state, player, abilities);

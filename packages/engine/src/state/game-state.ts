@@ -52,7 +52,7 @@ export interface PlayerState {
  *
  * Fields that later phases add: `pendingDecision` (1.4), `combat` (1.6),
  * `pendingTriggers` and `delayedTriggers` (1.8), `effects` (1.9),
- * `replacements` and `pendingReplacement` (1.10).
+ * `replacements` and `pendingReplacement` (1.10), `loyaltyActivatedThisTurn` (1.11).
  */
 export interface GameState {
   /** Bumped by every update; the memoisation key for derived characteristics. */
@@ -87,6 +87,11 @@ export interface GameState {
   readonly delayedTriggers: readonly DelayedTrigger[];
   /** `source:abilityId` for each once-each-turn ability that has already fired. */
   readonly triggersFiredThisTurn: readonly string[];
+  /**
+   * Planeswalkers that have already had a loyalty ability activated this turn. At most
+   * one per permanent per turn, whoever controlled it at the time (CR 606.3).
+   */
+  readonly loyaltyActivatedThisTurn: readonly ObjectId[];
   /** Continuous effects currently in force (CR 613). */
   readonly effects: readonly ContinuousEffect[];
   /** Replacement and prevention effects currently in force (CR 614-616). */
@@ -183,6 +188,7 @@ export const createGameState = (options: CreateGameStateOptions): GameState => {
     pendingTriggers: [],
     delayedTriggers: [],
     triggersFiredThisTurn: [],
+    loyaltyActivatedThisTurn: [],
     effects: [],
     replacements: [],
     nextEffectId: 1,

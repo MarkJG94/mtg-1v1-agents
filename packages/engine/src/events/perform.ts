@@ -1,4 +1,5 @@
 import { kindOfZone, type ObjectId, type PlayerId, playerZone } from '@mtg/shared';
+import { counterCount, isCreature, isPlaneswalker } from '../characteristics.js';
 import {
   type EventBatch,
   resolveReplacements,
@@ -6,7 +7,7 @@ import {
   UnknownReplacementError,
 } from '../replacement.js';
 import type { GameState } from '../state/game-state.js';
-import { withCounters } from '../state/object.js';
+import { type GameObject, withCounters } from '../state/object.js';
 import {
   getObject,
   moveObject,
@@ -103,13 +104,19 @@ const lifelinkGains = (damage: readonly DamageEvent[]): readonly LifeEvent[] => 
   return [...byPlayer].map(([player, amount]) => ({ kind: 'gainLife', player, amount }) as const);
 };
 
-/** All the damage in one batch, marked and deducted together (CR 510.2). */
+/**
+ * All the damage in one batch, marked and deducted together (CR 510.2).
+ *
+ * What damage *does* depends on what it hits (CR 120.3). A player loses that much life; a
+ * creature has it marked until cleanup; a planeswalker has that many loyalty counters
+ * removed (CR 306.8). A permanent that is both a creature and a planeswalker gets both.
+ */
 const applyDamage = (
   state: GameState,
   emitter: EventEmitter,
   events: readonly DamageEvent[],
 ): GameState => {
-  const damageByObject = new Map<ObjectId, number>();
+  const toObject = new Map<ObjectId, number>();
   const deathtouched = new Set<ObjectId>();
   const lifeLossByPlayer = new Map<PlayerId, number>();
 
@@ -117,7 +124,7 @@ const applyDamage = (
     if (event.amount <= 0) continue;
     if (event.target.kind === 'object') {
       const id = event.target.object;
-      damageByObject.set(id, (damageByObject.get(id) ?? 0) + event.amount);
+      toObject.set(id, (toObject.get(id) ?? 0) + event.amount);
       // Remembered so the state-based action can destroy it even when the damage is not
       // lethal on its own (CR 702.2b).
       if (event.deathtouch) deathtouched.add(id);
@@ -127,21 +134,36 @@ const applyDamage = (
     }
   }
 
+  const hit = [...toObject].filter(([id]) => state.objects.has(id));
+  const loyaltyLost: { id: ObjectId; from: number; to: number }[] = [];
+
   let next = updateObjects(
     state,
-    [...damageByObject]
-      .filter(([id]) => state.objects.has(id))
-      .map(
-        ([id, amount]) =>
-          [
-            id,
-            {
-              damage: getObject(state, id).damage + amount,
-              ...(deathtouched.has(id) ? { deathtouched: true } : {}),
-            },
-          ] as const,
-      ),
+    hit.map(([id, amount]) => {
+      const object = getObject(state, id);
+      let patch: Partial<Omit<GameObject, 'id'>> = {};
+
+      if (isCreature(state, id)) {
+        patch = {
+          damage: object.damage + amount,
+          ...(deathtouched.has(id) ? { deathtouched: true } : {}),
+        };
+      }
+
+      if (isPlaneswalker(state, id)) {
+        const from = counterCount(object, 'loyalty');
+        const to = Math.max(0, from - amount);
+        patch = { ...patch, counters: withCounters(object, 'loyalty', to).counters };
+        loyaltyLost.push({ id, from, to });
+      }
+
+      return [id, patch] as const;
+    }),
   );
+
+  for (const { id, from, to } of loyaltyLost) {
+    emitter.emit(next, { type: 'counterChange', object: id, counter: 'loyalty', from, to });
+  }
 
   for (const event of events) {
     if (event.amount <= 0) continue;

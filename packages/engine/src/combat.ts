@@ -1,6 +1,7 @@
 import { type EventTarget, type ObjectId, opponentOf, type PlayerId } from '@mtg/shared';
 import {
   characteristicsOf,
+  isPlaneswalker,
   keywordsOfObject,
   powerOf,
   remainingToughness,
@@ -84,6 +85,27 @@ export const legalAttackers = (state: GameState): readonly ObjectId[] =>
   });
 
 /**
+ * Who a creature may be declared as attacking (CR 508.1a): the defending player, or any
+ * planeswalker they control. Each attacker chooses independently, so one creature can go
+ * at the player while another goes at a planeswalker.
+ */
+export const legalDefenders = (state: GameState): readonly EventTarget[] => {
+  const defender = defendingPlayer(state);
+  const planeswalkers = objectsIn(state, 'battlefield').filter(
+    (id) => isPlaneswalker(state, id) && getObject(state, id).controller === defender,
+  );
+  return [
+    { kind: 'player', player: defender },
+    ...planeswalkers.map((object) => ({ kind: 'object', object }) as const),
+  ];
+};
+
+const sameTarget = (a: EventTarget, b: EventTarget): boolean =>
+  a.kind === 'player'
+    ? b.kind === 'player' && a.player === b.player
+    : b.kind === 'object' && a.object === b.object;
+
+/**
  * Declare attackers (CR 508.1). Attacking taps each attacker unless it has vigilance
  * (CR 702.20), and attacking is not targeting, so hexproof and shroud do not apply.
  */
@@ -93,14 +115,20 @@ export const declareAttackers = (
   declarations: readonly { readonly attacker: ObjectId; readonly defender: EventTarget }[],
 ): GameState => {
   const legal = new Set(legalAttackers(state));
+  const defenders = legalDefenders(state);
   const seen = new Set<ObjectId>();
 
-  for (const { attacker } of declarations) {
+  for (const { attacker, defender } of declarations) {
     if (!legal.has(attacker)) {
       throw new IllegalCombatError(`object ${attacker} cannot attack`);
     }
     if (seen.has(attacker)) {
       throw new IllegalCombatError(`object ${attacker} was declared as an attacker twice`);
+    }
+    if (!defenders.some((candidate) => sameTarget(candidate, defender))) {
+      throw new IllegalCombatError(
+        `object ${attacker} cannot attack ${describeTarget(defender)}: only the defending player and the planeswalkers they control may be attacked (CR 508.1a)`,
+      );
     }
     seen.add(attacker);
   }
@@ -283,6 +311,9 @@ export const attackersNeedingOrder = (state: GameState): readonly ObjectId[] =>
 
 // --- Damage (CR 510) ---
 
+const onBattlefield = (state: GameState, id: ObjectId): boolean =>
+  state.objects.get(id)?.zone === 'battlefield';
+
 /** Whether this creature deals damage in the given step. */
 const dealsDamageIn = (keywords: Keywords, firstStrikeStep: boolean): boolean => {
   const { firstStrike, doubleStrike } = keywords;
@@ -356,6 +387,12 @@ export const assignCombatDamage = (
 
     // Blockers that are still on the battlefield when damage is dealt.
     const blockers = entry.blockedBy.filter((id) => state.objects.get(id)?.zone === 'battlefield');
+
+    // A planeswalker that has left the battlefield is no longer there to be hit, and its
+    // attacker is not redirected to the player: it simply deals no combat damage.
+    if (entry.defender.kind === 'object' && !onBattlefield(state, entry.defender.object)) {
+      continue;
+    }
 
     if (!entry.blocked) {
       if (power > 0) assignments.push({ ...base, target: entry.defender, amount: power });
@@ -448,3 +485,6 @@ const markFirstStrikeDone = (state: GameState, firstStrikeStep: boolean): GameSt
 /** End of combat (CR 511.3): creatures are removed from combat and the state is cleared. */
 export const endCombat = (state: GameState): GameState =>
   state.combat === null ? state : updateState(state, { combat: null });
+
+const describeTarget = (target: EventTarget): string =>
+  target.kind === 'player' ? `player ${target.player}` : `object ${target.object}`;
