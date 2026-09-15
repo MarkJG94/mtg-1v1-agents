@@ -1,5 +1,6 @@
 import type { EventTarget, ObjectId, PlayerId } from '@mtg/shared';
 import type { BlockDeclaration } from './combat.js';
+import type { RulesEvent } from './events/rules-event.js';
 
 /**
  * Decisions (docs/01 "Engine execution model", docs/02 "Decisions").
@@ -11,7 +12,8 @@ import type { BlockDeclaration } from './combat.js';
  *
  * Only the kinds the engine can currently raise are modelled. The rest listed in docs/02
  * arrive with the subsystems that need them: `chooseTargets` in 1.5, `declareAttackers`
- * and friends in 1.6, `orderTriggers` in 1.8, `mulligan` in 1.12.
+ * and friends in 1.6, `orderTriggers` in 1.8, `chooseReplacement` in 1.10,
+ * `mulligan` in 1.12.
  */
 
 /** What a player may do while holding priority. */
@@ -87,8 +89,23 @@ export interface OrderTriggersDecision {
   readonly triggers: readonly string[];
 }
 
+/**
+ * Which of several applicable replacement effects applies first (CR 616.1). The affected
+ * player chooses — the damaged player, the dying creature's controller — and the rest are
+ * reconsidered afterwards, since the one just applied may have changed what still applies.
+ */
+export interface ChooseReplacementDecision {
+  readonly kind: 'chooseReplacement';
+  readonly player: PlayerId;
+  /** Ids of the replacement effects in force that all apply to `event`. */
+  readonly options: readonly number[];
+  /** What is about to happen, so a driver can weigh the options. */
+  readonly event: RulesEvent;
+}
+
 export type Decision =
   | ChooseOptionDecision
+  | ChooseReplacementDecision
   | OrderTriggersDecision
   | PriorityDecision
   | DiscardDecision
@@ -109,6 +126,7 @@ export type DecisionResponse =
   | { readonly kind: 'declareBlockers'; readonly blocks: readonly BlockDeclaration[] }
   | { readonly kind: 'orderBlockers'; readonly order: readonly ObjectId[] }
   | { readonly kind: 'chooseOption'; readonly chosen: ObjectId }
+  | { readonly kind: 'chooseReplacement'; readonly effect: number }
   | { readonly kind: 'orderTriggers'; readonly order: readonly string[] };
 
 export class UnexpectedDecisionError extends Error {

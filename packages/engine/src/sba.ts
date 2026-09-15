@@ -7,17 +7,11 @@ import {
   remainingToughness,
 } from './characteristics.js';
 import type { EventEmitter } from './events/emitter.js';
+import { runBatch } from './events/perform.js';
+import type { MoveZoneEvent } from './events/rules-event.js';
 import type { GameState } from './state/game-state.js';
 import { withCounters } from './state/object.js';
-import {
-  destroyObject,
-  getObject,
-  moveObject,
-  objectsIn,
-  updateObject,
-  updateState,
-} from './state/update.js';
-import { queueTriggers, triggersFromZoneChange } from './triggers.js';
+import { destroyObject, getObject, objectsIn, updateObject, updateState } from './state/update.js';
 
 /**
  * State-based actions (CR 704).
@@ -215,6 +209,10 @@ export const checkStateBasedActions = (
     }
 
     current = applyActions(current, emitter, actions);
+
+    // A replacement effect on one of the deaths may need a choice (CR 616.1); the batch
+    // is paused and resumes once the player answers, which re-enters this loop.
+    if (current.pendingDecision !== null) return current;
   }
 
   throw new Error(`state-based actions did not settle within ${limit} passes`);
@@ -247,33 +245,40 @@ const applyActions = (
     emitter.emit(next, { type: 'sba', kind: 'equipmentIllegallyAttached', objects: [id] });
   }
 
-  // Everything that dies, dies together.
-  for (const { id, kind } of actions.destroyed) {
-    const object = getObject(next, id);
-    const graveyard = playerZone(object.owner, 'graveyard');
-
-    // Capture what died before it leaves: a dies trigger has to remember the creature as
-    // it last was on the battlefield (CR 603.10).
-    const fired = triggersFromZoneChange(next, id, object, 'dies');
-
-    next = queueTriggers(moveObject(next, id, graveyard), fired);
-    emitter.emit(next, { type: 'sba', kind, objects: [id] });
-    emitter.emit(next, {
-      type: 'moveZone',
-      object: id,
-      from: 'battlefield',
-      to: graveyard,
-      cause: 'stateBasedAction',
-    });
-  }
-
   for (const id of actions.vanishing) {
     next = destroyObject(next, id);
     emitter.emit(next, { type: 'sba', kind: 'tokenNotOnBattlefield', objects: [id] });
   }
 
-  return next;
+  // Everything that dies, dies together — as one batch of proposed events, so that
+  // replacement effects see them all and a regeneration shield can pull one back out.
+  if (actions.destroyed.length === 0) return next;
+
+  const events: MoveZoneEvent[] = [];
+  for (const { id, kind } of actions.destroyed) {
+    const object = getObject(next, id);
+    emitter.emit(next, { type: 'sba', kind, objects: [id] });
+    events.push({
+      kind: 'moveZone',
+      object: id,
+      from: 'battlefield',
+      to: playerZone(object.owner, 'graveyard'),
+      cause: 'stateBasedAction',
+      destruction: isDestruction(kind),
+    });
+  }
+
+  return runBatch(next, emitter, { kind: 'plain' }, events);
 };
+
+/**
+ * Which state-based actions *destroy* a permanent (CR 701.7) rather than merely putting
+ * it somewhere. The distinction is what regeneration hangs on: lethal damage destroys, so
+ * a shield saves the creature, but zero toughness and a planeswalker out of loyalty are
+ * put into the graveyard directly and no shield applies (CR 704.5f, 704.5i).
+ */
+const isDestruction = (kind: SbaKind): boolean =>
+  kind === 'creatureLethalDamage' || kind === 'creatureDeathtouched';
 
 /** Answer the legend rule: keep `keep`, and the rest go to their owners' graveyards. */
 export const applyLegendRule = (
@@ -286,20 +291,19 @@ export const applyLegendRule = (
     throw new Error(`object ${keep} is not one of the legendary permanents in question`);
   }
 
-  let next = state;
   const doomed = options.filter((id) => id !== keep);
-  for (const id of doomed) {
-    const object = getObject(next, id);
-    const graveyard = playerZone(object.owner, 'graveyard');
-    next = moveObject(next, id, graveyard);
-    emitter.emit(next, {
-      type: 'moveZone',
-      object: id,
-      from: 'battlefield',
-      to: graveyard,
-      cause: 'stateBasedAction',
-    });
-  }
-  emitter.emit(next, { type: 'sba', kind: 'legendRule', objects: doomed });
-  return next;
+  emitter.emit(state, { type: 'sba', kind: 'legendRule', objects: doomed });
+
+  // Put into the graveyard rather than destroyed (CR 704.5j), so no shield saves them —
+  // but "if it would be put into a graveyard, exile it instead" still applies.
+  const events: MoveZoneEvent[] = doomed.map((id) => ({
+    kind: 'moveZone',
+    object: id,
+    from: 'battlefield',
+    to: playerZone(getObject(state, id).owner, 'graveyard'),
+    cause: 'stateBasedAction',
+    destruction: false,
+  }));
+
+  return runBatch(state, emitter, { kind: 'plain' }, events);
 };

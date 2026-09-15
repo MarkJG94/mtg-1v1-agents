@@ -29,19 +29,15 @@ import {
   UnexpectedDecisionError,
 } from '../decision.js';
 import type { EventEmitter } from '../events/emitter.js';
+import { resumeBatch, runBatch, runEvent } from '../events/perform.js';
+import type { MoveZoneEvent } from '../events/rules-event.js';
 import { emptyManaPool, isManaPoolEmpty } from '../mana/pool.js';
+import { expireEndOfTurnReplacements } from '../replacement.js';
 import { applyLegendRule, checkStateBasedActions } from '../sba.js';
 import { isStackEmpty, putTriggerOnStack, resolveTopOfStack } from '../stack.js';
 import type { GameState } from '../state/game-state.js';
 import { isGameOver } from '../state/game-state.js';
-import {
-  getObject,
-  moveObject,
-  objectsIn,
-  updateObjects,
-  updatePlayer,
-  updateState,
-} from '../state/update.js';
+import { getObject, objectsIn, updateObjects, updatePlayer, updateState } from '../state/update.js';
 import {
   evaluateCondition,
   fireDelayedTriggers,
@@ -126,58 +122,46 @@ const performDraw = (state: GameState, emitter: EventEmitter): GameState => {
 };
 
 /**
- * Draw one card. A player who tries to draw from an empty library does not lose on the
- * spot: they are flagged and lose the next time state-based actions are checked
- * (CR 120.3, 704.5b), which roadmap 1.7 adds.
+ * Draw one card, as a proposed event so that "if you would draw a card, instead ..."
+ * replacements (CR 614) get their say. A player who tries to draw from an empty library
+ * does not lose on the spot: they are flagged and lose the next time state-based actions
+ * are checked (CR 120.3, 704.5b).
  */
-export const drawCard = (state: GameState, emitter: EventEmitter, player: PlayerId): GameState => {
-  const library = objectsIn(state, playerZone(player, 'library'));
-  const top = library[0];
-  if (top === undefined) {
-    return state.players[player].drewFromEmptyLibrary
-      ? state
-      : updatePlayer(state, player, { drewFromEmptyLibrary: true });
-  }
-
-  const drawn = moveObject(state, top, playerZone(player, 'hand'));
-  emitter.emit(drawn, { type: 'draw', player, object: top });
-  return drawn;
-};
+export const drawCard = (state: GameState, emitter: EventEmitter, player: PlayerId): GameState =>
+  runEvent(state, emitter, { kind: 'draw', player });
 
 /**
  * Cleanup step (CR 514). The active player discards down to their maximum hand size, and
  * simultaneously all damage is removed from permanents and "until end of turn" effects
- * end. Those effects arrive with the layer system in roadmap 1.9.
+ * end — continuous ones and any unused regeneration shield alike.
  */
-const performCleanup = (state: GameState, emitter: EventEmitter): GameState => {
+const performCleanup = (state: GameState): GameState => {
   const player = state.activePlayer;
-  const excess = objectsIn(state, playerZone(player, 'hand')).length - state.config.maxHandSize;
+  const hand = objectsIn(state, playerZone(player, 'hand'));
+  const excess = hand.length - state.config.maxHandSize;
 
-  // Discarding is a real choice, so the engine stops and asks. `applyDecision` calls
-  // `finishCleanup` once the player has answered.
-  if (excess > 0) {
-    return updateState(state, {
-      pendingDecision: {
-        kind: 'discard',
-        player,
-        count: excess,
-        from: objectsIn(state, playerZone(player, 'hand')),
-      },
-    });
-  }
+  // Discarding, removing damage and ending "until end of turn" effects all happen at once
+  // (CR 514.2), so the order here is free. Tidying first means nothing is left to do after
+  // the discard, which matters because a replacement effect can pause the discard batch.
+  const tidied = finishCleanup(state);
 
-  return finishCleanup(state, emitter);
+  // Discarding is a real choice, so the engine stops and asks.
+  if (excess <= 0) return tidied;
+
+  return updateState(tidied, {
+    pendingDecision: { kind: 'discard', player, count: excess, from: hand },
+  });
 };
 
-/** The rest of cleanup, once any discard has happened: all damage is removed (CR 514.2). */
-const finishCleanup = (state: GameState, _emitter: EventEmitter): GameState => {
+/** All damage is removed and "until end of turn" effects end (CR 514.2). */
+const finishCleanup = (state: GameState): GameState => {
   const patches = objectsIn(state, 'battlefield')
     .map((id) => [id, getObject(state, id)] as const)
     .filter(([, object]) => object.damage !== 0 || object.deathtouched)
     .map(([id]) => [id, { damage: 0, deathtouched: false }] as const);
 
-  // "Until end of turn" effects end here too (CR 514.2).
-  return expireEndOfTurnEffects(updateObjects(state, patches));
+  // Regeneration shields last only for the turn that made them (CR 701.15b).
+  return expireEndOfTurnReplacements(expireEndOfTurnEffects(updateObjects(state, patches)));
 };
 
 const applyDiscard = (
@@ -197,22 +181,22 @@ const applyDiscard = (
   const graveyard = playerZone(player, 'graveyard');
   const allowed = new Set(decision.from);
 
-  let next = state;
+  const events: MoveZoneEvent[] = [];
   for (const id of chosen) {
     if (!allowed.has(id)) {
       throw new UnexpectedDecisionError(`card ${id} is not in ${player}'s hand`);
     }
     allowed.delete(id);
-    next = moveObject(next, id, graveyard);
-    emitter.emit(next, {
-      type: 'moveZone',
+    events.push({
+      kind: 'moveZone',
       object: id,
       from: hand,
       to: graveyard,
       cause: 'discard',
+      destruction: false,
     });
   }
-  return finishCleanup(next, emitter);
+  return runBatch(state, emitter, { kind: 'plain' }, events);
 };
 
 /**
@@ -287,7 +271,7 @@ const performTurnBasedActions = (state: GameState, emitter: EventEmitter): GameS
     case 'endCombat':
       return endCombat(state);
     case 'cleanup':
-      return performCleanup(state, emitter);
+      return performCleanup(state);
     default:
       return state;
   }
@@ -511,6 +495,8 @@ export const applyDecision = (
     next = applyLegendRule(cleared, emitter, decision.options, response.chosen);
   } else if (decision.kind === 'orderBlockers' && response.kind === 'orderBlockers') {
     next = askForBlockerOrder(orderBlockers(cleared, decision.attacker, response.order));
+  } else if (decision.kind === 'chooseReplacement' && response.kind === 'chooseReplacement') {
+    next = resumeBatch(cleared, emitter, response.effect);
   } else {
     next = applyPriority(cleared, emitter, decision as Extract<Decision, { kind: 'priority' }>);
   }
@@ -538,9 +524,16 @@ const applyPriority = (
     return leaveStep(updateState(state, { passesInARow: 0, priority: null }), emitter);
   }
 
-  const resolved = resolveTopOfStack(updateState(state, { passesInARow: 0 }), emitter);
-  // The active player receives priority after something resolves (CR 117.3b).
-  return grantPriority(resolved, resolved.activePlayer);
+  // The active player receives priority after something resolves (CR 117.3b). Set that
+  // before resolving, so that a resolution paused by a replacement choice resumes with
+  // priority in the right place rather than back with whoever passed.
+  const resolved = resolveTopOfStack(
+    updateState(state, { passesInARow: 0, priority: state.activePlayer }),
+    emitter,
+  );
+  return resolved.pendingDecision === null
+    ? grantPriority(resolved, resolved.activePlayer)
+    : resolved;
 };
 
 /** Put one player's queued triggers on the stack in the order they chose. */
@@ -626,6 +619,11 @@ const defaultAnswer = (decision: Decision, options: AutoPlayOptions): DecisionRe
       const [first] = decision.options;
       if (first === undefined) throw new Error('a chooseOption decision offered nothing');
       return { kind: 'chooseOption', chosen: first };
+    }
+    case 'chooseReplacement': {
+      const [first] = decision.options;
+      if (first === undefined) throw new Error('a chooseReplacement decision offered nothing');
+      return { kind: 'chooseReplacement', effect: first };
     }
     default:
       return { kind: 'priority', action: { kind: 'pass' } };

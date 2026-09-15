@@ -11,6 +11,7 @@ import type { CombatState } from '../combat.js';
 import type { Decision } from '../decision.js';
 import type { ContinuousEffect } from '../layers.js';
 import { emptyManaPool, type ManaPool } from '../mana/pool.js';
+import type { ReplacementEffect, ReplacementProgress } from '../replacement.js';
 import type { RngState } from '../rng.js';
 import { type Keywords, noKeywords } from '../targeting.js';
 import type { DelayedTrigger, TriggerInstance } from '../triggers.js';
@@ -50,7 +51,8 @@ export interface PlayerState {
  * rather than a second parallel array.
  *
  * Fields that later phases add: `pendingDecision` (1.4), `combat` (1.6),
- * `pendingTriggers` and `delayedTriggers` (1.8), `effects` (1.9).
+ * `pendingTriggers` and `delayedTriggers` (1.8), `effects` (1.9),
+ * `replacements` and `pendingReplacement` (1.10).
  */
 export interface GameState {
   /** Bumped by every update; the memoisation key for derived characteristics. */
@@ -87,8 +89,16 @@ export interface GameState {
   readonly triggersFiredThisTurn: readonly string[];
   /** Continuous effects currently in force (CR 613). */
   readonly effects: readonly ContinuousEffect[];
-  /** Next id and timestamp for a new continuous effect. */
+  /** Replacement and prevention effects currently in force (CR 614-616). */
+  readonly replacements: readonly ReplacementEffect[];
+  /** Next id for a continuous or replacement effect; shared so log ids never clash. */
   readonly nextEffectId: number;
+  /**
+   * A batch of events stopped part-way because a player must choose which of several
+   * applicable replacement effects applies first (CR 616.1). Plain data, so a replay
+   * reproduces the pause exactly.
+   */
+  readonly pendingReplacement: ReplacementProgress | null;
   /**
    * Players owed an extra turn (CR 500.7), oldest first. The next turn goes to the
    * front of this queue if it has one, otherwise to the other player.
@@ -174,7 +184,9 @@ export const createGameState = (options: CreateGameStateOptions): GameState => {
     delayedTriggers: [],
     triggersFiredThisTurn: [],
     effects: [],
+    replacements: [],
     nextEffectId: 1,
+    pendingReplacement: null,
     result: null,
   };
 };

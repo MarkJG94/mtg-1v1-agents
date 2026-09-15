@@ -6,8 +6,10 @@ import {
   remainingToughness,
 } from './characteristics.js';
 import type { EventEmitter } from './events/emitter.js';
+import { runBatch } from './events/perform.js';
+import type { DamageEvent } from './events/rules-event.js';
 import type { GameState } from './state/game-state.js';
-import { getObject, objectsIn, updateObjects, updatePlayer, updateState } from './state/update.js';
+import { getObject, objectsIn, updateObjects, updateState } from './state/update.js';
 import type { Keywords } from './targeting.js';
 import { queueTriggers, triggersFromAttack, triggersFromBlock } from './triggers.js';
 
@@ -405,8 +407,15 @@ export const assignCombatDamage = (
 };
 
 /**
- * Deal one step's combat damage, all at once (CR 510.2). Creatures are only marked here;
- * dying is a state-based action, which roadmap 1.7 adds.
+ * Deal one step's combat damage, all at once (CR 510.2).
+ *
+ * Every point is proposed as a damage event and run past the replacement and prevention
+ * effects in force (CR 614-615) before any of it lands: a prevention shield can absorb
+ * some of it, a redirection can send it somewhere else, and a creature can be left taking
+ * nothing at all. Creatures are only *marked* here; dying is a state-based action.
+ *
+ * The batch stops and waits if the damaged player has to choose between two applicable
+ * replacements, which is why this can return a state with a pending decision.
  */
 export const dealCombatDamage = (
   state: GameState,
@@ -417,70 +426,18 @@ export const dealCombatDamage = (
   emitter.emit(state, { type: 'combatDamage', firstStrike: firstStrikeStep });
   if (assignments.length === 0) return markFirstStrikeDone(state, firstStrikeStep);
 
-  // Accumulate first, apply once: simultaneity is what makes creatures trade.
-  const damageByObject = new Map<ObjectId, number>();
-  const deathtouchedObjects = new Set<ObjectId>();
-  const lifeByPlayer = new Map<PlayerId, number>();
-  const lifeGain = new Map<PlayerId, number>();
+  const events: readonly DamageEvent[] = assignments.map((assignment) => ({
+    kind: 'damage',
+    source: assignment.source,
+    controller: assignment.controller,
+    target: assignment.target,
+    amount: assignment.amount,
+    combat: true,
+    deathtouch: assignment.deathtouch,
+    lifelink: assignment.lifelink,
+  }));
 
-  for (const assignment of assignments) {
-    if (assignment.target.kind === 'object') {
-      const id = assignment.target.object;
-      damageByObject.set(id, (damageByObject.get(id) ?? 0) + assignment.amount);
-      // Remembered so the state-based action can destroy it even if the damage is not
-      // lethal on its own (CR 702.2b).
-      if (assignment.deathtouch && assignment.amount > 0) deathtouchedObjects.add(id);
-    } else {
-      const player = assignment.target.player;
-      lifeByPlayer.set(player, (lifeByPlayer.get(player) ?? 0) + assignment.amount);
-    }
-    if (assignment.lifelink) {
-      lifeGain.set(
-        assignment.controller,
-        (lifeGain.get(assignment.controller) ?? 0) + assignment.amount,
-      );
-    }
-  }
-
-  let next = updateObjects(
-    state,
-    [...damageByObject].map(
-      ([id, amount]) =>
-        [
-          id,
-          {
-            damage: getObject(state, id).damage + amount,
-            ...(deathtouchedObjects.has(id) ? { deathtouched: true } : {}),
-          },
-        ] as const,
-    ),
-  );
-
-  for (const assignment of assignments) {
-    emitter.emit(next, {
-      type: 'damage',
-      source: assignment.source,
-      target: assignment.target,
-      amount: assignment.amount,
-      combat: true,
-      ...(assignment.deathtouch ? { deathtouch: true } : {}),
-    });
-  }
-
-  for (const [player, amount] of lifeByPlayer) {
-    const from = next.players[player].life;
-    next = updatePlayer(next, player, { life: from - amount });
-    emitter.emit(next, { type: 'lifeChange', player, from, to: from - amount, reason: 'combat' });
-  }
-
-  // Lifelink is not a trigger: the life is gained as the damage is dealt (CR 702.15a).
-  for (const [player, amount] of lifeGain) {
-    const from = next.players[player].life;
-    next = updatePlayer(next, player, { life: from + amount });
-    emitter.emit(next, { type: 'lifeChange', player, from, to: from + amount, reason: 'lifelink' });
-  }
-
-  return markFirstStrikeDone(next, firstStrikeStep);
+  return runBatch(state, emitter, { kind: 'combatDamage', firstStrike: firstStrikeStep }, events);
 };
 
 const markFirstStrikeDone = (state: GameState, firstStrikeStep: boolean): GameState =>

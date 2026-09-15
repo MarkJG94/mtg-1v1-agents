@@ -42,7 +42,9 @@ interface GameState {
   config: GameConfig;                       // turnCap, maxHandSize, playerOnPlay
   extraTurns: PlayerId[];                   // owed extra turns, oldest first (CR 500.7)
   effects: ContinuousEffect[];              // active continuous effects with timestamps
-  nextEffectId: number;
+  replacements: ReplacementEffect[];        // replacement and prevention effects (CR 614-616)
+  nextEffectId: number;                     // shared by both, so log ids never clash
+  pendingReplacement: ReplacementProgress | null;   // a batch paused for a CR 616.1 choice
   delayedTriggers: DelayedTrigger[];        // set up to fire at a later step (CR 603.7)
   pendingTriggers: TriggerInstance[];       // fired, waiting to go on the stack
   triggersFiredThisTurn: string[];          // for once-each-turn abilities
@@ -81,7 +83,15 @@ Control-changing effects trigger zone-independent controller updates; the copy l
 
 ## Replacement and prevention effects
 
-Events are constructed as data (`{ type: 'damage', source, target, amount, combat: true }`, `{ type: 'moveZone', object, from, to }`, `{ type: 'draw', player }` …) and pass through `applyReplacements(state, event)` before execution. Applicable replacements are collected; if more than one applies, the affected player/controller chooses (a `chooseReplacement` decision, which the AI answers with a heuristic and fuzzers randomly). Self-replacement effects apply first (CR 616.1a). A replacement effect never applies twice to the same event.
+Nothing in the engine deals damage, draws a card or moves a permanent directly. It builds a `RulesEvent` — `{ kind: 'damage', source, target, amount, combat }`, `{ kind: 'moveZone', object, from, to, destruction }`, `{ kind: 'draw', player }`, `{ kind: 'entersBattlefield', object, tapped, counters }`, life, counters — and hands a list of them to `runBatch`, which runs each past every applicable replacement effect before any of it happens. What survives is applied by `performEvents`. These are not the `GameEvent`s of the log: those are the record written afterwards, of what the replacements left.
+
+Applicable effects are collected; self-replacement applies first (CR 616.1a), an effect never applies twice to the same event (CR 614.5), and when more than one still applies the affected player chooses — a `chooseReplacement` decision, which the AI answers with a heuristic and fuzzers randomly. The order is not cosmetic: prevent 2 and then double leaves 2 damage where doubling and then preventing 2 leaves 4.
+
+Because that choice is a decision, a batch can stop half-way. The work in progress — events already resolved, events still queued, effect ids already applied to the current one — is written to `state.pendingReplacement` and picked back up by `resumeBatch`. What to do once the batch finishes is a closed union (`{ kind: 'plain' }`, `{ kind: 'combatDamage', firstStrike }`) rather than a callback, so a paused batch is plain data that replays and clones like the rest of the state. See ADR 0004.
+
+Prevention effects (CR 615) are replacement effects, not a separate system: a shield replaces some or all of a damage event with nothing and shrinks by what it absorbed (CR 615.7). Regeneration (CR 701.15) is a one-use shield over *destruction* specifically, which is why a `moveZone` event records whether it is destruction — a creature with zero toughness is put into its graveyard rather than destroyed (CR 704.5f), and no shield saves it.
+
+A state-based action logs the `sba` event that applied even when a replacement then changes the result, so a regenerated creature shows `creatureLethalDamage` with no `moveZone` after it. That is the faithful record: the rule applied and was replaced.
 
 ## Combat
 

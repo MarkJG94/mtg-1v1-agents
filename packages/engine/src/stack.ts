@@ -9,6 +9,7 @@ import {
 } from '@mtg/shared';
 import { priorityDecision } from './decision.js';
 import type { EventEmitter } from './events/emitter.js';
+import { runEvent } from './events/perform.js';
 import type { GameState } from './state/game-state.js';
 import {
   createObject,
@@ -20,7 +21,6 @@ import {
   updateState,
 } from './state/update.js';
 import { canBeTargeted, type TargetSource } from './targeting.js';
-import { queueTriggers, triggersFromZoneChange } from './triggers.js';
 
 /**
  * The stack (CR 405).
@@ -172,6 +172,12 @@ export const hasFizzled = (state: GameState, id: ObjectId): boolean => {
  * A spell all of whose targets have become illegal does not resolve at all: it is
  * countered by the rules (CR 608.2b), which players call fizzling.
  *
+ * Leaving the stack is a proposed event like any other, so replacement effects get their
+ * say: a permanent's own "this enters tapped" (CR 614.1c) applies here, as does a
+ * graveyard replacement on an instant that has finished resolving. Because such an effect
+ * can need a choice, this may return a state waiting on a decision, with the object still
+ * on the stack until the batch finishes.
+ *
  * What a spell *does* on resolution is its card script, so that arrives with definitions
  * in roadmap 2.1.
  */
@@ -192,24 +198,26 @@ export const resolveTopOfStack = (state: GameState, emitter: EventEmitter): Game
   const destination = object.stack?.resolvesTo ?? playerZone(object.owner, 'graveyard');
 
   emitter.emit(state, { type: 'resolve', object: id });
-  const resolved = updateObject(moveObject(state, id, destination), id, { stack: undefined });
-  emitter.emit(resolved, {
-    type: 'moveZone',
+  const cleared = updateObject(state, id, { stack: undefined });
+
+  if (destination === 'battlefield') {
+    return runEvent(cleared, emitter, {
+      kind: 'entersBattlefield',
+      object: id,
+      from: 'stack',
+      tapped: false,
+      counters: {},
+    });
+  }
+
+  return runEvent(cleared, emitter, {
+    kind: 'moveZone',
     object: id,
     from: 'stack',
     to: destination,
     cause: 'resolve',
+    destruction: false,
   });
-
-  if (destination !== 'battlefield') return resolved;
-
-  // A permanent entering the battlefield has summoning sickness until its controller's
-  // next turn begins (CR 302.6), and its arrival is something abilities can trigger on.
-  const entered = updateObject(resolved, id, { summoningSick: true });
-  return queueTriggers(
-    entered,
-    triggersFromZoneChange(entered, id, getObject(entered, id), 'enters'),
-  );
 };
 
 /**
@@ -225,15 +233,14 @@ const fizzle = (state: GameState, emitter: EventEmitter, id: ObjectId): GameStat
     object: id,
     reason: 'every target is now illegal',
   });
-  const fizzled = updateObject(moveObject(state, id, graveyard), id, { stack: undefined });
-  emitter.emit(fizzled, {
-    type: 'moveZone',
+  return runEvent(updateObject(state, id, { stack: undefined }), emitter, {
+    kind: 'moveZone',
     object: id,
     from: 'stack',
     to: graveyard,
     cause: 'effect',
+    destruction: false,
   });
-  return fizzled;
 };
 
 /**
@@ -252,16 +259,16 @@ export const counterObject = (
   }
 
   const graveyard = playerZone(object.owner, 'graveyard');
-  const countered = updateObject(moveObject(state, id, graveyard), id, { stack: undefined });
-  emitter.emit(countered, { type: 'counter', object: id, by });
-  emitter.emit(countered, {
-    type: 'moveZone',
+  const cleared = updateObject(state, id, { stack: undefined });
+  emitter.emit(cleared, { type: 'counter', object: id, by });
+  return runEvent(cleared, emitter, {
+    kind: 'moveZone',
     object: id,
     from: 'stack',
     to: graveyard,
     cause: 'effect',
+    destruction: false,
   });
-  return countered;
 };
 
 /**
