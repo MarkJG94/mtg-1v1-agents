@@ -8,6 +8,7 @@ import {
   skipsPriority,
   steps,
 } from '@mtg/shared';
+import { resolveTop } from '../cards/resolve.js';
 import { expireEndOfTurnEffects } from '../characteristics.js';
 import {
   attackersNeedingOrder,
@@ -38,7 +39,7 @@ import { emptyManaPool, isManaPoolEmpty } from '../mana/pool.js';
 import { expireEndOfTurnReplacements } from '../replacement.js';
 import { applyLegendRule, checkStateBasedActions } from '../sba.js';
 import { applyBottomCards, applyMulligan } from '../setup.js';
-import { isStackEmpty, putTriggerOnStack, resolveTopOfStack } from '../stack.js';
+import { isStackEmpty, putTriggerOnStack } from '../stack.js';
 import type { GameState } from '../state/game-state.js';
 import { isGameOver } from '../state/game-state.js';
 import { getObject, objectsIn, updateObjects, updatePlayer, updateState } from '../state/update.js';
@@ -574,13 +575,15 @@ const applyPriority = (
   // The active player receives priority after something resolves (CR 117.3b). Set that
   // before resolving, so that a resolution paused by a replacement choice resumes with
   // priority in the right place rather than back with whoever passed.
-  const resolved = resolveTopOfStack(
+  const resolved = resolveTop(
     updateState(state, { passesInARow: 0, priority: state.activePlayer }),
     emitter,
   );
-  return resolved.pendingDecision === null
-    ? grantPriority(resolved, resolved.activePlayer)
-    : resolved;
+  // CR 117.5: before anyone actually receives priority, state-based actions are checked
+  // and anything that has triggered goes on the stack. `advanceToDecision` is the one
+  // place that does all of it in order, so resolution hands back to it rather than
+  // granting priority itself and leaving a trigger waiting a whole round.
+  return resolved.pendingDecision === null ? advanceToDecision(resolved, emitter) : resolved;
 };
 
 /** Put one player's queued triggers on the stack in the order they chose. */

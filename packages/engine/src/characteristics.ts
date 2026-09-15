@@ -1,4 +1,5 @@
 import type { ObjectId, PlayerId } from '@mtg/shared';
+import { staticEffects } from './cards/statics.js';
 import {
   type Characteristics,
   type ContinuousEffect,
@@ -30,9 +31,15 @@ const cache = new WeakMap<GameState, Map<ObjectId, Characteristics>>();
 export const counterCount = (object: GameObject, kind: string): number =>
   object.counters[kind] ?? 0;
 
-/** Effects that are currently doing anything, ignoring those whose source has gone. */
+/**
+ * Effects that are currently doing anything, ignoring those whose source has gone.
+ *
+ * Two sources: effects the game registered — a pump spell's, a counter's — and the ones
+ * the static abilities of permanents in play are making right now, which are derived
+ * rather than stored (see `cards/statics.ts`).
+ */
 export const activeEffects = (state: GameState): readonly ContinuousEffect[] =>
-  state.effects.filter((effect) => {
+  [...state.effects, ...staticEffects(state)].filter((effect) => {
     if (effect.duration.kind !== 'whileSourceOnBattlefield') return true;
     return state.objects.get(effect.source)?.zone === 'battlefield';
   });

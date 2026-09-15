@@ -8,6 +8,7 @@ import {
   playerIds,
   type ZoneId,
 } from '@mtg/shared';
+import type { CardAbility, CardDefinition } from '../cards/definition.js';
 import type { LoyaltyAbility } from '../planeswalker.js';
 import { type Keywords, noKeywords } from '../targeting.js';
 import type { TriggeredAbility } from '../triggers.js';
@@ -116,12 +117,57 @@ export interface NewObjectSpec {
   readonly position?: ZonePosition;
 }
 
+/**
+ * What an object gets from its card rather than from the caller (ADR 0006).
+ *
+ * The printed characteristics and the abilities an object carries are the card's, so a
+ * game that has the definition need not be told them twice. Anything the spec states
+ * still wins, which is how a token — a card that was never printed — and the scenario
+ * builder's made-up permanents work.
+ */
+const printedFrom = (
+  definition: CardDefinition | undefined,
+): Partial<NewObjectSpec> & { readonly attachment?: 'aura' | 'equipment' } => {
+  if (!definition) return {};
+
+  const triggers = definition.abilities.filter(
+    (ability): ability is Extract<CardAbility, { kind: 'triggered' }> =>
+      ability.kind === 'triggered',
+  );
+  const loyaltyAbilities = definition.abilities.filter(
+    (ability): ability is Extract<CardAbility, { kind: 'loyalty' }> => ability.kind === 'loyalty',
+  );
+  const subtypes = definition.subtypes ?? [];
+
+  return {
+    name: definition.name,
+    legendary: definition.supertypes?.includes('legendary') ?? false,
+    colours: definition.colours,
+    ...(definition.keywords !== undefined ? { keywords: definition.keywords } : {}),
+    ...(definition.power !== undefined ? { power: definition.power } : {}),
+    ...(definition.toughness !== undefined ? { toughness: definition.toughness } : {}),
+    ...(definition.loyalty !== undefined ? { loyalty: definition.loyalty } : {}),
+    ...(subtypes.includes('aura') ? { attachment: 'aura' as const } : {}),
+    ...(subtypes.includes('equipment') ? { attachment: 'equipment' as const } : {}),
+    triggers: triggers.map((ability) => ({
+      id: ability.id,
+      when: ability.when,
+      ...(ability.interveningIf !== undefined ? { interveningIf: ability.interveningIf } : {}),
+      ...(ability.onceEachTurn !== undefined ? { onceEachTurn: ability.onceEachTurn } : {}),
+    })),
+    loyaltyAbilities: loyaltyAbilities.map((ability) => ({ id: ability.id, cost: ability.cost })),
+  };
+};
+
 /** Create an object, assigning it the next id and timestamp, and put it in its zone. */
 export const createObject = (
   state: GameState,
   spec: NewObjectSpec,
 ): { readonly state: GameState; readonly object: GameObject } => {
   const id = asObjectId(state.nextObjectId);
+  // A token was never printed, so nothing about it comes from a card: it borrows its
+  // maker's oracle id as a label only, and every characteristic is stated in the spec.
+  const printed = spec.token === true ? {} : printedFrom(state.definitions.get(spec.definitionId));
   const object: GameObject = {
     id,
     definitionId: spec.definitionId,
@@ -136,17 +182,17 @@ export const createObject = (
     attachments: [],
     chosen: {},
     token: spec.token ?? false,
-    keywords: spec.keywords ?? noKeywords,
-    power: spec.power ?? null,
-    toughness: spec.toughness ?? null,
-    loyalty: spec.loyalty ?? null,
-    name: spec.name ?? null,
-    legendary: spec.legendary ?? false,
-    colours: spec.colours ?? [],
-    attachment: spec.attachment ?? null,
+    keywords: spec.keywords ?? printed.keywords ?? noKeywords,
+    power: spec.power ?? printed.power ?? null,
+    toughness: spec.toughness ?? printed.toughness ?? null,
+    loyalty: spec.loyalty ?? printed.loyalty ?? null,
+    name: spec.name ?? printed.name ?? null,
+    legendary: spec.legendary ?? printed.legendary ?? false,
+    colours: spec.colours ?? printed.colours ?? [],
+    attachment: spec.attachment ?? printed.attachment ?? null,
     deathtouched: false,
-    triggers: spec.triggers ?? [],
-    loyaltyAbilities: spec.loyaltyAbilities ?? [],
+    triggers: spec.triggers ?? printed.triggers ?? [],
+    loyaltyAbilities: spec.loyaltyAbilities ?? printed.loyaltyAbilities ?? [],
     summoningSick: false,
   };
 

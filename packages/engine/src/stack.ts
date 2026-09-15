@@ -52,6 +52,14 @@ export interface StackProperties {
   readonly isAbility?: boolean;
   /** Which ability of its source this is, for the card script that supplies behaviour. */
   readonly abilityId?: string;
+  /**
+   * The permanent an ability came from. An ability on the stack is its own object, but
+   * what it does is written about its source — "deals damage equal to its power" — so
+   * resolution needs the way back (CR 113.7a).
+   */
+  readonly source?: ObjectId;
+  /** The value chosen for {X} as this was cast (CR 601.2b). */
+  readonly x?: number;
 }
 
 /** The object on top of the stack, or undefined when the stack is empty. */
@@ -81,6 +89,8 @@ export interface PutOnStackOptions {
   /** Chosen targets; each is checked for legality as the spell is cast (CR 601.2c). */
   readonly targets?: readonly EventTarget[];
   readonly colours?: readonly Colour[];
+  /** The value chosen for {X} (CR 601.2b). */
+  readonly x?: number;
 }
 
 /**
@@ -132,6 +142,7 @@ export const putOnStack = (
     splitSecond: options.splitSecond ?? false,
     targets,
     colours,
+    ...(options.x !== undefined ? { x: options.x } : {}),
   };
 
   const moved = updateObject(moveObject(state, id, 'stack'), id, { stack: stackProperties });
@@ -280,6 +291,8 @@ export interface AbilityOnStack {
   readonly source: ObjectId;
   readonly controller: PlayerId;
   readonly definitionId: OracleId;
+  /** Targets chosen as the ability was put on the stack (CR 601.2c, via 602.2b). */
+  readonly targets?: readonly EventTarget[];
 }
 
 /**
@@ -302,10 +315,11 @@ const createAbilityOnStack = (
       stack: {
         resolvesTo: 'exile',
         splitSecond: false,
-        targets: [],
+        targets: ability.targets ?? [],
         colours: [],
         isAbility: true,
         abilityId: ability.abilityId,
+        source: ability.source,
       },
     }),
     id: created.object.id,

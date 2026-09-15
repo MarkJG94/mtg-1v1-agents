@@ -2,13 +2,15 @@ import {
   asOracleId,
   type EventTarget,
   type ObjectId,
+  type OracleId,
   type PlayerId,
   playerIds,
   playerZone,
   type Step,
   type ZoneId,
 } from '@mtg/shared';
-import { addEffect } from '../characteristics.js';
+import { activateAbility, type CastOptions, castSpell } from '../cards/cast.js';
+import { addEffect, characteristicsOf } from '../characteristics.js';
 import type { BlockDeclaration } from '../combat.js';
 import type { DecisionResponse } from '../decision.js';
 import { createEventEmitter, type EventEmitter } from '../events/emitter.js';
@@ -22,7 +24,7 @@ import {
   createGameState,
   type GameState,
 } from '../state/game-state.js';
-import { createObject, getObject, objectsIn, updateObject } from '../state/update.js';
+import { createObject, getObject, moveObject, objectsIn, updateObject } from '../state/update.js';
 import { type Keywords, keywords } from '../targeting.js';
 import type { TriggeredAbility } from '../triggers.js';
 import { applyDecision, startGame } from '../turn/turn.js';
@@ -46,6 +48,11 @@ import { applyDecision, startGame } from '../turn/turn.js';
  */
 
 export interface PermanentSpec {
+  /**
+   * The card this is a copy of. With a definition in the game, everything the spec does
+   * not state — name, power, toughness, keywords, triggers — comes from the card.
+   */
+  readonly definitionId?: OracleId;
   /** A label for readability and for `ref()`; also what the legend rule compares. */
   readonly name?: string;
   readonly power?: number;
@@ -196,10 +203,51 @@ export class Scenario {
     throw new ScenarioError(`did not reach ${step} within ${limit} decisions`);
   }
 
-  /** Put a card from the current player's hand on the stack, by label. */
-  cast(name: string, options: Parameters<typeof putOnStack>[4] = {}): this {
+  /**
+   * Cast a card from the current player's hand, by label: timing, targets and paying for
+   * it, the way a driver would (CR 601). Mana comes from the pool, and sources are tapped
+   * to cover the rest.
+   */
+  cast(name: string, options: CastOptions = {}): this {
+    this.state = castSpell(this.state, this.emitter, this.current, this.ref(name), options);
+    return this;
+  }
+
+  /**
+   * Put a card on the stack without paying for it or checking whether the card allows it.
+   * For tests about the stack itself rather than about a card.
+   */
+  putOnStack(name: string, options: Parameters<typeof putOnStack>[4] = {}): this {
     this.state = putOnStack(this.state, this.emitter, this.current, this.ref(name), options);
     return this;
+  }
+
+  /** Activate an ability of a permanent, by label and ability id. */
+  activate(name: string, ability: string, options: CastOptions = {}): this {
+    this.state = activateAbility(
+      this.state,
+      this.emitter,
+      this.current,
+      this.ref(name),
+      ability,
+      options,
+    );
+    return this;
+  }
+
+  /**
+   * Pass until the stack is empty and nothing is waiting to go on it. Triggers that fire
+   * as something resolves go on the stack at the next priority (CR 603.3b), so "the stack
+   * is empty" alone would stop one step early.
+   */
+  resolve(limit = 50): this {
+    for (let i = 0; i < limit; i += 1) {
+      const settled =
+        this.state.zones.stack.length === 0 && this.state.pendingTriggers.length === 0;
+      if (settled || this.state.result !== null) return this;
+      this.pass();
+    }
+    throw new ScenarioError(`the stack did not empty within ${limit} decisions`);
   }
 
   attack(
@@ -237,6 +285,21 @@ export class Scenario {
     return this.object(name).zone;
   }
 
+  /** Power as the game sees it now, with counters and effects applied. */
+  power(name: string): number | null {
+    return characteristicsOf(this.state, this.ref(name)).power;
+  }
+
+  toughness(name: string): number | null {
+    return characteristicsOf(this.state, this.ref(name)).toughness;
+  }
+
+  /** Move a permanent out of play, for testing what stops applying when it goes. */
+  exile(name: string): this {
+    this.state = moveObject(this.state, this.ref(name), 'exile');
+    return this;
+  }
+
   lifeOf(player: PlayerId): number {
     return this.state.players[player].life;
   }
@@ -255,11 +318,14 @@ export class Scenario {
 
   private put(spec: PermanentSpec, zone: ZoneId): ObjectId {
     const created = createObject(this.state, {
-      definitionId: definition,
+      definitionId: spec.definitionId ?? definition,
       owner: this.current,
       zone,
-      keywords: keywords(spec.keywords ?? {}),
-      ...(spec.name !== undefined ? { name: spec.name } : {}),
+      // Only override the card's own keywords when the spec actually states some.
+      ...(spec.keywords !== undefined ? { keywords: keywords(spec.keywords) } : {}),
+      // `name` is a label for the test. A card's own name wins over it, so a scenario can
+      // call a permanent whatever is readable without renaming the card.
+      ...(spec.name !== undefined && spec.definitionId === undefined ? { name: spec.name } : {}),
       ...(spec.power !== undefined ? { power: spec.power } : {}),
       ...(spec.toughness !== undefined ? { toughness: spec.toughness } : {}),
       ...(spec.loyalty !== undefined ? { loyalty: spec.loyalty } : {}),

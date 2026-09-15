@@ -66,6 +66,16 @@ export interface LifeEvent {
   readonly amount: number;
 }
 
+/**
+ * Poison counters (CR 122.1). A player counter rather than an object one, which is why
+ * it is its own event: everything else in `CountersEvent` is about a permanent.
+ */
+export interface PoisonEvent {
+  readonly kind: 'poison';
+  readonly player: PlayerId;
+  readonly amount: number;
+}
+
 export interface CountersEvent {
   readonly kind: 'addCounters';
   readonly object: ObjectId;
@@ -79,6 +89,7 @@ export type RulesEvent =
   | MoveZoneEvent
   | EntersBattlefieldEvent
   | LifeEvent
+  | PoisonEvent
   | CountersEvent;
 
 export type RulesEventKind = RulesEvent['kind'];
@@ -99,6 +110,7 @@ export const affectedPlayer = (
     case 'draw':
     case 'gainLife':
     case 'loseLife':
+    case 'poison':
       return event.player;
     case 'moveZone':
     case 'entersBattlefield':

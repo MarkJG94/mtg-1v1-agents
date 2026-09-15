@@ -2,11 +2,13 @@ import {
   allZoneIds,
   type GameResult,
   type ObjectId,
+  type OracleId,
   type PlayerId,
   playerIds,
   type Step,
   type ZoneId,
 } from '@mtg/shared';
+import type { CardDefinition } from '../cards/definition.js';
 import type { CombatState } from '../combat.js';
 import type { Decision } from '../decision.js';
 import type { ContinuousEffect } from '../layers.js';
@@ -75,6 +77,12 @@ export interface GameState {
   /** Next layer-system timestamp (CR 613.7). */
   readonly nextTimestamp: number;
   readonly config: GameConfig;
+  /**
+   * The cards in this game, by oracle id (ADR 0006). Immutable and shared: every object
+   * points at its definition rather than carrying a copy, and an update never touches
+   * this map, so structural sharing keeps it free.
+   */
+  readonly definitions: ReadonlyMap<OracleId, CardDefinition>;
   /**
    * Set when the game is waiting for a player to choose; `null` while it can run on its
    * own. A driver answers it with `applyDecision`.
@@ -192,6 +200,8 @@ const emptyZones = (): Record<ZoneId, readonly ObjectId[]> => {
 
 export interface CreateGameStateOptions {
   readonly rng: RngState;
+  /** The cards this game is played with. Anything not in here has no script (docs/03). */
+  readonly definitions?: Iterable<CardDefinition>;
   /** The player who takes the first turn. */
   readonly onPlay: PlayerId;
   readonly startingLife?: number;
@@ -213,6 +223,10 @@ export const createGameState = (options: CreateGameStateOptions): GameState => {
   const players = {} as Record<PlayerId, PlayerState>;
   for (const player of playerIds) players[player] = emptyPlayerState(life);
 
+  const definitions = new Map<OracleId, CardDefinition>();
+  for (const definition of options.definitions ?? [])
+    definitions.set(definition.oracleId, definition);
+
   return {
     version: 0,
     rng: options.rng,
@@ -226,6 +240,7 @@ export const createGameState = (options: CreateGameStateOptions): GameState => {
     zones: emptyZones(),
     nextObjectId: 1,
     nextTimestamp: 1,
+    definitions,
     config: {
       turnCap: options.turnCap ?? DEFAULT_TURN_CAP,
       maxHandSize: options.maxHandSize ?? DEFAULT_MAX_HAND_SIZE,

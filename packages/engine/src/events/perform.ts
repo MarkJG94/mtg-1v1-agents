@@ -207,6 +207,8 @@ const applyOne = (state: GameState, emitter: EventEmitter, event: RulesEvent): G
       return applyLife(state, emitter, event);
     case 'addCounters':
       return applyCounters(state, emitter, event);
+    case 'poison':
+      return applyPoison(state, event);
   }
 };
 
@@ -316,6 +318,18 @@ const applyLife = (state: GameState, emitter: EventEmitter, event: LifeEvent): G
     reason: event.kind === 'gainLife' ? 'gain' : 'loss',
   });
   return next;
+};
+
+/** CR 122.1: poison counters sit on the player; ten of them is a loss (CR 704.5c). */
+const applyPoison = (
+  state: GameState,
+  event: Extract<RulesEvent, { kind: 'poison' }>,
+): GameState => {
+  const poison = state.players[event.player].poison + event.amount;
+  // No log event yet: `counterChange` in @mtg/shared is about an object, and a player
+  // counter needs its own entry. It goes in with the log consumer the replay viewer
+  // wants, which is the same work that `replay(log) == state` waits on (docs/09).
+  return updatePlayer(state, event.player, { poison });
 };
 
 const applyCounters = (

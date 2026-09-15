@@ -1,5 +1,6 @@
 import type { CounterKind, EventTarget, ObjectId, PlayerId, ZoneId } from '@mtg/shared';
 import { opponentOf } from '@mtg/shared';
+import { staticReplacements } from './cards/statics.js';
 import type { CombatState } from './combat.js';
 import { affectedPlayer, type RulesEvent } from './events/rules-event.js';
 import type { GameState } from './state/game-state.js';
@@ -138,7 +139,7 @@ export const removeReplacement = (state: GameState, id: number): GameState =>
 
 /** Replacements currently in force, ignoring those whose source has left the battlefield. */
 export const activeReplacements = (state: GameState): readonly ReplacementEffect[] =>
-  state.replacements.filter((effect) => {
+  [...state.replacements, ...staticReplacements(state)].filter((effect) => {
     if (effect.duration.kind !== 'whileSourceOnBattlefield') return true;
     return state.objects.get(effect.source)?.zone === 'battlefield';
   });
