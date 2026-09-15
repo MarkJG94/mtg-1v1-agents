@@ -1,0 +1,17 @@
+# Negate
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Counter target noncreature spell.
+
+oracleId: 3407fe41-fdd3-4119-8f70-4bc4590a379f
+name: "Negate"
+manaCost: "{1}{U}"
+types: [instant]
+colours: [U]
+text: "Counter target noncreature spell."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets: [{ id: t, filter: { is: spell, not: { type: creature } } }]
+    effects: [{ op: counter, object: $t }]

@@ -1,0 +1,21 @@
+# Icy Manipulator
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. {1}, {T}: Tap target artifact, creature, or land.
+
+oracleId: 3608f1f7-8dc5-4dd1-ae91-c830e1de9529
+name: "Icy Manipulator"
+manaCost: "{4}"
+types: [artifact]
+colours: []
+text: "{1}, {T}: Tap target artifact, creature, or land."
+
+abilities:
+  - kind: activated
+    id: tap-something
+    covers: [0]
+    cost: { mana: "{1}", tap: true }
+    targets:
+      - id: t
+        filter: { or: [{ type: artifact }, creature, { type: land }] }
+    effects: [{ op: tap, object: $t }]

@@ -6,6 +6,7 @@ import {
   playerZone,
 } from '@mtg/shared';
 import type { EventEmitter } from '../events/emitter.js';
+import { runEvent } from '../events/perform.js';
 import { activateManaAbility, type ManaAbility, type ManaProduction } from '../mana/ability.js';
 import type { ManaCost } from '../mana/cost.js';
 import { payCost } from '../mana/payment.js';
@@ -137,6 +138,19 @@ export const activateAbility = (
     current = updateObject(current, id, { tapped: true });
     emitter.emit(current, { type: 'tap', object: id });
   }
+  if (ability.cost.sacrificeSelf === true) {
+    // Costs are paid as the ability is activated, before it goes on the stack (CR 601.2h
+    // through 602.2b), so the source is already gone when the ability resolves — which is
+    // why "it deals 1 damage" works from a creature that has sacrificed itself.
+    current = runEvent(current, emitter, {
+      kind: 'moveZone',
+      object: id,
+      from: 'battlefield',
+      to: playerZone(object.owner, 'graveyard'),
+      cause: 'sacrifice',
+      destruction: false,
+    });
+  }
 
   return putActivatedAbilityOnStack(current, emitter, {
     abilityId: ability.id,
@@ -222,7 +236,13 @@ const untappedSources = (state: GameState, player: PlayerId): readonly ManaAbili
   });
 
 /**
- * Activate a source, preferring the mode that lets the whole cost be paid.
+ * Activate a source, choosing the mode that gets closest to paying the cost.
+ *
+ * "Closest" rather than "pays it outright": a cost with two of the same pip — `{1}{B}{B}`
+ * — is never completed by the first land tapped, so a rule that only accepted a mode
+ * finishing the whole cost would take the first mode every time and never produce the
+ * second black. What counts is progress: how many of the cost's symbols the pool could
+ * still not cover.
  *
  * Which mode that is has to be worked out *before* anything is activated — a mode tried
  * and rejected would otherwise leave a tap in the event log that never happened, which
@@ -239,11 +259,41 @@ const tapForMana = (
   if (ability.modes.length === 0) return null;
 
   const pool = state.players[player].manaPool;
-  const best = ability.modes.findIndex(
-    (mode) => payCost(poolWith(pool, mode), cost, { xValue: x }) !== null,
-  );
+  let best = 0;
+  let bestShortfall = Number.POSITIVE_INFINITY;
 
-  return activateManaAbility(state, emitter, player, ability, best === -1 ? 0 : best);
+  for (const [index, mode] of ability.modes.entries()) {
+    const remaining = shortfall(poolWith(pool, mode), cost, x);
+    if (remaining < bestShortfall) {
+      best = index;
+      bestShortfall = remaining;
+    }
+  }
+
+  return activateManaAbility(state, emitter, player, ability, best);
+};
+
+/**
+ * How many of a cost's symbols this pool still could not pay, counting the generic part
+ * as one symbol per mana owed. Exact enough to choose between a dual land's two halves,
+ * which is all it is for — `payCost` is still what decides whether the cost is paid.
+ */
+const shortfall = (pool: ManaPool, cost: ManaCost, x: number): number => {
+  const available = [...pool];
+  let unpaid = 0;
+
+  // Coloured and hybrid symbols first: they are the constrained ones, and a unit spent on
+  // generic mana that could have paid a pip is the mistake worth avoiding.
+  for (const symbol of cost.symbols) {
+    const index = available.findIndex(
+      (unit) => payCost([unit], { generic: 0, variable: 0, symbols: [symbol] }) !== null,
+    );
+    if (index === -1) unpaid += 1;
+    else available.splice(index, 1);
+  }
+
+  const generic = cost.generic + cost.variable * x;
+  return unpaid + Math.max(0, generic - available.length);
 };
 
 /** The pool a mode would leave behind, for deciding whether to use it. */

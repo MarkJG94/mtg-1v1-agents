@@ -1,0 +1,17 @@
+# Titanic Growth
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Target creature gets +4/+4 until end of turn.
+
+oracleId: 61e09dd9-7870-48c2-9177-d6abc3162692
+name: "Titanic Growth"
+manaCost: "{1}{G}"
+types: [instant]
+colours: [G]
+text: "Target creature gets +4/+4 until end of turn."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets: [{ id: t, filter: creature }]
+    effects: [{ op: pump, object: $t, power: 4, toughness: 4 }]

@@ -146,7 +146,38 @@ Realistic expectations: vanilla/keyword creatures, burn, pump, simple removal, c
 
 ## Hand-script workflow
 
-`pnpm cards:new "<name>"` scaffolds a YAML from Scryfall data with the text pre-split into sentences and a `covers` skeleton; `pnpm cards:test <name>` runs validation and any scenario tests. The UI's coverage page lists the most-requested unsupported cards so hand-scripting effort follows demand.
+`pnpm cards:new "<name>" ["<name>" ...]` fetches each card from Scryfall and writes two things: a YAML skeleton under `packages/cards/scripts/<letter>/<slug>.yaml`, with every characteristic filled from the printed card and the oracle text listed as numbered sentences to claim, and the card's projection into `packages/cards/fixtures/scryfall.json`. The fixture is committed because validation runs in CI, where there is no network and no 500 MB bulk file. An existing script is never overwritten — only its fixture entry is refreshed.
+
+Every script is then validated as a test (`packages/cards/src/scripts.test.ts`), which is what keeps the set honest: a script that stops agreeing with its card, or stops being playable because the engine changed underneath it, fails there rather than in a game a thousand cycles into a run. The UI's coverage page lists the most-requested unsupported cards so hand-scripting effort follows demand.
+
+One trap worth knowing: **a bare `~` is `null` in YAML**. Write `object: "~"` when an op acts on the card itself. The loader says so by name rather than making you work it out from a schema error.
+
+## The bootstrap set (roadmap 2.3)
+
+60 cards, chosen to exercise the engine rather than to make a deck: the five basics and a gate, one creature per evergreen keyword, enters and dies triggers, tokens, counters, a fight, an extra turn, regeneration, a planeswalker, and the layer-system cards. Between them they use **all seven ability kinds** and **26 of the 39 effect ops**.
+
+Three of them are **partial** — they do less than the card says, on purpose, and are never played. They are in the set because leaving them out would hide what the engine cannot do:
+
+| Card | What is missing |
+|---|---|
+| Wrath of God | "They can't be regenerated" has no op |
+| Swords to Plowshares | life equal to the exiled creature's power needs last known information |
+| Turn to Frog | "becomes a Frog" is a creature-type change layer 4 cannot make |
+
+### What the set leaves out, and why
+
+Cards deliberately not scripted, with the phase that would close each:
+
+- **Fetchlands and tutors** — `search` needs a choice during resolution, which needs the resumable effect pipeline (ADR 0006).
+- **Shocklands** ("unless you pay 2 life") and **checklands** ("unless you control a Swamp") — a replacement effect cannot ask for a payment or test a condition.
+- **Modal spells** ("Choose one —") — same pipeline.
+- **A discard the player chooses** — Hymn to Tourach is in the set because it discards *at random*, which needs nobody's input.
+- **Auras** (Pacifism, Rancor) — an aura spell has to attach to its target as it resolves, and nothing does that yet.
+- **Blood Moon and type-changing statics** — layer 4 can make something a creature; it cannot set land types or take a land's abilities away.
+- **Bad Moon** and other "creatures of a colour get +1/+1" — the effect selector has no colour filter.
+- **Hardened Scales** and counter-modifying replacements — the event matcher for counters cannot say "a creature you control".
+- **Triggered abilities that target** (Bond Beetle) — the engine puts a trigger on the stack without asking for targets, which needs a decision at that point.
+- **Dynamic power and toughness** (`*` / `*+1`) — quantity-valued layer changes.
 
 ## Images
 

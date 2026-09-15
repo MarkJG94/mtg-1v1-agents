@@ -1,0 +1,22 @@
+# Mogg Fanatic
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Sacrifice this creature: It deals 1 damage to any target.
+
+oracleId: 7efd5d62-6da2-428a-98e3-5b842f668656
+name: "Mogg Fanatic"
+manaCost: "{R}"
+types: [creature]
+subtypes: [goblin]
+colours: [R]
+power: 1
+toughness: 1
+text: "Sacrifice this creature: It deals 1 damage to any target."
+
+abilities:
+  - kind: activated
+    id: fling
+    covers: [0]
+    cost: { sacrificeSelf: true }
+    targets: [{ id: t, filter: any }]
+    effects: [{ op: damage, to: $t, amount: 1 }]

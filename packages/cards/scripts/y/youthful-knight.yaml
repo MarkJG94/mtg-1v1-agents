@@ -1,0 +1,17 @@
+# Youthful Knight
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. First strike
+
+oracleId: ef2a24f5-ce5e-4054-843a-2cae0c66318a
+name: "Youthful Knight"
+manaCost: "{1}{W}"
+types: [creature]
+subtypes: [human, knight]
+colours: [W]
+power: 2
+toughness: 1
+keywords: [firstStrike]
+text: "First strike"
+
+abilities: []

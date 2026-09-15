@@ -1,0 +1,20 @@
+# Humility
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. All creatures lose all abilities and have base power and toughness 1/1.
+
+oracleId: ed7bdb3e-5c51-4547-9266-76a791e0b2b0
+name: "Humility"
+manaCost: "{2}{W}{W}"
+types: [enchantment]
+colours: [W]
+text: "All creatures lose all abilities and have base power and toughness 1/1."
+
+abilities:
+  - kind: static
+    covers: [0]
+    affects: { kind: allCreatures }
+    change: { kind: removeAllAbilities }
+  - kind: static
+    affects: { kind: allCreatures }
+    change: { kind: setPowerToughness, power: 1, toughness: 1 }

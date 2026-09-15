@@ -1,0 +1,17 @@
+# Lightning Bolt
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Lightning Bolt deals 3 damage to any target.
+
+oracleId: 4457ed35-7c10-48c8-9776-456485fdf070
+name: "Lightning Bolt"
+manaCost: "{R}"
+types: [instant]
+colours: [R]
+text: "Lightning Bolt deals 3 damage to any target."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets: [{ id: t, filter: any }]
+    effects: [{ op: damage, to: $t, amount: 3 }]

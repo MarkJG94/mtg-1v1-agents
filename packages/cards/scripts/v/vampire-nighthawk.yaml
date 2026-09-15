@@ -1,0 +1,19 @@
+# Vampire Nighthawk
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Flying
+#   1. Deathtouch
+#   2. Lifelink
+
+oracleId: feb244f8-bcb1-44cf-9940-2719221a7309
+name: "Vampire Nighthawk"
+manaCost: "{1}{B}{B}"
+types: [creature]
+subtypes: [vampire, shaman]
+colours: [B]
+power: 2
+toughness: 3
+keywords: [flying, deathtouch, lifelink]
+text: "Flying Deathtouch (Any amount of damage this deals to a creature is enough to destroy it.) Lifelink (Damage dealt by this creature also causes you to gain that much life.)"
+
+abilities: []

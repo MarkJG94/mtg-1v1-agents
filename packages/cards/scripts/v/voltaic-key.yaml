@@ -1,0 +1,19 @@
+# Voltaic Key
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. {1}, {T}: Untap target artifact.
+
+oracleId: 09aeea91-b1dc-443f-a509-4758f052c0a7
+name: "Voltaic Key"
+manaCost: "{1}"
+types: [artifact]
+colours: []
+text: "{1}, {T}: Untap target artifact."
+
+abilities:
+  - kind: activated
+    id: untap-artifact
+    covers: [0]
+    cost: { mana: "{1}", tap: true }
+    targets: [{ id: t, filter: { type: artifact } }]
+    effects: [{ op: untap, object: $t }]

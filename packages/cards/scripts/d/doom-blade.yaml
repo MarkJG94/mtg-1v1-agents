@@ -1,0 +1,17 @@
+# Doom Blade
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Destroy target nonblack creature.
+
+oracleId: 59e7f2ae-4535-4191-98be-3e65b6b2befa
+name: "Doom Blade"
+manaCost: "{1}{B}"
+types: [instant]
+colours: [B]
+text: "Destroy target nonblack creature."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets: [{ id: t, filter: { is: creature, not: { colour: B } } }]
+    effects: [{ op: destroy, object: $t }]

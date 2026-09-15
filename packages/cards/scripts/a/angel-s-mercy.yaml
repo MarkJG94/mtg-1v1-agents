@@ -1,0 +1,16 @@
+# Angel's Mercy
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. You gain 7 life.
+
+oracleId: 6b232bb7-d372-4174-a049-5f8d620810e6
+name: "Angel's Mercy"
+manaCost: "{2}{W}{W}"
+types: [instant]
+colours: [W]
+text: "You gain 7 life."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    effects: [{ op: gainLife, player: you, amount: 7 }]

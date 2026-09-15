@@ -13,7 +13,7 @@
  */
 import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -284,4 +284,11 @@ const readJsonIfPresent = async <T>(path: string): Promise<T | null> => {
   }
 };
 
-await main();
+/**
+ * Only when this script is what was run. It exports `project` for `cards:new`, and an
+ * import that downloaded 37 MB of bulk data as a side effect would be a nasty surprise
+ * — as it was, once.
+ */
+if (process.argv[1] !== undefined && import.meta.url.endsWith(basename(process.argv[1]))) {
+  await main();
+}

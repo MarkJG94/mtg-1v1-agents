@@ -21,9 +21,13 @@ import { noKeywords } from './targeting.js';
 /** What makes an ability trigger. */
 export type TriggerWhen =
   | { readonly kind: 'selfEntersBattlefield' }
-  | { readonly kind: 'anotherEntersBattlefield' }
+  | {
+      readonly kind: 'anotherEntersBattlefield';
+      /** "another creature you control enters" is the common printed wording. */
+      readonly controlledBy?: 'you' | 'any';
+    }
   | { readonly kind: 'selfDies' }
-  | { readonly kind: 'anotherDies' }
+  | { readonly kind: 'anotherDies'; readonly controlledBy?: 'you' | 'any' }
   | { readonly kind: 'selfAttacks' }
   | { readonly kind: 'selfBlocks' }
   | { readonly kind: 'beginningOfUpkeep'; readonly whose: 'self' | 'any' }
@@ -125,17 +129,19 @@ const matchesZoneChange = (
   watcher: ObjectId,
   moved: ObjectId,
   kind: 'enters' | 'dies',
+  /** Whether the watcher and the object that moved were controlled by the same player. */
+  sameController: boolean,
 ): boolean => {
   const self = watcher === moved;
   switch (when.kind) {
     case 'selfEntersBattlefield':
       return kind === 'enters' && self;
     case 'anotherEntersBattlefield':
-      return kind === 'enters' && !self;
+      return kind === 'enters' && !self && (when.controlledBy !== 'you' || sameController);
     case 'selfDies':
       return kind === 'dies' && self;
     case 'anotherDies':
-      return kind === 'dies' && !self;
+      return kind === 'dies' && !self && (when.controlledBy !== 'you' || sameController);
     default:
       return false;
   }
@@ -174,7 +180,17 @@ export const triggersFromZoneChange = (
     const watcher = getObject(state, id);
     for (const ability of watcher.triggers) {
       if (id === moved) continue;
-      if (!matchesZoneChange(ability.when, id, moved, kind)) continue;
+      if (
+        !matchesZoneChange(
+          ability.when,
+          id,
+          moved,
+          kind,
+          watcher.controller === movedSnapshot.controller,
+        )
+      ) {
+        continue;
+      }
       if (!notYetFired(state, ability, id)) continue;
       found.push(instanceFor(watcher, ability));
     }
@@ -182,7 +198,7 @@ export const triggersFromZoneChange = (
 
   // The moved object's own triggers use the snapshot, since it may have left.
   for (const ability of movedSnapshot.triggers) {
-    if (!matchesZoneChange(ability.when, moved, moved, kind)) continue;
+    if (!matchesZoneChange(ability.when, moved, moved, kind, true)) continue;
     if (!notYetFired(state, ability, moved)) continue;
     found.push(instanceFor(movedSnapshot, ability));
   }

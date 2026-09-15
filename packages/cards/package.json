@@ -17,9 +17,11 @@
   "dependencies": {
     "@mtg/engine": "workspace:*",
     "@mtg/shared": "workspace:*",
+    "yaml": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

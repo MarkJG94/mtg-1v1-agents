@@ -1,0 +1,35 @@
+# Jace Beleren
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. +2: Each player draws a card.
+#   1. −1: Target player draws a card.
+#   2. −10: Target player mills twenty cards.
+
+oracleId: cc2b6e58-2d6f-495e-95f3-9496105c4cba
+name: "Jace Beleren"
+manaCost: "{1}{U}{U}"
+types: [planeswalker]
+supertypes: [legendary]
+subtypes: [jace]
+colours: [U]
+loyalty: 3
+text: "+2: Each player draws a card. −1: Target player draws a card. −10: Target player mills twenty cards."
+
+abilities:
+  - kind: loyalty
+    id: plus-two
+    cost: 2
+    covers: [0]
+    effects: [{ op: draw, player: each, count: 1 }]
+  - kind: loyalty
+    id: minus-one
+    cost: -1
+    covers: [1]
+    targets: [{ id: p, filter: player }]
+    effects: [{ op: draw, player: $p, count: 1 }]
+  - kind: loyalty
+    id: minus-ten
+    cost: -10
+    covers: [2]
+    targets: [{ id: p, filter: player }]
+    effects: [{ op: mill, player: $p, count: 20 }]

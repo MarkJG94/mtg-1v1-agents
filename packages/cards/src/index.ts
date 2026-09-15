@@ -7,6 +7,7 @@
  */
 
 export * from './checks.js';
+export * from './files.js';
 export * from './json-schema.js';
 export * from './load.js';
 export * from './ops-spec.js';

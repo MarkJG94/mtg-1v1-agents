@@ -1,0 +1,17 @@
+# Time Warp
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Target player takes an extra turn after this one.
+
+oracleId: dbd6a94b-62ff-4a10-9d52-bdd90b26e425
+name: "Time Warp"
+manaCost: "{3}{U}{U}"
+types: [sorcery]
+colours: [U]
+text: "Target player takes an extra turn after this one."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets: [{ id: p, filter: player }]
+    effects: [{ op: extraTurn, player: $p }]

@@ -1,0 +1,25 @@
+# Dimir Guildgate
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. This land enters tapped.
+#   1. {T}: Add {U} or {B}.
+
+oracleId: 52d14717-0cbc-4d7e-b546-54ea91580338
+name: "Dimir Guildgate"
+manaCost: ""
+types: [land]
+subtypes: [gate]
+colours: []
+text: "This land enters tapped. {T}: Add {U} or {B}."
+
+abilities:
+  - kind: replacement
+    id: enters-tapped
+    covers: [0]
+    applies: { kind: entersBattlefield, object: source }
+    change: { kind: entersTapped }
+    selfReplacement: true
+  - kind: mana
+    id: tap-for-ub
+    covers: [1]
+    modes: [[{ type: U }], [{ type: B }]]

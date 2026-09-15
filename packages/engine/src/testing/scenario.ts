@@ -14,6 +14,7 @@ import { addEffect, characteristicsOf } from '../characteristics.js';
 import type { BlockDeclaration } from '../combat.js';
 import type { DecisionResponse } from '../decision.js';
 import { createEventEmitter, type EventEmitter } from '../events/emitter.js';
+import { runEvent } from '../events/perform.js';
 import type { ContinuousEffect } from '../layers.js';
 import type { LoyaltyAbility } from '../planeswalker.js';
 import { addReplacement, type ReplacementEffect } from '../replacement.js';
@@ -292,6 +293,19 @@ export class Scenario {
 
   toughness(name: string): number | null {
     return characteristicsOf(this.state, this.ref(name)).toughness;
+  }
+
+  /** Destroy a permanent, so what watches for a death sees one (CR 701.7). */
+  kill(name: string): this {
+    this.state = runEvent(this.state, this.emitter, {
+      kind: 'moveZone',
+      object: this.ref(name),
+      from: 'battlefield',
+      to: playerZone(this.object(name).owner, 'graveyard'),
+      cause: 'destroy',
+      destruction: true,
+    });
+    return this;
   }
 
   /** Move a permanent out of play, for testing what stops applying when it goes. */

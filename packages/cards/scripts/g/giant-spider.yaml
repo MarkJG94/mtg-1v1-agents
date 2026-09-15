@@ -1,0 +1,17 @@
+# Giant Spider
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Reach
+
+oracleId: e740ce2f-2134-473c-afa1-1b6d2d1e38ef
+name: "Giant Spider"
+manaCost: "{3}{G}"
+types: [creature]
+subtypes: [spider]
+colours: [G]
+power: 2
+toughness: 4
+keywords: [reach]
+text: "Reach (This creature can block creatures with flying.)"
+
+abilities: []

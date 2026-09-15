@@ -1,0 +1,17 @@
+# Shatter
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Destroy target artifact.
+
+oracleId: 84d32e68-72b9-432d-a023-7bc6a26b8ad0
+name: "Shatter"
+manaCost: "{1}{R}"
+types: [instant]
+colours: [R]
+text: "Destroy target artifact."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets: [{ id: t, filter: { type: artifact } }]
+    effects: [{ op: destroy, object: $t }]

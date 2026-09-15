@@ -1,0 +1,17 @@
+# Shock
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Shock deals 2 damage to any target.
+
+oracleId: a9d288b8-cdc1-4e55-a0c9-d6edfc95e65d
+name: "Shock"
+manaCost: "{R}"
+types: [instant]
+colours: [R]
+text: "Shock deals 2 damage to any target."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets: [{ id: t, filter: any }]
+    effects: [{ op: damage, to: $t, amount: 2 }]

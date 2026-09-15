@@ -1,0 +1,18 @@
+# Island
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   (no rules text)
+
+oracleId: b2c6aa39-2d2a-459c-a555-fb48ba993373
+name: "Island"
+manaCost: ""
+types: [land]
+supertypes: [basic]
+subtypes: [island]
+colours: []
+text: "({T}: Add {U}.)"
+
+abilities:
+  - kind: mana
+    id: tap-for-u
+    modes: [[{ type: U }]]

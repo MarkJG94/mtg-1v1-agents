@@ -1,0 +1,17 @@
+# Unsummon
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Return target creature to its owner's hand.
+
+oracleId: 837182db-1bf3-4a2c-bd01-1af9d9873561
+name: "Unsummon"
+manaCost: "{U}"
+types: [instant]
+colours: [U]
+text: "Return target creature to its owner's hand."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets: [{ id: t, filter: creature }]
+    effects: [{ op: bounce, object: $t }]

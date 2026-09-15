@@ -1,0 +1,20 @@
+# Twisted Image
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Switch target creature's power and toughness until end of turn.
+#   1. Draw a card.
+
+oracleId: 4a40cee1-fc09-4f97-aef8-440778d8c0ca
+name: "Twisted Image"
+manaCost: "{U}"
+types: [instant]
+colours: [U]
+text: "Switch target creature's power and toughness until end of turn. Draw a card."
+
+abilities:
+  - kind: spell
+    covers: [0, 1]
+    targets: [{ id: t, filter: creature }]
+    effects:
+      - { op: switchPowerToughness, object: $t }
+      - { op: draw, player: you, count: 1 }

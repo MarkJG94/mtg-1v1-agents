@@ -1,0 +1,17 @@
+# Ornithopter
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Flying
+
+oracleId: a3a98bc9-caa0-49b7-951c-fe4e4f54e4ba
+name: "Ornithopter"
+manaCost: "{0}"
+types: [artifact, creature]
+subtypes: [thopter]
+colours: []
+power: 0
+toughness: 2
+keywords: [flying]
+text: "Flying"
+
+abilities: []

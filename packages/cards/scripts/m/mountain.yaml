@@ -1,0 +1,18 @@
+# Mountain
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   (no rules text)
+
+oracleId: a3fb7228-e76b-4e96-a40e-20b5fed75685
+name: "Mountain"
+manaCost: ""
+types: [land]
+supertypes: [basic]
+subtypes: [mountain]
+colours: []
+text: "({T}: Add {R}.)"
+
+abilities:
+  - kind: mana
+    id: tap-for-r
+    modes: [[{ type: R }]]

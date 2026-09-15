@@ -1,0 +1,31 @@
+# Doomed Traveler
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. When this creature dies, create a 1/1 white Spirit creature token with flying.
+
+oracleId: a30907c0-fbde-4fd3-a8c7-f304305fcea7
+name: "Doomed Traveler"
+manaCost: "{W}"
+types: [creature]
+subtypes: [human, soldier]
+colours: [W]
+power: 1
+toughness: 1
+text: "When this creature dies, create a 1/1 white Spirit creature token with flying."
+
+abilities:
+  - kind: triggered
+    id: dies-spirit
+    covers: [0]
+    when: { kind: selfDies }
+    effects:
+      - op: createToken
+        controller: you
+        token:
+          name: Spirit
+          types: [creature]
+          subtypes: [spirit]
+          colours: [W]
+          power: 1
+          toughness: 1
+          keywords: [flying]

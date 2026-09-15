@@ -1,0 +1,19 @@
+# Pyroclasm
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Pyroclasm deals 2 damage to each creature.
+
+oracleId: e4bcd4ea-e7cd-4471-8f3b-18bb51d3d70c
+name: "Pyroclasm"
+manaCost: "{1}{R}"
+types: [sorcery]
+colours: [R]
+text: "Pyroclasm deals 2 damage to each creature."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    effects:
+      - op: forEach
+        of: creature
+        effects: [{ op: damage, to: $each, amount: 2 }]

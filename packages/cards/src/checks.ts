@@ -100,6 +100,47 @@ export const checkCharacteristics = (
   return problems;
 };
 
+/**
+ * How a keyword reads on a card, so a printed keyword line can be matched against what
+ * the script declares. `firstStrike` is printed "First strike"; the rest are one word.
+ */
+const keywordNames: Readonly<Record<string, string>> = {
+  flying: 'flying',
+  reach: 'reach',
+  menace: 'menace',
+  vigilance: 'vigilance',
+  haste: 'haste',
+  defender: 'defender',
+  firstStrike: 'first strike',
+  doubleStrike: 'double strike',
+  trample: 'trample',
+  deathtouch: 'deathtouch',
+  lifelink: 'lifelink',
+  indestructible: 'indestructible',
+  shroud: 'shroud',
+  hexproof: 'hexproof',
+};
+
+/**
+ * A keyword line claims itself.
+ *
+ * "Flying", or "Flying, first strike", is not an ability a script writes out: the card's
+ * `keywords:` list says it, and the loader expands it into the engine's keywords. So a
+ * sentence that is nothing but keywords the script declares is claimed — by the card
+ * itself rather than by one of its abilities.
+ */
+const isClaimedByKeywords = (sentence: string, declared: readonly string[]): boolean => {
+  const printed = declared.map((keyword) => keywordNames[keyword] ?? keyword);
+  const parts = sentence
+    .toLowerCase()
+    .replace(/\.$/, '')
+    .split(/,|\band\b/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return parts.length > 0 && parts.every((part) => printed.includes(part));
+};
+
 export interface CoverageReport {
   readonly sentences: readonly string[];
   /** Sentences nobody claimed. These make a script partial, not wrong. */
@@ -139,7 +180,11 @@ export const checkCoverage = (script: CardScript, card: CardProjection): Coverag
 
   const unclaimed = sentences
     .map((_, index) => index)
-    .filter((index) => (claims.get(index) ?? 0) === 0);
+    .filter(
+      (index) =>
+        (claims.get(index) ?? 0) === 0 &&
+        !isClaimedByKeywords(sentences[index] ?? '', script.keywords),
+    );
 
   return { sentences, unclaimed, problems };
 };

@@ -1,0 +1,18 @@
+# Swords to Plowshares
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Exile target creature.
+#   1. Its controller gains life equal to its power.
+
+oracleId: b1544f21-7e98-461b-aed5-e748b0168c52
+name: "Swords to Plowshares"
+manaCost: "{W}"
+types: [instant]
+colours: [W]
+text: "Exile target creature. Its controller gains life equal to its power."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets: [{ id: t, filter: creature }]
+    effects: [{ op: exile, object: $t }]

@@ -1,4 +1,4 @@
-import { isMainPhase, type ObjectId, type PlayerId } from '@mtg/shared';
+import { type EventTarget, isMainPhase, type ObjectId, type PlayerId } from '@mtg/shared';
 import { counterCount, currentLoyalty, isPlaneswalker } from './characteristics.js';
 import type { EventEmitter } from './events/emitter.js';
 import { isStackEmpty, putActivatedAbilityOnStack } from './stack.js';
@@ -124,6 +124,8 @@ export const activateLoyaltyAbility = (
   player: PlayerId,
   source: ObjectId,
   abilityId: string,
+  /** Targets chosen as the ability is activated (CR 601.2c, through CR 602.2b). */
+  targets: readonly EventTarget[] = [],
 ): GameState => {
   const problem = whyNotActivateLoyalty(state, player, source, abilityId);
   if (problem !== null) throw new IllegalLoyaltyActivationError(problem);
@@ -151,5 +153,6 @@ export const activateLoyaltyAbility = (
     source,
     controller: player,
     definitionId: object.definitionId,
+    targets,
   });
 };

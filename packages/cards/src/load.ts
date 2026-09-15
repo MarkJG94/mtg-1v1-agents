@@ -286,6 +286,16 @@ const convertArg = (
     case 'target':
     case 'object':
     case 'player': {
+      // YAML reads a bare `~` as null, and `~` is exactly the character a script uses for
+      // "this card". The error a schema gives for that is true but unhelpful, so say what
+      // actually happened.
+      if (value === null) {
+        throw new ScriptError(
+          script.name,
+          path,
+          'is null — a bare `~` is null in YAML, so write it quoted: "~"',
+        );
+      }
       checkReference(script, value, declared, path);
       const schema = kind === 'target' ? targetRef : kind === 'object' ? objectRef : playerRef;
       return parseWith(script, schema, value, path);

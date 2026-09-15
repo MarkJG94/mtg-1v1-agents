@@ -1,0 +1,17 @@
+# Darksteel Myr
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Indestructible
+
+oracleId: f90fe86c-5cca-483b-93c2-6e856fa01c88
+name: "Darksteel Myr"
+manaCost: "{3}"
+types: [artifact, creature]
+subtypes: [myr]
+colours: []
+power: 0
+toughness: 1
+keywords: [indestructible]
+text: "Indestructible (Damage and effects that say \"destroy\" don't destroy this creature. If its toughness is 0 or less, it still dies.)"
+
+abilities: []
