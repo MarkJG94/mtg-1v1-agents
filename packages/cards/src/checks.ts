@@ -1,5 +1,6 @@
 import { type CardDefinition, manaValue, parseManaCost } from '@mtg/engine';
 import type { Colour } from '@mtg/shared';
+import { keywordFromPrinted } from './keyword-names.js';
 import { parseTypeLine, sentencesOf } from './oracle-text.js';
 import type { CardScript } from './schema.js';
 import type { CardProjection } from './scryfall.js';
@@ -101,27 +102,6 @@ export const checkCharacteristics = (
 };
 
 /**
- * How a keyword reads on a card, so a printed keyword line can be matched against what
- * the script declares. `firstStrike` is printed "First strike"; the rest are one word.
- */
-const keywordNames: Readonly<Record<string, string>> = {
-  flying: 'flying',
-  reach: 'reach',
-  menace: 'menace',
-  vigilance: 'vigilance',
-  haste: 'haste',
-  defender: 'defender',
-  firstStrike: 'first strike',
-  doubleStrike: 'double strike',
-  trample: 'trample',
-  deathtouch: 'deathtouch',
-  lifelink: 'lifelink',
-  indestructible: 'indestructible',
-  shroud: 'shroud',
-  hexproof: 'hexproof',
-};
-
-/**
  * A keyword line claims itself.
  *
  * "Flying", or "Flying, first strike", is not an ability a script writes out: the card's
@@ -130,7 +110,6 @@ const keywordNames: Readonly<Record<string, string>> = {
  * itself rather than by one of its abilities.
  */
 const isClaimedByKeywords = (sentence: string, declared: readonly string[]): boolean => {
-  const printed = declared.map((keyword) => keywordNames[keyword] ?? keyword);
   const parts = sentence
     .toLowerCase()
     .replace(/\.$/, '')
@@ -138,7 +117,13 @@ const isClaimedByKeywords = (sentence: string, declared: readonly string[]): boo
     .map((part) => part.trim())
     .filter(Boolean);
 
-  return parts.length > 0 && parts.every((part) => printed.includes(part));
+  return (
+    parts.length > 0 &&
+    parts.every((part) => {
+      const keyword = keywordFromPrinted(part);
+      return keyword !== null && (declared as readonly string[]).includes(keyword);
+    })
+  );
 };
 
 export interface CoverageReport {

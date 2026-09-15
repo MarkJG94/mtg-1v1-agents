@@ -6,10 +6,12 @@
  * here knows how to play Magic — that is the engine's job.
  */
 
+export * from './auto/normalise.js';
 export * from './checks.js';
 export * from './differential.js';
 export * from './files.js';
 export * from './json-schema.js';
+export * from './keyword-names.js';
 export * from './load.js';
 export * from './ops-spec.js';
 export * from './oracle-text.js';
