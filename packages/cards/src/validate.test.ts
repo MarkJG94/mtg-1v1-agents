@@ -196,6 +196,36 @@ describe('the executability smoke test', () => {
     expect(cub.status).toBe('supported');
   });
 
+  /**
+   * The board is built big enough that the card's own cost is never what stops it, which
+   * is a fine rule until a card costs {1000000}. Gleemax does. Running the coverage report
+   * over every card Scryfall has found the smoke test trying to build a million lands.
+   */
+  it('skips a card that costs more than a board can pay, rather than building it', () => {
+    const started = Date.now();
+    const verdict = validateScript(
+      script({
+        oracleId: 'oracle-silly',
+        name: 'Silly',
+        manaCost: '{1000000}',
+        types: ['artifact'],
+        colours: [],
+        abilities: [],
+      }),
+      printed({
+        oracleId: 'oracle-silly',
+        name: 'Silly',
+        manaCost: '{1000000}',
+        colors: [],
+        typeLine: 'Artifact',
+        oracleText: '',
+      }),
+    );
+
+    expect(Date.now() - started).toBeLessThan(5000);
+    expect(verdict.skipped.join(' ')).toContain('more than a board this size can pay');
+  });
+
   it('catches a card that breaks the game when it is played', () => {
     // A spell that counters itself is shaped correctly and agrees with the printed card.
     // It only falls over when it resolves, which is exactly the class of problem the

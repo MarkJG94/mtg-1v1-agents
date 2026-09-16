@@ -89,6 +89,20 @@ export const smokeScenarios: readonly SmokeScenario[] = [
   { name: "the opponent's turn", opposing: 1, onOpponentsTurn: true },
 ];
 
+/**
+ * The most lands a scenario will build.
+ *
+ * The board is made big enough that the card's own cost is never what stops it, which is
+ * a fine rule until a card costs `{1000000}`. Gleemax does, and the smoke test set about
+ * building a million lands, three times, and never came back — found by running the
+ * coverage report over every card Scryfall has, which is what that report is for.
+ *
+ * Twenty is past anything a real game pays; a card that wants more is skipped with a
+ * reason, the way a card with no legal target is, rather than silently played on a board
+ * that could not pay for it.
+ */
+const MOST_LANDS = 20;
+
 export const smokeTest = (definition: CardDefinition): SmokeResult => {
   const problems: CheckProblem[] = [];
   const skipped: string[] = [];
@@ -97,6 +111,13 @@ export const smokeTest = (definition: CardDefinition): SmokeResult => {
   for (const scenario of smokeScenarios) {
     if (scenario.onOpponentsTurn && isSorcerySpeed(definition)) {
       skipped.push(`${scenario.name}: sorcery speed`);
+      continue;
+    }
+    if (landsFor(definition) > MOST_LANDS) {
+      skipped.push(
+        `${scenario.name}: costs ${manaValue(definition.manaCost)}, more than a board this ` +
+          'size can pay',
+      );
       continue;
     }
 
@@ -130,9 +151,9 @@ export const playSmokeScenario = (
   definition: CardDefinition,
   scenario: SmokeScenario,
 ): GameState | 'skipped' => {
-  // Enough lands to pay for anything the bootstrap set will hold, and a library each so
-  // nobody decks while the card is being tried.
-  const lands = Math.max(6, manaValue(definition.manaCost) + 2);
+  // Enough lands to pay for anything a real card costs, and a library each so nobody decks
+  // while the card is being tried.
+  const lands = Math.min(landsFor(definition), MOST_LANDS);
   const caster = scenario.onOpponentsTurn ? 'B' : 'A';
 
   let board: Scenario = game({
@@ -182,6 +203,9 @@ const checkSettled = (state: GameState): readonly CheckProblem[] => {
 
   return problems;
 };
+
+const landsFor = (definition: CardDefinition): number =>
+  Math.max(6, manaValue(definition.manaCost) + 2);
 
 /** Legal targets for every target the card asks for, or `null` if there are none. */
 const chooseTargets = (
