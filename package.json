@@ -21,6 +21,7 @@
     "cards:new": "tsx scripts/new-card-script.ts",
     "cards:corpus": "tsx scripts/fetch-corpus.ts",
     "cards:goldens": "tsx scripts/write-goldens.ts",
+    "cards:coverage": "tsx scripts/cards-coverage.ts",
     "fetch:scryfall": "tsx scripts/fetch-scryfall.ts",
     "check": "pnpm lint && pnpm typecheck && pnpm cards:schema --check && pnpm cards:goldens --check && pnpm test && pnpm build"
   },

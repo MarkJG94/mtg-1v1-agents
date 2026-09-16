@@ -116,7 +116,9 @@ A benchmark is also a test that reads a whole system at once. This one found tha
 
 ## CI (GitHub Actions)
 
-`ci.yml`: pnpm install (cached) → biome lint → typecheck → unit + card + sim + server tests → fuzz (short budget, 2 minutes; the nightly workflow runs 30 minutes) → benchmarks → build web → Playwright smoke → upload coverage report and parser coverage report as artifacts. A `nightly.yml` runs the long fuzz and the full-Scryfall parser coverage report and opens/updates an issue with the top failing parser patterns.
+`ci.yml`: pnpm install (cached) → biome lint → typecheck → card-schema and goldens freshness → unit + card + sim + server tests (the fuzzer among them, at its ordinary forty games) → benchmarks against the baseline recorded on `main` → build → a Docker image build.
+
+`nightly.yml` runs the two things that are too slow or too networked for a pull request. The **long fuzz** plays `FUZZ_GAMES` games rather than the forty a suite somebody runs on every save can afford — the budget is read off the environment so the same test serves both. And the **full-Scryfall coverage report** fetches the day's bulk projection, runs the auto-scripter over every card, uploads the report and keeps one issue up to date with the top failing patterns. Neither gates anything: they are what tells us the parser reads less of Magic than it did yesterday, which is worth knowing and is never a reason to stop a merge.
 
 ## Definition of done for a card
 

@@ -7,6 +7,7 @@
  */
 
 export * from './auto/classify.js';
+export * from './auto/coverage.js';
 export * from './auto/emit.js';
 export * from './auto/goldens.js';
 export * from './auto/normalise.js';

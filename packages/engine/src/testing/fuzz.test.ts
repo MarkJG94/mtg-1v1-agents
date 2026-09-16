@@ -12,6 +12,21 @@ import {
 import { randomDecision } from './random-agent.js';
 import { game } from './scenario.js';
 
+/**
+ * How many games to fuzz. Forty in an ordinary run, because a test suite somebody runs on
+ * every save has to stay quick, and whatever `FUZZ_GAMES` says in the nightly, where the
+ * point is to play enough games to find the rare one that breaks an invariant (docs/09).
+ *
+ * Read off `globalThis` rather than through `process`, because the engine's tsconfig
+ * carries no Node types and this file lives inside it.
+ */
+const budget = (): number => {
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
+    ?.env;
+  const asked = Number(env?.['FUZZ_GAMES']);
+  return Number.isInteger(asked) && asked > 0 ? asked : 40;
+};
+
 describe('the random agent', () => {
   it('answers every decision kind the engine can raise', () => {
     // The point of this test is the list: a decision kind the agent cannot answer would
@@ -70,8 +85,9 @@ describe('the invariant fuzzer', () => {
   });
 
   it('plays many games without violating an invariant', () => {
-    const results = fuzzGames(40, { turnCap: 8, librarySize: 20 });
-    expect(results).toHaveLength(40);
+    const games = budget();
+    const results = fuzzGames(games, { turnCap: 8, librarySize: 20 });
+    expect(results).toHaveLength(games);
     for (const result of results) expect(result.state.result).not.toBeNull();
   });
 
