@@ -124,4 +124,20 @@ describe('counting, over the committed corpus', () => {
   it('says the parser reads less than everything, which is the point of the report', () => {
     expect(report.counts.sentencesClaimed).toBeLessThan(report.counts.sentences);
   });
+
+  /**
+   * A sentence left unread because an earlier one of the same ability was is fallout, not
+   * a template. Counting it as a failure put "draw a card" — read since 3.3 — fourteenth
+   * in the table.
+   */
+  it('counts the fallout of a failure apart from the failure', () => {
+    const { counts } = report;
+    expect(counts.sentencesFallout).toBeGreaterThan(0);
+    expect(counts.sentencesClaimed + counts.sentencesFallout).toBeLessThanOrEqual(counts.sentences);
+  });
+
+  it('never ranks a template the grammar reads', () => {
+    // If "draw a card" is in the table, the report is counting fallout as failure again.
+    expect(report.patterns.map((pattern) => pattern.pattern)).not.toContain('draw a card');
+  });
 });

@@ -320,7 +320,11 @@ export const object = (reader: Reader, bindings: Bindings): ObjectPhrase | null 
     () => {
       if (reader.anyWord('all', 'each', 'every') === null) return null;
       const what = filter(reader);
-      return what === null ? null : { kind: 'all', filter: what };
+      // "each player" is not a set of objects. Every effect that takes one of these walks
+      // the battlefield, so a player filter would match nothing and the effect would land
+      // on nobody — while the sentence still counted as read, which is a card that is
+      // quietly blank. Refusing it here sends the caller to the player phrase instead.
+      return what === null || aboutPlayers(what) ? null : { kind: 'all', filter: what };
     },
     () => {
       const word = reader.peek()?.word;
@@ -342,6 +346,18 @@ export const object = (reader: Reader, bindings: Bindings): ObjectPhrase | null 
       return ref === null ? null : { kind: 'ref', ref };
     },
   );
+
+/** Whether a filter is about players rather than about objects on the battlefield. */
+const aboutPlayers = (what: ScriptFilter): boolean => {
+  if (what === 'player') return true;
+  if (typeof what === 'string') return false;
+  const record = what as Record<string, unknown>;
+  if (record['is'] === 'player') return true;
+  const alternatives = record['or'];
+  return (
+    Array.isArray(alternatives) && alternatives.some((each) => aboutPlayers(each as ScriptFilter))
+  );
+};
 
 /** The word a filter would be called by, so a pronoun can find it again. */
 const nounOf = (what: ScriptFilter): string => {

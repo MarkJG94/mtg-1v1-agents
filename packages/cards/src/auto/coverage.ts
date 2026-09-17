@@ -2,8 +2,8 @@ import { checkCoverage } from '../checks.js';
 import { cardScriptSchema } from '../schema.js';
 import type { CardProjection } from '../scryfall.js';
 import { validateScript } from '../validate.js';
+import { classifyCard } from './classify.js';
 import { emitScript } from './emit.js';
-import { normaliseCard } from './normalise.js';
 
 /**
  * `pnpm cards:coverage` — how much of Magic the auto-scripter can read (docs/03).
@@ -32,6 +32,11 @@ export interface CoverageCounts {
   readonly supportedWithText: number;
   readonly sentences: number;
   readonly sentencesClaimed: number;
+  /**
+   * Sentences left unread because an earlier sentence of the same ability was: real, and
+   * not a template to teach. Counted apart so the pattern table ranks the causes.
+   */
+  readonly sentencesFallout: number;
 }
 
 export interface FailingPattern {
@@ -78,6 +83,7 @@ export const measureCoverage = (
     supportedWithText: 0,
     sentences: 0,
     sentencesClaimed: 0,
+    sentencesFallout: 0,
   };
 
   const buckets = new Map<string, { count: number; card: string; sentence: string }>();
@@ -106,9 +112,10 @@ export const measureCoverage = (
 
     const read = sentenceCoverage(emitted.script, card);
     counts.sentences += read.total;
-    counts.sentencesClaimed += read.total - read.unread.length;
+    counts.sentencesClaimed += read.claimed;
+    counts.sentencesFallout += read.fallout;
 
-    for (const unread of read.unread) {
+    for (const unread of read.failures) {
       const pattern = patternOf(unread);
       const bucket = buckets.get(pattern);
       if (bucket === undefined) {
@@ -135,7 +142,18 @@ export const measureCoverage = (
 // --- What was not read ---
 
 /**
- * How much of a card's text the script claimed, and which sentences it did not.
+ * How much of a card's text the script claimed, and the sentences that stopped it.
+ *
+ * A card's sentences are claimed as a run: the emitter claims the ones the grammar read
+ * and stops, so one sentence it cannot read leaves every sentence after it in the same
+ * ability unclaimed too. That is right for the verdict — a card that does half of what it
+ * says must be partial — and wrong for the ranking, because those later sentences are
+ * fallout rather than templates to teach. "Draw a card" was the fourteenth most common
+ * unread sentence in the first run, and the grammar has read it since 3.3.
+ *
+ * So only the *first* unread sentence of each ability counts as a failure. Abilities are
+ * the classifier's lines, with the spell lines taken together because the emitter makes
+ * one spell ability out of all of them (CR 112.3a).
  *
  * The unread ones come back as the *normalised* text rather than the printed text: the
  * parser is what failed, the report is for whoever has to teach it, and it should read the
@@ -144,21 +162,56 @@ export const measureCoverage = (
 const sentenceCoverage = (
   script: Readonly<Record<string, unknown>>,
   card: CardProjection,
-): { readonly total: number; readonly unread: readonly string[] } => {
+): {
+  readonly total: number;
+  readonly claimed: number;
+  readonly fallout: number;
+  readonly failures: readonly string[];
+} => {
   const parsed = cardScriptSchema.safeParse(script);
-  if (!parsed.success) return { total: 0, unread: [] };
+  if (!parsed.success) return { total: 0, claimed: 0, fallout: 0, failures: [] };
 
   const report = checkCoverage(parsed.data, card);
-  const normalised = normaliseCard(card).abilities.flatMap((line) => line.sentences);
-  const byIndex = new Map(normalised.map((sentence) => [sentence.index, sentence.text]));
+  const unclaimed = new Set(report.unclaimed);
+  const byIndex = new Map(
+    classifyCard(card).lines.flatMap((line) =>
+      line.line.sentences.map((sentence) => [sentence.index, sentence.text] as const),
+    ),
+  );
+
+  const failures: string[] = [];
+  let fallout = 0;
+
+  for (const group of abilityGroups(card)) {
+    const unread = group.filter((index) => unclaimed.has(index)).sort((a, b) => a - b);
+    const first = unread[0];
+    if (first === undefined) continue;
+
+    const text = byIndex.get(first);
+    if (text !== undefined) failures.push(text);
+    fallout += unread.length - 1;
+  }
 
   return {
     total: report.sentences.length,
-    unread: report.unclaimed.flatMap((index) => {
-      const text = byIndex.get(index);
-      return text === undefined ? [] : [text];
-    }),
+    claimed: report.sentences.length - unclaimed.size,
+    fallout,
+    failures,
   };
+};
+
+/** Each ability's sentence numbers, with all the spell lines as one ability. */
+const abilityGroups = (card: CardProjection): readonly (readonly number[])[] => {
+  const groups: number[][] = [];
+  const spell: number[] = [];
+
+  for (const line of classifyCard(card).lines) {
+    const indexes = line.line.sentences.map((sentence) => sentence.index);
+    if (line.kind === 'spell') spell.push(...indexes);
+    else groups.push(indexes);
+  }
+
+  return spell.length > 0 ? [...groups, spell] : groups;
 };
 
 // --- Patterns ---

@@ -48,6 +48,18 @@ describe('damage and life', () => {
     expect(targetsOf('~ deals 3 damage to any target.')).toEqual([{ id: 't', filter: 'any' }]);
   });
 
+  /**
+   * "Each player" is not a filter over objects. `forEach` walks the battlefield, so a
+   * player filter matches nothing and the damage lands on nobody — while the sentence is
+   * *claimed*, which makes the card supported and blank. A burn spell that hits both
+   * players would come down as a do-nothing.
+   */
+  it('deals damage to each player, rather than to no objects at all', () => {
+    expect(effectsOf('~ deals 2 damage to each player.')).toEqual([
+      { op: 'damage', to: 'each', amount: 2 },
+    ]);
+  });
+
   it('reads damage to everything', () => {
     expect(effectsOf('~ deals 2 damage to each creature.')).toEqual([
       { op: 'forEach', of: 'creature', effects: [{ op: 'damage', to: '$each', amount: 2 }] },

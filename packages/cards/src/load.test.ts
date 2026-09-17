@@ -164,6 +164,25 @@ describe('what the loader refuses', () => {
     ).toThrow(ScriptError);
   });
 
+  /**
+   * `forEach` walks the battlefield. A filter about players matches nothing, so every
+   * effect inside it does nothing — and the sentence that produced it still counts as
+   * read, which makes the card supported and blank. The auto-scripter wrote one of these
+   * for "deals 2 damage to each player" until the coverage report showed it.
+   */
+  it('rejects a forEach over players, whose effects could never happen', () => {
+    expect(
+      broken([
+        {
+          kind: 'spell',
+          effects: [
+            { op: 'forEach', of: 'player', effects: [{ op: 'damage', to: '$each', amount: 2 }] },
+          ],
+        },
+      ]),
+    ).toThrow(/about players/);
+  });
+
   it('rejects an op the engine does not implement', () => {
     expect(broken([{ kind: 'spell', effects: [{ op: 'transmogrify', object: '~' }] }])).toThrow(
       ScriptError,

@@ -261,8 +261,26 @@ const opFrom = (
     }
   }
 
+  // `forEach` walks the battlefield, so a filter about players matches nothing at all and
+  // every effect inside it silently does nothing — while the sentence that produced it
+  // still counts as read, which is a card that is quietly blank. "Each player" is a player
+  // phrase, and the ops that take one say `player`.
+  if (name === 'forEach' && aboutPlayers(converted['of'] as Filter)) {
+    throw new ScriptError(
+      script.name,
+      path,
+      'forEach is over objects on the battlefield, and this filter is about players: ' +
+        'every effect inside it would do nothing',
+    );
+  }
+
   return converted as unknown as EffectOp;
 };
+
+const aboutPlayers = (filter: Filter): boolean =>
+  filter.kind === 'player' ||
+  (filter.kind === 'or' && filter.filters.some(aboutPlayers)) ||
+  (filter.kind === 'and' && filter.filters.every(aboutPlayers));
 
 const convertArg = (
   script: CardScript,
