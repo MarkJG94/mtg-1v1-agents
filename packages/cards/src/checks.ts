@@ -1,6 +1,6 @@
 import { type CardDefinition, manaValue, parseManaCost } from '@mtg/engine';
 import type { Colour } from '@mtg/shared';
-import { keywordFromPrinted } from './keyword-names.js';
+import { cardKeywordFromPrinted, keywordFromPrinted } from './keyword-names.js';
 import { parseTypeLine, sentencesOf } from './oracle-text.js';
 import type { CardScript } from './schema.js';
 import type { CardProjection } from './scryfall.js';
@@ -108,8 +108,15 @@ export const checkCharacteristics = (
  * `keywords:` list says it, and the loader expands it into the engine's keywords. So a
  * sentence that is nothing but keywords the script declares is claimed — by the card
  * itself rather than by one of its abilities.
+ *
+ * "Flash" and "Split second" are the same thing said a different way: the script declares
+ * them as `flash: true` and `splitSecond: true` rather than in `keywords:`, because the
+ * engine keeps them on the card where casting can see them. A line of them is claimed by
+ * the field, and only when the script actually sets it — a card printed with flash whose
+ * script forgot it is a card that may be cast at the wrong time, which is a disagreement
+ * worth reporting rather than a line to wave through.
  */
-const isClaimedByKeywords = (sentence: string, declared: readonly string[]): boolean => {
+const isClaimedByKeywords = (sentence: string, script: CardScript): boolean => {
   const parts = sentence
     .toLowerCase()
     .replace(/\.$/, '')
@@ -121,7 +128,9 @@ const isClaimedByKeywords = (sentence: string, declared: readonly string[]): boo
     parts.length > 0 &&
     parts.every((part) => {
       const keyword = keywordFromPrinted(part);
-      return keyword !== null && (declared as readonly string[]).includes(keyword);
+      if (keyword !== null) return (script.keywords as readonly string[]).includes(keyword);
+      const field = cardKeywordFromPrinted(part);
+      return field !== null && script[field] === true;
     })
   );
 };
@@ -167,8 +176,7 @@ export const checkCoverage = (script: CardScript, card: CardProjection): Coverag
     .map((_, index) => index)
     .filter(
       (index) =>
-        (claims.get(index) ?? 0) === 0 &&
-        !isClaimedByKeywords(sentences[index] ?? '', script.keywords),
+        (claims.get(index) ?? 0) === 0 && !isClaimedByKeywords(sentences[index] ?? '', script),
     );
 
   return { sentences, unclaimed, problems };

@@ -140,6 +140,7 @@ const abilityFrom = (
       }
       if (ability.kind === 'triggered') {
         checkKind(script, `${path}.when`, ability.when.kind, triggerWhenKinds);
+        checkWhose(script, `${path}.when`, ability.when);
         return {
           kind: 'triggered',
           id: ability.id,
@@ -230,6 +231,30 @@ const abilityFrom = (
  * actually declared by the ability — a typo in a target name would otherwise be a spell
  * that silently does nothing.
  */
+/**
+ * A step trigger has to say whose step it is (CR 603.1).
+ *
+ * The engine asks `whose === 'any' || controller === activePlayer`, so a `when` with no
+ * `whose` at all quietly means "your upkeep" — right for "at the beginning of your
+ * upkeep" and wrong for "at the beginning of each player's upkeep", with nothing to say
+ * which was meant. The `when` in a script is a loose object so the schema cannot catch
+ * it, which leaves it here.
+ */
+const stepTriggers = ['beginningOfUpkeep', 'beginningOfEndStep'];
+
+const checkWhose = (script: CardScript, path: string, when: { readonly kind: string }): void => {
+  if (!stepTriggers.includes(when.kind)) return;
+  const whose = (when as Record<string, unknown>)['whose'];
+  if (whose === 'self' || whose === 'any') return;
+  throw new ScriptError(
+    script.name,
+    path,
+    `a "${when.kind}" trigger needs "whose": "self" or "any", and this says ` +
+      `${JSON.stringify(whose)} — without it the engine fires on the active player's step ` +
+      'whatever the card was meant to say',
+  );
+};
+
 const opFrom = (
   script: CardScript,
   raw: Record<string, unknown>,

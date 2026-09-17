@@ -99,17 +99,67 @@ describe('punctuation', () => {
 
 describe('keyword lines', () => {
   it('reads a line of several keywords', () => {
-    expect(keywordsOnLine('Flying, first strike')).toEqual(['flying', 'firstStrike']);
+    expect(keywordsOnLine('Flying, first strike')).toEqual({
+      keywords: ['flying', 'firstStrike'],
+      cardKeywords: [],
+    });
   });
 
   it('reads them however they are joined', () => {
-    expect(keywordsOnLine('Flying and trample.')).toEqual(['flying', 'trample']);
+    expect(keywordsOnLine('Flying and trample.')).toEqual({
+      keywords: ['flying', 'trample'],
+      cardKeywords: [],
+    });
   });
 
   it('refuses a line with anything else in it', () => {
     expect(keywordsOnLine('Flying, protection from red')).toBeNull();
     expect(keywordsOnLine('When this creature enters, draw a card.')).toBeNull();
     expect(keywordsOnLine('Equip {2}')).toBeNull();
+  });
+
+  /**
+   * Flash and split second print on their own line like flying does, but the engine keeps
+   * them on the card rather than in `Keywords`, because they are about when a spell may be
+   * cast. Read as a keyword line and reported apart from the grantable ones, so the
+   * emitter can set the field rather than add an entry nothing would read.
+   */
+  it('reads flash and split second as fields rather than keywords', () => {
+    expect(keywordsOnLine('Flash')).toEqual({ keywords: [], cardKeywords: ['flash'] });
+    expect(keywordsOnLine('Split second')).toEqual({
+      keywords: [],
+      cardKeywords: ['splitSecond'],
+    });
+    expect(keywordsOnLine('Flash, deathtouch')).toEqual({
+      keywords: ['deathtouch'],
+      cardKeywords: ['flash'],
+    });
+  });
+
+  it('keeps a card the normaliser fully read out of the abilities', () => {
+    const viper: CardProjection = {
+      ...card('Grizzly Bears'),
+      oracleText: 'Flash\nDeathtouch',
+      keywords: ['Flash', 'Deathtouch'],
+    };
+    const normalised = normaliseCard(viper);
+
+    expect(normalised.keywords).toEqual(['deathtouch']);
+    expect(normalised.cardKeywords).toEqual(['flash']);
+    expect(normalised.abilities).toEqual([]);
+    // Scryfall lists "Flash" too, so reading it must not look like a misread line, and it
+    // must not come back as a keyword the vocabulary has no word for either.
+    expect(normalised.notes).toEqual([]);
+    expect(normalised.otherKeywords).toEqual([]);
+  });
+
+  it('says so when a card is printed with flash and the line is missing', () => {
+    const invented: CardProjection = {
+      ...card('Grizzly Bears'),
+      oracleText: 'Split second',
+      keywords: [],
+    };
+    expect(normaliseCard(invented).notes.join(' ')).toContain('"split second"');
   });
 
   it('keeps a keyword line out of the abilities', () => {

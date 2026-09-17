@@ -1,5 +1,11 @@
 import type { GrantableKeyword } from '@mtg/engine';
-import { keywordFromPrinted, printedKeyword } from '../keyword-names.js';
+import {
+  type CardKeyword,
+  cardKeywordFromPrinted,
+  keywordFromPrinted,
+  printedCardKeyword,
+  printedKeyword,
+} from '../keyword-names.js';
 import { linesOf, type OracleLine, parseTypeLine } from '../oracle-text.js';
 import type { CardProjection } from '../scryfall.js';
 
@@ -30,10 +36,16 @@ export interface NormalisedCard {
   readonly abilities: readonly OracleLine[];
   /** Keywords read off keyword lines, ready for a script's `keywords:` list. */
   readonly keywords: readonly GrantableKeyword[];
+  /**
+   * Keyword lines that are a field on the card rather than an entry in `keywords:`:
+   * `flash: true` and `splitSecond: true`. Separate because the engine keeps them
+   * separate — they are about when a spell may be cast, not about a permanent.
+   */
+  readonly cardKeywords: readonly CardKeyword[];
   /** The lines those keywords came from, so `covers:` can still claim their sentences. */
   readonly keywordLines: readonly OracleLine[];
   /**
-   * Scryfall keywords with no grantable keyword in the engine. Not a verdict: Scryfall's
+   * Scryfall keywords the script vocabulary has no word for. Not a verdict: Scryfall's
    * `keywords` array mixes keyword abilities with action words and ability words, so Jace
    * Beleren lists "Mill" — an op the engine has — and an Equipment lists "Equip", which it
    * has not. Which is which is the classifier's call in 3.2, not the normaliser's.
@@ -53,6 +65,7 @@ export const normaliseCard = (card: CardProjection): NormalisedCard => {
   const abilities: OracleLine[] = [];
   const keywordLines: OracleLine[] = [];
   const found: GrantableKeyword[] = [];
+  const onCard: CardKeyword[] = [];
 
   for (const line of lines) {
     const keywords = keywordsOnLine(line.text);
@@ -61,17 +74,23 @@ export const normaliseCard = (card: CardProjection): NormalisedCard => {
       continue;
     }
     keywordLines.push(line);
-    for (const keyword of keywords) if (!found.includes(keyword)) found.push(keyword);
+    for (const keyword of keywords.keywords) if (!found.includes(keyword)) found.push(keyword);
+    for (const keyword of keywords.cardKeywords) {
+      if (!onCard.includes(keyword)) onCard.push(keyword);
+    }
   }
 
-  notes.push(...crossCheck(card, found));
+  notes.push(...crossCheck(card, found, onCard));
 
   return {
     name: face.name,
     abilities,
     keywords: found,
+    cardKeywords: onCard,
     keywordLines,
-    otherKeywords: card.keywords.filter((keyword) => keywordFromPrinted(keyword) === null),
+    otherKeywords: card.keywords.filter(
+      (keyword) => keywordFromPrinted(keyword) === null && cardKeywordFromPrinted(keyword) === null,
+    ),
     notes,
   };
 };
@@ -165,15 +184,22 @@ const shortName = (name: string, typeLine: string): string | null => {
 
 // --- Keyword lines ---
 
+/** What a keyword line said, split the way the engine keeps the two kinds apart. */
+export interface KeywordLine {
+  readonly keywords: readonly GrantableKeyword[];
+  readonly cardKeywords: readonly CardKeyword[];
+}
+
 /**
  * The keywords a line is made of, or `null` if it is not a keyword line at all.
  *
- * A keyword line is one where *every* part is a keyword the engine can grant. A line with
- * one word it cannot — "Protection from red", "Equip {2}" — is not partly a keyword line;
- * it is an ability, and it goes to the classifier whole. Claiming half of it would lose
- * the other half.
+ * A keyword line is one where *every* part is a keyword the script can say — one the
+ * engine can grant, or one of the two it keeps as a field on the card. A line with one
+ * word it cannot — "Protection from red", "Equip {2}" — is not partly a keyword line; it
+ * is an ability, and it goes to the classifier whole. Claiming half of it would lose the
+ * other half.
  */
-export const keywordsOnLine = (line: string): readonly GrantableKeyword[] | null => {
+export const keywordsOnLine = (line: string): KeywordLine | null => {
   const parts = line
     .toLowerCase()
     .replace(/\.$/, '')
@@ -183,12 +209,18 @@ export const keywordsOnLine = (line: string): readonly GrantableKeyword[] | null
   if (parts.length === 0) return null;
 
   const keywords: GrantableKeyword[] = [];
+  const onCard: CardKeyword[] = [];
   for (const part of parts) {
     const keyword = keywordFromPrinted(part);
-    if (keyword === null) return null;
-    keywords.push(keyword);
+    if (keyword !== null) {
+      keywords.push(keyword);
+      continue;
+    }
+    const field = cardKeywordFromPrinted(part);
+    if (field === null) return null;
+    onCard.push(field);
   }
-  return keywords;
+  return { keywords, cardKeywords: onCard };
 };
 
 /**
@@ -202,13 +234,14 @@ export const keywordsOnLine = (line: string): readonly GrantableKeyword[] | null
 const crossCheck = (
   card: CardProjection,
   found: readonly GrantableKeyword[],
+  onCard: readonly CardKeyword[],
 ): readonly string[] => {
   const printed = new Set(card.keywords.map((keyword) => keyword.toLowerCase()));
-  return found
-    .filter((keyword) => !printed.has(printedKeyword(keyword)))
+  return [...found.map(printedKeyword), ...onCard.map(printedCardKeyword)]
+    .filter((keyword) => !printed.has(keyword))
     .map(
       (keyword) =>
-        `read "${printedKeyword(keyword)}" off a keyword line, but Scryfall does not list it ` +
+        `read "${keyword}" off a keyword line, but Scryfall does not list it ` +
         "as one of this card's keywords",
     );
 };

@@ -7,6 +7,7 @@ import {
   parseEffects,
   parseManaModes,
   parseReplacement,
+  parseRiders,
   parseStatic,
   parseTrigger,
 } from './parse.js';
@@ -75,6 +76,10 @@ export const emitScript = (card: CardProjection): EmittedScript => {
       colours: card.colors.map((colour) => colour.toUpperCase()),
       ...printedNumbers(card),
       ...(classified.keywords.length > 0 ? { keywords: classified.keywords } : {}),
+      // Flash and split second are fields rather than entries in `keywords:`, because
+      // they are about when the card may be cast (CR 702.8, CR 702.19) and the engine
+      // keeps them where casting can see them.
+      ...Object.fromEntries(classified.cardKeywords.map((keyword) => [keyword, true])),
       text: card.oracleText,
       abilities,
     },
@@ -145,9 +150,19 @@ const abilityFor = (line: ClassifiedLine): Record<string, unknown> | null => {
 
     case 'activated': {
       const cost = parseCost(line.cost ?? '');
-      const parsed = parseEffects([line.effect ?? line.line.text]);
+      // The rider comes off before the grammar sees the effect: "Activate only as a
+      // sorcery" is a restriction on the ability, not something the ability does.
+      const rider = parseRiders(line.effect ?? line.line.text);
+      const parsed = parseEffects([rider.effect]);
       if (cost === null || !parsed.ok) return null;
-      return { kind: 'activated', id, covers: covered(line), cost, ...body(parsed.ability) };
+      return {
+        kind: 'activated',
+        id,
+        covers: covered(line),
+        cost,
+        ...(rider.sorceryOnly === true ? { sorceryOnly: true } : {}),
+        ...body(parsed.ability),
+      };
     }
 
     case 'loyalty': {

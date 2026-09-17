@@ -229,10 +229,8 @@
     }
   },
   "Air Servant": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 1 is not claimed by any ability: \"{2}{U}: Tap target creature with flying.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "49638d96-e83e-4aab-bafb-d6183a6e3ff6",
       "name": "Air Servant",
@@ -252,7 +250,37 @@
         "flying"
       ],
       "text": "Flying\n{2}{U}: Tap target creature with flying.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "activated",
+          "id": "auto-activated-1",
+          "covers": [
+            1
+          ],
+          "cost": {
+            "mana": "{2}{U}"
+          },
+          "targets": [
+            {
+              "id": "t",
+              "filter": {
+                "is": "creature",
+                "and": [
+                  {
+                    "keyword": "flying"
+                  }
+                ]
+              }
+            }
+          ],
+          "effects": [
+            {
+              "op": "tap",
+              "object": "$t"
+            }
+          ]
+        }
+      ]
     }
   },
   "Ajani Goldmane": {
@@ -600,10 +628,8 @@
     }
   },
   "Assassinate": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Destroy target tapped creature.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "ce979f36-84f2-4419-b400-971263494cc6",
       "name": "Assassinate",
@@ -615,7 +641,33 @@
         "B"
       ],
       "text": "Destroy target tapped creature.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "spell",
+          "covers": [
+            0
+          ],
+          "targets": [
+            {
+              "id": "t",
+              "filter": {
+                "is": "creature",
+                "and": [
+                  {
+                    "tapped": true
+                  }
+                ]
+              }
+            }
+          ],
+          "effects": [
+            {
+              "op": "destroy",
+              "object": "$t"
+            }
+          ]
+        }
+      ]
     }
   },
   "Assault Griffin": {
@@ -859,10 +911,8 @@
     }
   },
   "Birds of Paradise": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 1 is not claimed by any ability: \"{T}: Add one mana of any color.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "d3a0b660-358c-41bd-9cd2-41fbf3491b1a",
       "name": "Birds of Paradise",
@@ -882,7 +932,48 @@
         "flying"
       ],
       "text": "Flying\n{T}: Add one mana of any color.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "mana",
+          "id": "auto-mana-1",
+          "covers": [
+            1
+          ],
+          "requiresTap": true,
+          "modes": [
+            [
+              {
+                "type": "W",
+                "amount": 1
+              }
+            ],
+            [
+              {
+                "type": "U",
+                "amount": 1
+              }
+            ],
+            [
+              {
+                "type": "B",
+                "amount": 1
+              }
+            ],
+            [
+              {
+                "type": "R",
+                "amount": 1
+              }
+            ],
+            [
+              {
+                "type": "G",
+                "amount": 1
+              }
+            ]
+          ]
+        }
+      ]
     }
   },
   "Black Knight": {
@@ -1093,7 +1184,6 @@
   "Bogardan Hellkite": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Flash\"",
       "coverage: sentence 2 is not claimed by any ability: \"When this creature enters, it deals 5 damage divided as you choose among any number of targets.\""
     ],
     "script": {
@@ -1114,6 +1204,7 @@
       "keywords": [
         "flying"
       ],
+      "flash": true,
       "text": "Flash\nFlying\nWhen this creature enters, it deals 5 damage divided as you choose among any number of targets.",
       "abilities": []
     }
@@ -1476,10 +1567,8 @@
     }
   },
   "Celestial Purge": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Exile target black or red permanent.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "ec1f6188-2516-46ac-8a03-7b7285b23a62",
       "name": "Celestial Purge",
@@ -1491,7 +1580,40 @@
         "W"
       ],
       "text": "Exile target black or red permanent.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "spell",
+          "covers": [
+            0
+          ],
+          "targets": [
+            {
+              "id": "t",
+              "filter": {
+                "is": "permanent",
+                "and": [
+                  {
+                    "or": [
+                      {
+                        "colour": "B"
+                      },
+                      {
+                        "colour": "R"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "effects": [
+            {
+              "op": "exile",
+              "object": "$t"
+            }
+          ]
+        }
+      ]
     }
   },
   "Cemetery Reaper": {
@@ -2153,10 +2275,8 @@
     }
   },
   "Deathmark": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Destroy target green or white creature.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "cf09b0af-3cf1-4486-8f65-8cfd2410314a",
       "name": "Deathmark",
@@ -2168,7 +2288,40 @@
         "B"
       ],
       "text": "Destroy target green or white creature.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "spell",
+          "covers": [
+            0
+          ],
+          "targets": [
+            {
+              "id": "t",
+              "filter": {
+                "is": "creature",
+                "and": [
+                  {
+                    "or": [
+                      {
+                        "colour": "G"
+                      },
+                      {
+                        "colour": "W"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "effects": [
+            {
+              "op": "destroy",
+              "object": "$t"
+            }
+          ]
+        }
+      ]
     }
   },
   "Demolish": {
@@ -2409,10 +2562,8 @@
     }
   },
   "Divine Verdict": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Destroy target attacking or blocking creature.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "3070f997-24f2-471d-af96-a2f3b588198e",
       "name": "Divine Verdict",
@@ -2424,13 +2575,41 @@
         "W"
       ],
       "text": "Destroy target attacking or blocking creature.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "spell",
+          "covers": [
+            0
+          ],
+          "targets": [
+            {
+              "id": "t",
+              "filter": {
+                "is": "creature",
+                "and": [
+                  {
+                    "or": [
+                      "attacking",
+                      "blocking"
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "effects": [
+            {
+              "op": "destroy",
+              "object": "$t"
+            }
+          ]
+        }
+      ]
     }
   },
   "Djinn of Wishes": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 1 is not claimed by any ability: \"This creature enters with three wish counters on it.\"",
       "coverage: sentence 2 is not claimed by any ability: \"{2}{U}{U}, Remove a wish counter from this creature: Reveal the top card of your library.\"",
       "coverage: sentence 3 is not claimed by any ability: \"You may play that card without paying its mana cost.\"",
       "coverage: sentence 4 is not claimed by any ability: \"If you don't, exile it.\""
@@ -2454,7 +2633,25 @@
         "flying"
       ],
       "text": "Flying\nThis creature enters with three wish counters on it.\n{2}{U}{U}, Remove a wish counter from this creature: Reveal the top card of your library. You may play that card without paying its mana cost. If you don't, exile it.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "replacement",
+          "id": "auto-replacement-1",
+          "covers": [
+            1
+          ],
+          "applies": {
+            "kind": "entersBattlefield",
+            "object": "source"
+          },
+          "change": {
+            "kind": "entersWithCounters",
+            "counter": "wish",
+            "amount": 3
+          },
+          "selfReplacement": true
+        }
+      ]
     }
   },
   "Doom Blade": {
@@ -2782,10 +2979,8 @@
     }
   },
   "Earthquake": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Earthquake deals X damage to each creature without flying and each player.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "9a40614b-50a3-422c-849e-53c8b7d3d204",
       "name": "Earthquake",
@@ -2797,7 +2992,45 @@
         "R"
       ],
       "text": "Earthquake deals X damage to each creature without flying and each player.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "spell",
+          "covers": [
+            0
+          ],
+          "effects": [
+            {
+              "op": "forEach",
+              "of": {
+                "is": "creature",
+                "and": [
+                  {
+                    "not": {
+                      "keyword": "flying"
+                    }
+                  }
+                ]
+              },
+              "effects": [
+                {
+                  "op": "damage",
+                  "to": "$each",
+                  "amount": {
+                    "x": true
+                  }
+                }
+              ]
+            },
+            {
+              "op": "damage",
+              "to": "each",
+              "amount": {
+                "x": true
+              }
+            }
+          ]
+        }
+      ]
     }
   },
   "Elite Vanguard": {
@@ -3262,10 +3495,8 @@
     }
   },
   "Flashfreeze": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Counter target red or green spell.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "eaf98e03-729b-4145-b2af-c910c415c15d",
       "name": "Flashfreeze",
@@ -3277,7 +3508,40 @@
         "U"
       ],
       "text": "Counter target red or green spell.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "spell",
+          "covers": [
+            0
+          ],
+          "targets": [
+            {
+              "id": "t",
+              "filter": {
+                "is": "spell",
+                "and": [
+                  {
+                    "or": [
+                      {
+                        "colour": "R"
+                      },
+                      {
+                        "colour": "G"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "effects": [
+            {
+              "op": "counter",
+              "object": "$t"
+            }
+          ]
+        }
+      ]
     }
   },
   "Fling": {
@@ -3703,10 +3967,8 @@
     }
   },
   "Goblin Artillery": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"{T}: This creature deals 2 damage to any target and 3 damage to you.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "06db7444-0225-48c8-ab04-d69ff06e97b6",
       "name": "Goblin Artillery",
@@ -3724,7 +3986,36 @@
       "power": 1,
       "toughness": 3,
       "text": "{T}: This creature deals 2 damage to any target and 3 damage to you.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "activated",
+          "id": "auto-activated-0",
+          "covers": [
+            0
+          ],
+          "cost": {
+            "tap": true
+          },
+          "targets": [
+            {
+              "id": "t",
+              "filter": "any"
+            }
+          ],
+          "effects": [
+            {
+              "op": "damage",
+              "to": "$t",
+              "amount": 2
+            },
+            {
+              "op": "damage",
+              "to": "you",
+              "amount": 3
+            }
+          ]
+        }
+      ]
     }
   },
   "Goblin Balloon Brigade": {
@@ -4512,10 +4803,8 @@
     }
   },
   "Infantry Veteran": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"{T}: Target attacking creature gets +1/+1 until end of turn.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "42798e2b-9a5c-4f93-8f77-b7bb7a916d07",
       "name": "Infantry Veteran",
@@ -4533,7 +4822,38 @@
       "power": 1,
       "toughness": 1,
       "text": "{T}: Target attacking creature gets +1/+1 until end of turn.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "activated",
+          "id": "auto-activated-0",
+          "covers": [
+            0
+          ],
+          "cost": {
+            "tap": true
+          },
+          "targets": [
+            {
+              "id": "t",
+              "filter": {
+                "is": "creature",
+                "and": [
+                  "attacking"
+                ]
+              }
+            }
+          ],
+          "effects": [
+            {
+              "op": "pump",
+              "object": "$t",
+              "power": 1,
+              "toughness": 1,
+              "duration": "untilEndOfTurn"
+            }
+          ]
+        }
+      ]
     }
   },
   "Inferno Elemental": {
@@ -4822,7 +5142,8 @@
             0
           ],
           "when": {
-            "kind": "beginningOfUpkeep"
+            "kind": "beginningOfUpkeep",
+            "whose": "self"
           },
           "effects": [
             {
@@ -5529,7 +5850,6 @@
   "Magma Phoenix": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 1 is not claimed by any ability: \"When this creature dies, it deals 3 damage to each creature and each player.\"",
       "coverage: sentence 2 is not claimed by any ability: \"{3}{R}{R}: Return this card from your graveyard to your hand.\""
     ],
     "script": {
@@ -5551,7 +5871,36 @@
         "flying"
       ],
       "text": "Flying\nWhen this creature dies, it deals 3 damage to each creature and each player.\n{3}{R}{R}: Return this card from your graveyard to your hand.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-1",
+          "covers": [
+            1
+          ],
+          "when": {
+            "kind": "selfDies"
+          },
+          "effects": [
+            {
+              "op": "forEach",
+              "of": "creature",
+              "effects": [
+                {
+                  "op": "damage",
+                  "to": "$each",
+                  "amount": 3
+                }
+              ]
+            },
+            {
+              "op": "damage",
+              "to": "each",
+              "amount": 3
+            }
+          ]
+        }
+      ]
     }
   },
   "Mana Leak": {
@@ -5715,7 +6064,8 @@
             0
           ],
           "when": {
-            "kind": "beginningOfUpkeep"
+            "kind": "beginningOfUpkeep",
+            "whose": "self"
           },
           "effects": [
             {
@@ -6875,10 +7225,8 @@
     }
   },
   "Plummet": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Destroy target creature with flying.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "85bde6ac-3dd4-4946-8b57-24f57e3eae2b",
       "name": "Plummet",
@@ -6890,7 +7238,33 @@
         "G"
       ],
       "text": "Destroy target creature with flying.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "spell",
+          "covers": [
+            0
+          ],
+          "targets": [
+            {
+              "id": "t",
+              "filter": {
+                "is": "creature",
+                "and": [
+                  {
+                    "keyword": "flying"
+                  }
+                ]
+              }
+            }
+          ],
+          "effects": [
+            {
+              "op": "destroy",
+              "object": "$t"
+            }
+          ]
+        }
+      ]
     }
   },
   "Polymorph": {
@@ -7425,10 +7799,8 @@
     }
   },
   "Righteousness": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Target blocking creature gets +7/+7 until end of turn.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "3f6b2f76-0364-415e-a6a2-e9e5bf31b745",
       "name": "Righteousness",
@@ -7440,7 +7812,34 @@
         "W"
       ],
       "text": "Target blocking creature gets +7/+7 until end of turn.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "spell",
+          "covers": [
+            0
+          ],
+          "targets": [
+            {
+              "id": "t",
+              "filter": {
+                "is": "creature",
+                "and": [
+                  "blocking"
+                ]
+              }
+            }
+          ],
+          "effects": [
+            {
+              "op": "pump",
+              "object": "$t",
+              "power": 7,
+              "toughness": 7,
+              "duration": "untilEndOfTurn"
+            }
+          ]
+        }
+      ]
     }
   },
   "Rise from the Grave": {
@@ -7643,10 +8042,8 @@
     }
   },
   "Royal Assassin": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"{T}: Destroy target tapped creature.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "9ed6f28f-a3db-48c5-9ab0-b90a7fba5f57",
       "name": "Royal Assassin",
@@ -7664,7 +8061,37 @@
       "power": 1,
       "toughness": 1,
       "text": "{T}: Destroy target tapped creature.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "activated",
+          "id": "auto-activated-0",
+          "covers": [
+            0
+          ],
+          "cost": {
+            "tap": true
+          },
+          "targets": [
+            {
+              "id": "t",
+              "filter": {
+                "is": "creature",
+                "and": [
+                  {
+                    "tapped": true
+                  }
+                ]
+              }
+            }
+          ],
+          "effects": [
+            {
+              "op": "destroy",
+              "object": "$t"
+            }
+          ]
+        }
+      ]
     }
   },
   "Runeclaw Bear": {
@@ -9127,7 +9554,6 @@
   "Triskelion": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"This creature enters with three +1/+1 counters on it.\"",
       "coverage: sentence 1 is not claimed by any ability: \"Remove a +1/+1 counter from this creature: It deals 1 damage to any target.\""
     ],
     "script": {
@@ -9145,7 +9571,25 @@
       "power": 1,
       "toughness": 1,
       "text": "This creature enters with three +1/+1 counters on it.\nRemove a +1/+1 counter from this creature: It deals 1 damage to any target.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "replacement",
+          "id": "auto-replacement-0",
+          "covers": [
+            0
+          ],
+          "applies": {
+            "kind": "entersBattlefield",
+            "object": "source"
+          },
+          "change": {
+            "kind": "entersWithCounters",
+            "counter": "+1/+1",
+            "amount": 3
+          },
+          "selfReplacement": true
+        }
+      ]
     }
   },
   "Trumpet Blast": {
@@ -10040,10 +10484,8 @@
     }
   },
   "Windstorm": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Windstorm deals X damage to each creature with flying.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "9969b822-2ead-4956-bac2-875ffd90e872",
       "name": "Windstorm",
@@ -10055,7 +10497,36 @@
         "G"
       ],
       "text": "Windstorm deals X damage to each creature with flying.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "spell",
+          "covers": [
+            0
+          ],
+          "effects": [
+            {
+              "op": "forEach",
+              "of": {
+                "is": "creature",
+                "and": [
+                  {
+                    "keyword": "flying"
+                  }
+                ]
+              },
+              "effects": [
+                {
+                  "op": "damage",
+                  "to": "$each",
+                  "amount": {
+                    "x": true
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   "Wurm's Tooth": {

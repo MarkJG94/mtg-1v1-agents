@@ -43,6 +43,19 @@ export interface FailingPattern {
   /** The generalised shape of the sentences in this bucket. */
   readonly pattern: string;
   readonly count: number;
+  /**
+   * Cards where this is the **only** shape left unread, so teaching it is the last thing
+   * standing between the card and being fully claimed.
+   *
+   * An upper bound rather than a promise: a card can still be held back by something that
+   * is not a sentence at all — a dynamic power the script cannot say, a cost it disagrees
+   * with — and those are counted here too, because this measures the text.
+   *
+   * It is the number to work from. `count` ranks by how often a shape appears, which puts
+   * a template on nine hundred cards at the top even when every one of those cards needs
+   * three more things taught before it plays.
+   */
+  readonly finishes: number;
   readonly example: { readonly card: string; readonly sentence: string };
 }
 
@@ -86,7 +99,10 @@ export const measureCoverage = (
     sentencesFallout: 0,
   };
 
-  const buckets = new Map<string, { count: number; card: string; sentence: string }>();
+  const buckets = new Map<
+    string,
+    { count: number; finishes: number; card: string; sentence: string }
+  >();
 
   for (const card of cards) {
     counts.cards += 1;
@@ -117,12 +133,23 @@ export const measureCoverage = (
 
     for (const unread of read.failures) {
       const pattern = patternOf(unread);
-      const bucket = buckets.get(pattern);
-      if (bucket === undefined) {
-        buckets.set(pattern, { count: 1, card: card.name, sentence: unread });
-      } else {
-        bucket.count += 1;
-      }
+      const bucket = buckets.get(pattern) ?? {
+        count: 0,
+        finishes: 0,
+        card: card.name,
+        sentence: unread,
+      };
+      bucket.count += 1;
+      buckets.set(pattern, bucket);
+    }
+
+    // `finishes` counts cards, not sentences: a card whose unread sentences are all the
+    // same shape is one template away, however many of them there are.
+    const shapes = new Set(read.failures.map(patternOf));
+    const [only] = shapes;
+    if (shapes.size === 1 && only !== undefined) {
+      const bucket = buckets.get(only);
+      if (bucket !== undefined) bucket.finishes += 1;
     }
   }
 
@@ -130,6 +157,7 @@ export const measureCoverage = (
     .map(([pattern, bucket]) => ({
       pattern,
       count: bucket.count,
+      finishes: bucket.finishes,
       example: { card: bucket.card, sentence: bucket.sentence },
     }))
     // By count, and by pattern where counts tie, so two runs over the same data agree.

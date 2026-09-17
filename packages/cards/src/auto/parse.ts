@@ -179,15 +179,34 @@ const triggerCondition = (reader: Reader): Readonly<Record<string, unknown>> | n
         ...(controlledBy === null ? {} : { controlledBy }),
       };
     },
-    () =>
-      reader.words('at', 'the', 'beginning', 'of', 'your', 'upkeep')
-        ? { kind: 'beginningOfUpkeep' }
-        : null,
-    () =>
-      reader.words('at', 'the', 'beginning', 'of', 'your', 'end', 'step')
-        ? { kind: 'beginningOfEndStep' }
-        : null,
+    () => stepTrigger(reader),
   );
+
+/**
+ * "At the beginning of your upkeep" and "at the beginning of each player's upkeep" — the
+ * same trigger, and `whose` is the difference (CR 603.1).
+ *
+ * The engine fires a step trigger on the active player's step unless `whose` is `'any'`,
+ * so the word the card uses has to reach the script: leaving it out would give every
+ * "each player's upkeep" ability the "your upkeep" reading, which is a card that triggers
+ * half as often as the one that is printed. Only upkeep and the end step are here because
+ * they are the two steps the engine has triggers for; combat and the main phases come
+ * back as a condition it cannot read, which is the truth.
+ */
+const stepTrigger = (reader: Reader): Readonly<Record<string, unknown>> | null => {
+  if (!reader.words('at', 'the', 'beginning', 'of')) return null;
+
+  const whose = reader.first(
+    () => (reader.word('your') ? 'self' : null),
+    () => (reader.words('each', 'player', "'s") ? 'any' : null),
+    () => (reader.word('each') ? 'any' : null),
+  );
+  if (whose === null) return null;
+
+  if (reader.word('upkeep')) return { kind: 'beginningOfUpkeep', whose };
+  if (reader.words('end', 'step')) return { kind: 'beginningOfEndStep', whose };
+  return null;
+};
 
 /** "another creature you control" carries a controller the trigger has to repeat. */
 const controllerOf = (what: unknown): string | null => {
@@ -215,6 +234,9 @@ export const parseManaModes = (sentence: string): readonly (readonly ManaMode[])
   const reader = Reader.of(sentence);
   if (!reader.word('add')) return null;
 
+  const any = anyColour(reader);
+  if (any !== null) return any;
+
   const modes: { type: string; amount: number }[][] = [];
   for (;;) {
     const symbols = reader.match(/(?:\{[^}]*\})+/);
@@ -233,6 +255,26 @@ export const parseManaModes = (sentence: string): readonly (readonly ManaMode[])
   reader.punctuation();
   return reader.done && modes.length > 0 ? modes : null;
 };
+
+/** The five colours. {C} is not one of them: colourless is not a colour (CR 105.1). */
+const COLOURS = ['W', 'U', 'B', 'R', 'G'] as const;
+
+/**
+ * "Add one mana of any color" — the same choice, written in words.
+ *
+ * Five modes rather than a mana type meaning "any", because the choice is made as the
+ * ability resolves and `modes:` is the place the engine makes one (CR 605.1a). It reads
+ * only *one* mana of any *one* colour: "two mana of any one color" and "one mana of any
+ * color in your commander's colour identity" are different abilities, and the line has to
+ * end here for this to be the one that was printed.
+ */
+const anyColour = (reader: Reader): readonly (readonly ManaMode[])[] | null =>
+  reader.try(() => {
+    if (!reader.words('one', 'mana', 'of', 'any')) return null;
+    if (reader.anyWord('color', 'colour') === null) return null;
+    reader.punctuation();
+    return reader.done ? COLOURS.map((type) => [{ type, amount: 1 }]) : null;
+  });
 
 // --- Static abilities ---
 
@@ -286,26 +328,84 @@ export interface ParsedReplacement {
 }
 
 /**
- * "~ enters tapped." — how a permanent changes its own arrival (CR 614.1c).
+ * "~ enters tapped." and "~ enters with four +1/+1 counters on it." — how a permanent
+ * changes its own arrival (CR 614.1c).
  *
- * The one shape here is the one the bootstrap set needs and the one every gate, shockland
- * and checkland shares. It is a self-replacement (CR 616.1a), which is what lets it apply
- * before anything else that would modify the same event.
+ * Both are self-replacements (CR 616.1a), which is what lets them apply before anything
+ * else that would modify the same event. The two shapes are the ones every gate,
+ * shockland and checkland shares and the ones every card that arrives already grown
+ * shares; "enters tapped unless you control two or more basic lands" is a third, and it
+ * needs a condition on a replacement that the vocabulary has no word for yet.
  */
 export const parseReplacement = (sentence: string): ParsedReplacement | null => {
   const reader = Reader.of(sentence);
   if (!reader.word('~')) return null;
   if (!reader.word('enters')) return null;
   reader.try(() => reader.words('the', 'battlefield'));
-  if (!reader.word('tapped')) return null;
+
+  const change = reader.first<Readonly<Record<string, unknown>>>(
+    () => (reader.word('tapped') ? { kind: 'entersTapped' } : null),
+    () => entersWithCounters(reader),
+  );
+  if (change === null) return null;
+
   reader.punctuation();
   if (!reader.done) return null;
 
   return {
     applies: { kind: 'entersBattlefield', object: 'source' },
-    change: { kind: 'entersTapped' },
+    change,
     selfReplacement: true,
   };
+};
+
+/**
+ * "with four +1/+1 counters on it" — the count, then what kind of counter.
+ *
+ * The count has to be a plain number: `entersWithCounters` adds it to the entering event,
+ * and an X or a "for each creature you control" would have to be worked out at that
+ * moment with nowhere to do it. A card that entered with one counter where it prints five
+ * is a quietly weaker card, so an amount this cannot settle is no parse at all.
+ */
+const entersWithCounters = (reader: Reader): Readonly<Record<string, unknown>> | null => {
+  if (!reader.word('with')) return null;
+
+  const amount = quantity(reader);
+  if (typeof amount !== 'number') return null;
+
+  // A "+1/+1" is one token, and every other counter is named by a single word.
+  const counter = reader.match(/[+-]\d+\/[+-]\d+/)?.[0] ?? reader.match(/[a-z]+/i)?.[0] ?? null;
+  if (counter === null) return null;
+  if (reader.anyWord('counter', 'counters') === null) return null;
+  if (!reader.words('on', 'it')) return null;
+
+  return { kind: 'entersWithCounters', counter, amount };
+};
+
+// --- Activation riders ---
+
+/** An activated ability's effect text, with the riders it could read taken off. */
+export interface ParsedRiders {
+  readonly effect: string;
+  /** "Activate only as a sorcery" — CR 601.3a as the script says it. */
+  readonly sorceryOnly?: boolean;
+}
+
+/**
+ * The sentence after the effect that says *when* the ability may be activated.
+ *
+ * "Activate only as a sorcery" is a restriction the engine already keeps on an activated
+ * ability, so it is read here and taken off the effect text the grammar then reads. Every
+ * other rider — "only once each turn", "only during your turn", "only if you control a
+ * Forest" — is **left where it is**, so the grammar fails on it and the card comes out
+ * partial. Stripping a rider with no field behind it would produce an ability with no
+ * limit on it at all, which is a strictly better card than the one printed.
+ */
+export const parseRiders = (effect: string): ParsedRiders => {
+  const rider = /\s*Activate only as a sorcery\.?\s*$/i;
+  return rider.test(effect)
+    ? { effect: effect.replace(rider, '').trim(), sorceryOnly: true }
+    : { effect };
 };
 
 // --- Costs ---

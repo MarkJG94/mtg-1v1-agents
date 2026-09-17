@@ -151,6 +151,37 @@ describe('what the loader refuses', () => {
     ).toThrow(/spell abilities/);
   });
 
+  /**
+   * The engine decides whether a step trigger fires with `whose === 'any' ||
+   * controller === activePlayer`, so a script that leaves `whose` out gets "your upkeep"
+   * by accident and the type that says it is required never sees the object. An
+   * auto-scripter meaning "each player's upkeep" would silently produce a trigger that
+   * fires on one of them.
+   */
+  it('rejects a step trigger that does not say whose step it is', () => {
+    expect(
+      broken([
+        {
+          kind: 'triggered',
+          id: 'upkeep',
+          when: { kind: 'beginningOfUpkeep' },
+          effects: [{ op: 'draw', player: 'you', count: 1 }],
+        },
+      ]),
+    ).toThrow(/whose/);
+
+    expect(
+      broken([
+        {
+          kind: 'triggered',
+          id: 'end',
+          when: { kind: 'beginningOfEndStep', whose: 'either' },
+          effects: [{ op: 'draw', player: 'you', count: 1 }],
+        },
+      ]),
+    ).toThrow(/whose/);
+  });
+
   /** A filter object with nothing in it used to mean "any permanent", quietly. */
   it('rejects a filter that says nothing', () => {
     expect(

@@ -69,18 +69,68 @@ const damage: Verb = (reader, bindings) => {
   if (!reader.word('damage')) return null;
   if (!reader.word('to')) return reader.stopped('damage with nobody to deal it to');
 
-  const to = object(reader, bindings);
-  if (to !== null) {
-    return forEachOf(to, (ref) => ({
-      op: 'damage',
-      to: ref,
-      amount,
-      ...(source.ref === '~' ? {} : { from: source.ref }),
-    }));
+  const from = source.ref === '~' ? {} : { from: source.ref };
+  const dealt = recipient(reader, bindings, amount, from);
+  if (dealt === null) return reader.stopped('damage dealt to something this cannot read');
+
+  // "and 3 damage to target creature", "and each player": a second clause with its own
+  // amount, or a second set the same amount goes to. Both are ordinary on a burn spell,
+  // and reading only the first half would be a spell that deals half the damage printed.
+  const more: ScriptEffect[] = [];
+  for (;;) {
+    const next = reader.try<readonly ScriptEffect[] | null>(() => {
+      if (!reader.word('and')) return null;
+      return reader.first<readonly ScriptEffect[]>(
+        () => {
+          const second = quantity(reader);
+          if (second === null) return null;
+          if (!reader.word('damage')) return null;
+          if (!reader.word('to')) return null;
+          return recipient(reader, bindings, second, from);
+        },
+        // The same amount to a second set. Only "each …" and a player, never a bare
+        // reference: "and ~ gets +1/+1" is the sentence's own "and" joining two clauses.
+        () => sharedRecipient(reader, bindings, amount, from),
+      );
+    });
+    if (next === null) break;
+    more.push(...next);
   }
+
+  return [...dealt, ...more];
+};
+
+/** Everything "damage to" can be pointed at: objects, a set of them, or a player. */
+const recipient = (
+  reader: Reader,
+  bindings: Bindings,
+  amount: ScriptQuantity,
+  from: Readonly<Record<string, unknown>>,
+): readonly ScriptEffect[] | null => {
+  const what = object(reader, bindings);
+  if (what !== null) return forEachOf(what, (ref) => ({ op: 'damage', to: ref, amount, ...from }));
   const who = player(reader, bindings);
-  if (who === null) return reader.stopped('damage dealt to something this cannot read');
-  return [{ op: 'damage', to: who, amount, ...(source.ref === '~' ? {} : { from: source.ref }) }];
+  return who === null ? null : [{ op: 'damage', to: who, amount, ...from }];
+};
+
+/** A recipient after a bare "and", where anything referential would be the clause joiner. */
+const sharedRecipient = (
+  reader: Reader,
+  bindings: Bindings,
+  amount: ScriptQuantity,
+  from: Readonly<Record<string, unknown>>,
+): readonly ScriptEffect[] | null => {
+  const set = reader.try(() => {
+    const what = object(reader, bindings);
+    return what === null || what.kind !== 'all' ? null : what;
+  });
+  if (set !== null) return forEachOf(set, (ref) => ({ op: 'damage', to: ref, amount, ...from }));
+
+  const who = reader.try(() => {
+    if (reader.peek()?.word !== 'each' && reader.peek()?.word !== 'every') return null;
+    return player(reader, bindings);
+  });
+  return who === null ? null : [{ op: 'damage', to: who, amount, ...from }];
 };
 
 /** "You gain 7 life", "target player loses 2 life". */

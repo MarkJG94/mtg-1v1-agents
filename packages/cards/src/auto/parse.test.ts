@@ -10,6 +10,7 @@ import {
   parseEffects,
   parseManaModes,
   parseReplacement,
+  parseRiders,
   parseStatic,
   parseTrigger,
 } from './parse.js';
@@ -66,6 +67,44 @@ describe('damage and life', () => {
     ]);
   });
 
+  /**
+   * "and 2 damage to" is a second damage clause with its own amount, and it was the single
+   * commonest thing standing between a burn spell and being read: "deals 4 damage to
+   * target creature" parsed and "deals 6 damage to target creature and 2 damage to target
+   * player" did not.
+   */
+  it('reads a second amount dealt to a second recipient', () => {
+    expect(
+      effectsOf(
+        '~ deals 3 damage to target player or planeswalker and 3 damage to target creature.',
+      ),
+    ).toEqual([
+      { op: 'damage', to: '$t', amount: 3 },
+      // Two targets, so two ids: the second declares its own (CR 601.2c).
+      { op: 'damage', to: '$u', amount: 3 },
+    ]);
+    expect(effectsOf('~ deals 2 damage to any target and 1 damage to you.')).toEqual([
+      { op: 'damage', to: '$t', amount: 2 },
+      { op: 'damage', to: 'you', amount: 1 },
+    ]);
+  });
+
+  it('reads one amount dealt to each of two sets', () => {
+    expect(effectsOf('~ deals 1 damage to each creature and each player.')).toEqual([
+      { op: 'forEach', of: 'creature', effects: [{ op: 'damage', to: '$each', amount: 1 }] },
+      { op: 'damage', to: 'each', amount: 1 },
+    ]);
+  });
+
+  it('leaves "and" alone when what follows it is not a recipient', () => {
+    // The sentence-level "and" joins clauses, and swallowing it here would make "and draw
+    // a card" a thing damage was dealt to.
+    expect(effectsOf('~ deals 2 damage to any target and you gain 2 life.')).toEqual([
+      { op: 'damage', to: '$t', amount: 2 },
+      { op: 'gainLife', player: 'you', amount: 2 },
+    ]);
+  });
+
   it('reads life gained and lost', () => {
     expect(effectsOf('You gain 7 life.')).toEqual([{ op: 'gainLife', player: 'you', amount: 7 }]);
     expect(effectsOf('Target player loses 2 life.')).toEqual([
@@ -101,6 +140,59 @@ describe('cards and removal', () => {
     expect(targetsOf('Destroy target artifact or enchantment.')).toEqual([
       { id: 't', filter: { or: [{ type: 'artifact' }, { type: 'enchantment' }] } },
     ]);
+  });
+
+  /**
+   * The filter is where most of Magic's variation lives, and the engine already has every
+   * predicate below (CR 115.1). Each of these was a whole card unread for the want of one
+   * adjective: "deals 4 damage to target creature" reads, and "to target attacking or
+   * blocking creature" did not.
+   */
+  it('reads the adjectives in front of a noun', () => {
+    expect(targetsOf('Destroy target attacking creature.')).toEqual([
+      { id: 't', filter: { is: 'creature', and: ['attacking'] } },
+    ]);
+    expect(targetsOf('Destroy target attacking or blocking creature.')).toEqual([
+      { id: 't', filter: { is: 'creature', and: [{ or: ['attacking', 'blocking'] }] } },
+    ]);
+    expect(targetsOf('Destroy target tapped creature.')).toEqual([
+      { id: 't', filter: { is: 'creature', and: [{ tapped: true }] } },
+    ]);
+    expect(targetsOf('Destroy target untapped artifact.')).toEqual([
+      { id: 't', filter: { type: 'artifact', and: [{ tapped: false }] } },
+    ]);
+  });
+
+  it('reads a colour alternation, which is not a single colour', () => {
+    expect(targetsOf('Destroy target white or blue creature.')).toEqual([
+      { id: 't', filter: { is: 'creature', and: [{ or: [{ colour: 'W' }, { colour: 'U' }] }] } },
+    ]);
+  });
+
+  it('reads the keyword a noun is qualified by, either side of "you control"', () => {
+    expect(targetsOf('Destroy target creature with flying.')).toEqual([
+      { id: 't', filter: { is: 'creature', and: [{ keyword: 'flying' }] } },
+    ]);
+    expect(targetsOf('Destroy target creature without flying.')).toEqual([
+      { id: 't', filter: { is: 'creature', and: [{ not: { keyword: 'flying' } }] } },
+    ]);
+    expect(targetsOf('Destroy target creature with first strike.')).toEqual([
+      { id: 't', filter: { is: 'creature', and: [{ keyword: 'firstStrike' }] } },
+    ]);
+    expect(effectsOf('Destroy all creatures you control with flying.')).toEqual([
+      {
+        op: 'forEach',
+        of: { is: 'creature', and: [{ keyword: 'flying' }], controller: 'you' },
+        effects: [{ op: 'destroy', object: '$each' }],
+      },
+    ]);
+  });
+
+  it('refuses a qualifier it has no predicate for rather than dropping it', () => {
+    // "That blocked this turn" needs the game to remember what blocked, and the engine has
+    // no filter for it. Dropping it would make every blocker a legal target.
+    expect(effectsOf('Destroy target creature that blocked this turn.')).toBeNull();
+    expect(effectsOf('Destroy target creature with a +1/+1 counter on it.')).toBeNull();
   });
 
   it('reads a list of alternatives with commas in it', () => {
@@ -236,12 +328,105 @@ describe('the parts that are not effects', () => {
     ).toMatchObject({ when: { kind: 'anotherDies', controlledBy: 'you' } });
   });
 
+  /**
+   * The engine reads a step trigger as "the active player's step unless `whose` says
+   * `any`", so the word the card uses for whose step it is has to reach the script: "your
+   * upkeep" and "each player's upkeep" are the same trigger with different answers.
+   */
+  it('says whose step a step trigger is about', () => {
+    expect(parseTrigger('At the beginning of your upkeep, draw a card.')).toMatchObject({
+      when: { kind: 'beginningOfUpkeep', whose: 'self' },
+    });
+    expect(parseTrigger("At the beginning of each player's upkeep, draw a card.")).toMatchObject({
+      when: { kind: 'beginningOfUpkeep', whose: 'any' },
+    });
+    expect(parseTrigger('At the beginning of your end step, draw a card.')).toMatchObject({
+      when: { kind: 'beginningOfEndStep', whose: 'self' },
+    });
+    expect(parseTrigger('At the beginning of each end step, draw a card.')).toMatchObject({
+      when: { kind: 'beginningOfEndStep', whose: 'any' },
+    });
+  });
+
+  it('refuses a step it has no trigger for', () => {
+    expect(parseTrigger('At the beginning of your first main phase, draw a card.')).toHaveProperty(
+      'failure',
+    );
+    expect(parseTrigger('At the beginning of combat on your turn, draw a card.')).toHaveProperty(
+      'failure',
+    );
+  });
+
   it('reads a mana ability’s modes', () => {
     expect(parseManaModes('Add {U} or {B}.')).toEqual([
       [{ type: 'U', amount: 1 }],
       [{ type: 'B', amount: 1 }],
     ]);
     expect(parseManaModes('Add {G}.')).toEqual([[{ type: 'G', amount: 1 }]]);
+  });
+
+  it('reads "one mana of any color" as the five colours', () => {
+    expect(parseManaModes('Add one mana of any color.')).toEqual([
+      [{ type: 'W', amount: 1 }],
+      [{ type: 'U', amount: 1 }],
+      [{ type: 'B', amount: 1 }],
+      [{ type: 'R', amount: 1 }],
+      [{ type: 'G', amount: 1 }],
+    ]);
+  });
+
+  it('refuses "any color" with anything else left on the line', () => {
+    // A spend restriction is part of the ability, and a mana ability that dropped one
+    // would add mana this card never said you could spend that way.
+    expect(
+      parseManaModes('Add one mana of any color. Spend this mana only to cast an artifact spell.'),
+    ).toBeNull();
+    // Two mana of one colour is a different ability, and reading it as one would be a card
+    // producing half the mana it prints.
+    expect(parseManaModes('Add two mana of any one color.')).toBeNull();
+  });
+
+  it('reads the sorcery-speed rider off an activated ability', () => {
+    expect(parseRiders('Draw a card. Activate only as a sorcery.')).toEqual({
+      effect: 'Draw a card.',
+      sorceryOnly: true,
+    });
+  });
+
+  it('leaves a rider the engine has no field for on the effect', () => {
+    // "Only once each turn" is a real restriction with nowhere to put it: an activated
+    // ability has no `onceEachTurn`. Left on the effect, so the parse fails and the card
+    // is partial — rather than stripped, which would be an ability with no limit on it.
+    expect(parseRiders('~ gets +2/+2 until end of turn. Activate only once each turn.')).toEqual({
+      effect: '~ gets +2/+2 until end of turn. Activate only once each turn.',
+    });
+    expect(parseRiders('Draw a card. Activate only during your turn.')).toEqual({
+      effect: 'Draw a card. Activate only during your turn.',
+    });
+  });
+
+  it('reads a permanent entering with counters on it', () => {
+    expect(parseReplacement('~ enters with four +1/+1 counters on it.')).toEqual({
+      applies: { kind: 'entersBattlefield', object: 'source' },
+      change: { kind: 'entersWithCounters', counter: '+1/+1', amount: 4 },
+      selfReplacement: true,
+    });
+    expect(parseReplacement('~ enters the battlefield with a -1/-1 counter on it.')).toMatchObject({
+      change: { kind: 'entersWithCounters', counter: '-1/-1', amount: 1 },
+    });
+    expect(parseReplacement('~ enters with two charge counters on it.')).toMatchObject({
+      change: { kind: 'entersWithCounters', counter: 'charge', amount: 2 },
+    });
+  });
+
+  it('refuses a count of counters it cannot turn into a number', () => {
+    // `entersWithCounters` takes a number, so an X or a "for each" would have to be
+    // evaluated as the permanent enters and there is nowhere for that to happen — a card
+    // entering with one counter instead of five is a weaker card, quietly.
+    expect(parseReplacement('~ enters with X +1/+1 counters on it.')).toBeNull();
+    expect(
+      parseReplacement('~ enters with a +1/+1 counter on it for each creature you control.'),
+    ).toBeNull();
   });
 
   it('reads an anthem', () => {

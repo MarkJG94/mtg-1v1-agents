@@ -1,4 +1,5 @@
 import type { CardAbility, CardType } from '@mtg/engine';
+import type { CardKeyword } from '../keyword-names.js';
 import type { OracleLine } from '../oracle-text.js';
 import { parseTypeLine } from '../oracle-text.js';
 import type { CardProjection } from '../scryfall.js';
@@ -42,6 +43,8 @@ export interface ClassifiedCard {
   readonly lines: readonly ClassifiedLine[];
   /** From the normaliser, unchanged: this step does not read the card's characteristics. */
   readonly keywords: readonly string[];
+  /** Also from the normaliser: the keyword lines that are a field on the card. */
+  readonly cardKeywords: readonly CardKeyword[];
   readonly otherKeywords: readonly string[];
   readonly notes: readonly string[];
 }
@@ -57,12 +60,13 @@ export const classifyCard = (card: CardProjection): ClassifiedCard => {
         (line): ClassifiedLine => ({
           line,
           kind: 'keyword',
-          why: 'every part of the line is a keyword the engine can grant',
+          why: 'every part of the line is a keyword the script vocabulary can say',
         }),
       ),
       ...normalised.abilities.map((line) => classifyLine(line, types)),
     ].sort((left, right) => left.line.line - right.line.line),
     keywords: normalised.keywords,
+    cardKeywords: normalised.cardKeywords,
     otherKeywords: normalised.otherKeywords,
     notes: normalised.notes,
   };

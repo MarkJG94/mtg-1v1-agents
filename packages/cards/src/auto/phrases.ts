@@ -1,3 +1,4 @@
+import { keywordFromPrinted } from '../keyword-names.js';
 import type { Reader } from './reader.js';
 
 /**
@@ -187,6 +188,12 @@ const colours: Readonly<Record<string, string>> = {
 /** One noun with the adjectives in front of it: "nonblack creature", "artifact creature". */
 const noun = (reader: Reader): ScriptFilter | null => {
   const parts: Record<string, unknown> = {};
+  /**
+   * Predicates that qualify the noun rather than name it: "attacking", "tapped", "with
+   * flying". They go in an `and` beside the head noun rather than into `parts`, because
+   * `parts` holds one of each key and a creature can be several of these at once.
+   */
+  const extra: ScriptFilter[] = [];
   let found = false;
 
   for (;;) {
@@ -199,8 +206,27 @@ const noun = (reader: Reader): ScriptFilter | null => {
       return { letter, negated: word.startsWith('non') };
     });
     if (colour !== null) {
-      if (colour.negated) parts['not'] = { colour: colour.letter };
+      // "white or blue creature" is two colours to choose between, not one colour and a
+      // stray word — and reading only the first would make a card hit what it cannot.
+      const rest = colourAlternatives(reader);
+      if (rest.length > 0 && !colour.negated) {
+        extra.push({ or: [{ colour: colour.letter }, ...rest] });
+      } else if (colour.negated) parts['not'] = { colour: colour.letter };
       else parts['colour'] = colour.letter;
+      continue;
+    }
+
+    const state = reader.first<ScriptFilter>(
+      () => (reader.anyWord('attacking', 'blocking') === null ? null : lastWord(reader)),
+      () => (reader.word('tapped') ? { tapped: true } : null),
+      () => (reader.word('untapped') ? { tapped: false } : null),
+      () => (reader.word('token') || reader.word('tokens') ? { token: true } : null),
+      () => (reader.word('nontoken') ? { token: false } : null),
+    );
+    if (state !== null) {
+      // "Attacking or blocking creature": the same choice the colours make above.
+      const alternatives = stateAlternatives(reader);
+      extra.push(alternatives.length > 0 ? { or: [state, ...alternatives] } : state);
       continue;
     }
 
@@ -235,7 +261,92 @@ const noun = (reader: Reader): ScriptFilter | null => {
   }
 
   if (!found) return null;
-  return simplify(parts);
+  return withExtra(simplify(parts), extra);
+};
+
+/** The word `anyWord` just consumed, as a shorthand filter. */
+const lastWord = (reader: Reader): ScriptFilter => reader.peek(-1)?.word ?? 'permanent';
+
+/** "or blue", "or green" — every colour after the first one. */
+const colourAlternatives = (reader: Reader): readonly ScriptFilter[] => {
+  const found: ScriptFilter[] = [];
+  for (;;) {
+    const next = reader.try(() => {
+      if (!reader.word('or')) return null;
+      const letter = colours[reader.peek()?.word ?? ''];
+      if (letter === undefined) return null;
+      reader.next();
+      return { colour: letter };
+    });
+    if (next === null) return found;
+    found.push(next);
+  }
+};
+
+/** "or blocking" — the same, for the states a creature can be in. */
+const stateAlternatives = (reader: Reader): readonly ScriptFilter[] => {
+  const found: ScriptFilter[] = [];
+  for (;;) {
+    const next = reader.try(() =>
+      reader.word('or') && reader.anyWord('attacking', 'blocking') !== null
+        ? lastWord(reader)
+        : null,
+    );
+    if (next === null) return found;
+    found.push(next);
+  }
+};
+
+/** The head noun with its qualifiers hung off it, keeping `type` where `nounOf` looks. */
+const withExtra = (head: ScriptFilter, extra: readonly ScriptFilter[]): ScriptFilter => {
+  if (extra.length === 0) return head;
+  if (typeof head === 'string') return { is: head, and: [...extra] };
+  const existing = (head as Record<string, unknown>)['and'];
+  const before = Array.isArray(existing) ? (existing as ScriptFilter[]) : [];
+  return { ...head, and: [...before, ...extra] };
+};
+
+/**
+ * "with flying", "without flying" — a keyword the noun has to have, or must not.
+ *
+ * Only the keywords the engine can actually ask about (CR 115.1): everything else — "with
+ * a +1/+1 counter on it", "that blocked this turn" — is left unread, because a filter with
+ * a qualifier quietly dropped is a spell that may be pointed at things the card forbids.
+ */
+const qualifiers = (reader: Reader): readonly ScriptFilter[] => {
+  const found: ScriptFilter[] = [];
+  for (;;) {
+    const next = reader.try(() => {
+      const word = reader.anyWord('with', 'without');
+      if (word === null) return null;
+      const keyword = keywordPhrase(reader);
+      if (keyword === null) return null;
+      return word === 'with' ? { keyword } : { not: { keyword } };
+    });
+    if (next === null) return found;
+    found.push(next);
+  }
+};
+
+/** A printed keyword, which is two words as often as one ("first strike"). */
+const keywordPhrase = (reader: Reader): string | null => {
+  const first = reader.peek()?.word;
+  if (first === undefined) return null;
+  const second = reader.peek(1)?.word;
+
+  if (second !== undefined) {
+    const pair = keywordFromPrinted(`${first} ${second}`);
+    if (pair !== null) {
+      reader.next();
+      reader.next();
+      return pair;
+    }
+  }
+
+  const one = keywordFromPrinted(first);
+  if (one === null) return null;
+  reader.next();
+  return one;
 };
 
 /** `{ type: creature }` is just `creature` when nothing else qualifies it. */
@@ -285,11 +396,16 @@ export const filter = (reader: Reader): ScriptFilter | null => {
   }
   const combined: ScriptFilter = alternatives.length === 1 ? first : { or: alternatives };
 
+  // The controller comes first and the qualifier second, in both "target creature with
+  // flying" and "creatures you control with flying" — and `controller` backtracks when it
+  // does not match, so there is nothing to read before it.
   const who = controller(reader);
-  if (who === null) return combined;
-  return typeof combined === 'string'
-    ? { is: combined, controller: who }
-    : { ...combined, controller: who };
+  const qualified = withExtra(combined, qualifiers(reader));
+
+  if (who === null) return qualified;
+  return typeof qualified === 'string'
+    ? { is: qualified, controller: who }
+    : { ...qualified, controller: who };
 };
 
 // --- Objects ---

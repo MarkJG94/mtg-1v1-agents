@@ -110,6 +110,20 @@ describe('counting, over the committed corpus', () => {
     expect([...counts].sort((left, right) => right - left)).toEqual(counts);
   });
 
+  /**
+   * The count says how many sentences share a shape; `finishes` says how many *cards* have
+   * nothing else standing in their way. They rank differently, and the second is the one
+   * worth working from: a template on nine hundred cards that each need three more things
+   * taught buys nothing until the other three are done.
+   */
+  it('says how many cards each pattern is the last thing standing in the way of', () => {
+    for (const pattern of report.patterns) {
+      expect(pattern.finishes).toBeGreaterThanOrEqual(0);
+      expect(pattern.finishes).toBeLessThanOrEqual(pattern.count);
+    }
+    expect(report.patterns.some((pattern) => pattern.finishes > 0)).toBe(true);
+  });
+
   it('gives every pattern an example somebody can go and look at', () => {
     for (const pattern of report.patterns) {
       expect(pattern.example.card.length).toBeGreaterThan(0);

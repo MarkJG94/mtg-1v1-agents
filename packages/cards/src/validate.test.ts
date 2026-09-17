@@ -51,6 +51,16 @@ const script = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
+/** The spell ability of `script()`, moved onto the second sentence of the card. */
+const claimsSentenceOne = [
+  {
+    kind: 'spell',
+    covers: [1],
+    targets: [{ id: 't', filter: 'any' }],
+    effects: [{ op: 'damage', to: '$t', amount: 3 }],
+  },
+];
+
 describe('reading a printed card', () => {
   it('splits a type line into supertypes, types and subtypes', () => {
     expect(parseTypeLine('Legendary Creature — Human Wizard')).toEqual({
@@ -130,6 +140,27 @@ describe('validating a script against its card', () => {
     expect(result.status).toBe('partial');
     expect(result.reasons).toHaveLength(1);
     expect(result.reasons[0]?.message).toMatch(/sentence 1 is not claimed/);
+  });
+
+  /**
+   * A flash line is claimed by `flash: true` rather than by an ability, the same way a
+   * flying line is claimed by `keywords:`. Only when the script actually sets it: a card
+   * printed with flash whose script forgot it is a card that may be cast at the wrong
+   * time, and waving the line through would make that card *supported*.
+   */
+  it('lets the flash field claim the line that prints it', () => {
+    const printedWithFlash = printed({
+      oracleText: 'Flash\nJolt deals 3 damage to any target.',
+      keywords: ['Flash'],
+    });
+
+    expect(
+      validateScript(script({ flash: true, abilities: claimsSentenceOne }), printedWithFlash),
+    ).toMatchObject({ status: 'supported' });
+
+    const forgotten = validateScript(script({ abilities: claimsSentenceOne }), printedWithFlash);
+    expect(forgotten.status).toBe('partial');
+    expect(forgotten.reasons[0]?.message).toMatch(/sentence 0 is not claimed/);
   });
 
   it('refuses a script where two abilities claim the same sentence', () => {

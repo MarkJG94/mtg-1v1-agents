@@ -39,3 +39,36 @@ export const printedKeyword = (keyword: GrantableKeyword): string => printed[key
 /** The engine's name for a printed keyword, or `null` if it has none. */
 export const keywordFromPrinted = (text: string): GrantableKeyword | null =>
   byPrinted.get(text.trim().toLowerCase()) ?? null;
+
+/**
+ * Keywords a card *has* rather than ones it can be *given*.
+ *
+ * Flash and split second are keyword abilities that print on their own line like flying
+ * does, but they are about **when a spell may be cast** rather than about a permanent on
+ * the battlefield, so the engine keeps them as fields on the card instead of in
+ * `Keywords` — there is nothing for "target creature gains split second" to mean. The
+ * script says them the same way: `flash: true` rather than an entry in `keywords:`.
+ *
+ * They are here rather than in the table above because a reader of a keyword line has to
+ * know both, and the two lists having one home is what keeps the validator and the
+ * normaliser agreeing about which lines are claimed.
+ */
+export type CardKeyword = 'flash' | 'splitSecond';
+
+export const cardKeywords = ['flash', 'splitSecond'] as const satisfies readonly CardKeyword[];
+
+const printedCard: Readonly<Record<CardKeyword, string>> = {
+  flash: 'flash',
+  splitSecond: 'split second',
+};
+
+const byPrintedCard: ReadonlyMap<string, CardKeyword> = new Map(
+  cardKeywords.map((keyword) => [printedCard[keyword], keyword]),
+);
+
+/** What a card prints for one of those, in lower case. */
+export const printedCardKeyword = (keyword: CardKeyword): string => printedCard[keyword];
+
+/** The engine's name for a printed card keyword, or `null` if it is not one. */
+export const cardKeywordFromPrinted = (text: string): CardKeyword | null =>
+  byPrintedCard.get(text.trim().toLowerCase()) ?? null;

@@ -82,13 +82,16 @@ const markdown = (report: ParserCoverage): string => {
     '',
     '## What to teach it next',
     '',
-    'Each row is a template the parser cannot read, with how many sentences share its shape.',
+    'Each row is a template the parser cannot read. **sentences** is how many share its',
+    'shape; **finishes** is how many cards have nothing else left unread, so teaching it',
+    'is the last thing standing in their way. Work from the second column: a shape on nine',
+    'hundred cards that each need three more things taught buys nothing on its own.',
     '',
-    '| cards | pattern | example |',
-    '|---:|---|---|',
+    '| sentences | finishes | pattern | example |',
+    '|---:|---:|---|---|',
     ...patterns.map(
       (pattern) =>
-        `| ${pattern.count} | \`${pattern.pattern}\` | ${pattern.example.card}: ${pattern.example.sentence.slice(0, 90)} |`,
+        `| ${pattern.count} | ${pattern.finishes} | \`${pattern.pattern}\` | ${pattern.example.card}: ${pattern.example.sentence.slice(0, 90)} |`,
     ),
     '',
   ].join('\n');
