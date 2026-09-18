@@ -27,11 +27,10 @@ import type { GameObject } from './object.js';
  * Mutating a `GameState` directly would leave that key stale, so these helpers — not
  * object spreads at the call site — are the only supported way to change state.
  *
- * `objects` is a plain `ReadonlyMap` copied on write. That is O(objects) per update,
- * which is fine at Magic's scale (a two-player game holds a few hundred objects): the
- * 1.14 benchmarks put a whole game at 2.2 ms with copying like this in it, so it is not
- * what to reach for first. If that changes, every read and write goes through this
- * module, so the representation can change here alone.
+ * `objects` is copied on write, which is O(objects) per update. That was a `Map` and a
+ * rehash of every entry until the 4.2 benchmarks priced it at about an eighth of a game;
+ * it is now an `ObjectStore`, an array indexed by id that copies as a block. The change
+ * was contained to this module and the store itself, which is what this note promised.
  */
 
 type StatePatch = Partial<Omit<GameState, 'version'>>;
@@ -86,14 +85,14 @@ export const updateObjects = (
   const entries = [...patches];
   if (entries.length === 0) return state;
 
-  const objects = new Map(state.objects);
+  const patched: [ObjectId, GameObject][] = [];
   for (const [id, patch] of entries) {
-    const existing = objects.get(id);
+    const existing = state.objects.get(id);
     if (!existing) throw new UnknownObjectError(id);
     // `id` is stripped by the patch type, so an object can never change identity.
-    objects.set(id, { ...existing, ...patch, id });
+    patched.push([id, { ...existing, ...patch, id }]);
   }
-  return updateState(state, { objects });
+  return updateState(state, { objects: state.objects.withObjects(patched) });
 };
 
 export interface NewObjectSpec {
@@ -196,11 +195,8 @@ export const createObject = (
     summoningSick: false,
   };
 
-  const objects = new Map(state.objects);
-  objects.set(id, object);
-
   const next = updateState(state, {
-    objects,
+    objects: state.objects.withObject(id, object),
     zones: withInserted(state.zones, spec.zone, id, spec.position ?? 'end'),
     nextObjectId: state.nextObjectId + 1,
     nextTimestamp: state.nextTimestamp + 1,
@@ -216,10 +212,8 @@ export const createObject = (
  */
 export const destroyObject = (state: GameState, id: ObjectId): GameState => {
   const object = getObject(state, id);
-  const objects = new Map(state.objects);
-  objects.delete(id);
   return updateState(state, {
-    objects,
+    objects: state.objects.without(id),
     zones: withRemoved(state.zones, object.zone, id),
   });
 };
@@ -281,8 +275,7 @@ export const moveObject = (
   }
 
   const zones = withInserted(withRemoved(state.zones, object.zone, id), to, id, position);
-  const objects = new Map(state.objects);
-  objects.set(id, { ...object, zone: to });
+  const objects = state.objects.withObject(id, { ...object, zone: to });
   return updateState(state, { objects, zones });
 };
 

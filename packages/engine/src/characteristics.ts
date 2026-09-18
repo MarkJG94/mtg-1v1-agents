@@ -44,8 +44,15 @@ interface BoardCache {
   readonly battlefield: readonly ObjectId[];
   readonly byId: Map<ObjectId, Characteristics>;
   readonly active: readonly ContinuousEffect[];
-  readonly byLayer: ReadonlyMap<Layer, readonly ContinuousEffect[]>;
+  /**
+   * Effects by layer, in `layers` order, so the walk indexes an array rather than asking
+   * a map eleven times for every object it looks at.
+   */
+  readonly inLayer: readonly (readonly ContinuousEffect[] | undefined)[];
 }
+
+/** Where layer 7d sits in `layers`; it is counters, which are not effects. */
+const countersLayer = layers.indexOf('7d-counters');
 
 const cache = new WeakMap<GameState['objects'], BoardCache>();
 
@@ -78,7 +85,7 @@ const boardCache = (state: GameState): BoardCache => {
     battlefield: state.zones.battlefield,
     byId: new Map(),
     active,
-    byLayer,
+    inLayer: layers.map((layer) => byLayer.get(layer)),
   };
   cache.set(state.objects, fresh);
   return fresh;
@@ -264,40 +271,52 @@ const applyLayer = (
   return current;
 };
 
+/** Layer 7d: counters are read off the object itself rather than from any effect. */
+const withCounters = (object: GameObject, working: Working): Working => {
+  const adjustment = counterCount(object, '+1/+1') - counterCount(object, '-1/-1');
+  if (adjustment === 0 || working.power === null || working.toughness === null) return working;
+  return {
+    ...working,
+    power: working.power + adjustment,
+    toughness: working.toughness + adjustment,
+  };
+};
+
+const finish = (working: Working): Characteristics => ({
+  power: working.power,
+  toughness: working.toughness,
+  keywords: working.keywords,
+  name: working.name,
+  legendary: working.legendary,
+  colours: working.colours,
+  controller: working.controller,
+  isCreature: working.power !== null && working.toughness !== null,
+});
+
 const computeFor = (state: GameState, object: GameObject): Characteristics => {
-  const applicable = boardCache(state).byLayer;
+  const board = boardCache(state);
   let working = printedOf(object);
 
-  for (const layer of layers) {
-    if (layer === '7d-counters') {
-      // Counters are layer 7d, and are not effects: they are read off the object itself.
-      const adjustment = counterCount(object, '+1/+1') - counterCount(object, '-1/-1');
-      if (adjustment !== 0 && working.power !== null && working.toughness !== null) {
-        working = {
-          ...working,
-          power: working.power + adjustment,
-          toughness: working.toughness + adjustment,
-        };
-      }
+  // A board with no continuous effect on it at all — which is most boards, most of the
+  // time — has nothing in any layer, so the only thing that can have changed this object
+  // is its own counters. Worth saying separately because this runs for every permanent on
+  // every state-based action sweep, and the walk below would otherwise ask eleven layers
+  // in turn for effects it already knows are not there.
+  if (board.active.length === 0) return finish(withCounters(object, working));
+
+  for (let index = 0; index < layers.length; index += 1) {
+    if (index === countersLayer) {
+      working = withCounters(object, working);
       continue;
     }
 
-    const inLayer = applicable.get(layer);
+    const inLayer = board.inLayer[index];
     if (inLayer === undefined || inLayer.length === 0) continue;
 
     working = applyLayer(state, object, working, inLayer);
   }
 
-  return {
-    power: working.power,
-    toughness: working.toughness,
-    keywords: working.keywords,
-    name: working.name,
-    legendary: working.legendary,
-    colours: working.colours,
-    controller: working.controller,
-    isCreature: working.power !== null && working.toughness !== null,
-  };
+  return finish(working);
 };
 
 /** What this object currently is, after every continuous effect that applies to it. */

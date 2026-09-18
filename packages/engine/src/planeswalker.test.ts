@@ -1,4 +1,4 @@
-import { asOracleId, type ObjectId, type PlayerId, playerZone } from '@mtg/shared';
+import { asOracleId, type ObjectId, type PlayerId, playerZone, steps } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
 import { currentLoyalty } from './characteristics.js';
 import {
@@ -12,6 +12,7 @@ import { runEvent } from './events/perform.js';
 import { legalActions } from './legal-actions.js';
 import {
   activateLoyaltyAbility,
+  canActivateLoyalty,
   IllegalLoyaltyActivationError,
   type LoyaltyAbility,
   legalLoyaltyAbilities,
@@ -376,6 +377,68 @@ describe('loyalty abilities (CR 606)', () => {
       ability: 'plus',
       cost: 1,
     });
+  });
+
+  /**
+   * `legalLoyaltyAbilities` asks the timing questions once, before it walks anything, so
+   * that six hundred priority grants a game do not each walk the battlefield to be told
+   * what the step already said (CR 606.3). The short cut is only sound while it agrees
+   * exactly with asking each permanent in turn — which is what `whyNotActivateLoyalty`
+   * does, and what activation itself then checks — so this asks both, everywhere.
+   */
+  it('agrees with asking each permanent in turn, in every step and for either player', () => {
+    for (const step of steps) {
+      // One planeswalker each, so a short cut that quietly only answered for the player
+      // on the play — or only for the active player's own walker — is visible here.
+      const game = board(step);
+      const walkers = (['A', 'B'] as const).map((owner) => ({
+        owner,
+        id: game.put(owner, {
+          loyalty: 3,
+          counters: { loyalty: 3 },
+          loyaltyAbilities: [plus, minus],
+        }),
+      }));
+
+      for (const active of ['A', 'B'] as const) {
+        for (const holder of ['A', 'B'] as const) {
+          const state = { ...game.state, activePlayer: active, priority: holder };
+
+          const byHand = walkers.flatMap(({ id }) =>
+            [plus, minus]
+              .filter((ability) => canActivateLoyalty(state, holder, id, ability.id))
+              .map((ability) => ({ source: id, ability })),
+          );
+
+          const where = `${step}, ${active} active, ${holder} holding`;
+          expect(legalLoyaltyAbilities(state, holder), where).toEqual(byHand);
+        }
+      }
+    }
+  });
+
+  /** Each player can reach their own, so the agreement above is not agreement on nothing. */
+  it('offers each player their own planeswalker on their own turn', () => {
+    for (const owner of ['A', 'B'] as const) {
+      const game = board('precombatMain');
+      const walker = game.put(owner, {
+        loyalty: 3,
+        counters: { loyalty: 3 },
+        loyaltyAbilities: [plus],
+      });
+      const state = { ...game.state, activePlayer: owner, priority: owner };
+      expect(legalLoyaltyAbilities(state, owner)).toEqual([{ source: walker, ability: plus }]);
+    }
+  });
+
+  /** And with a spell waiting, which is the one condition that is not about the step. */
+  it('agrees with asking each permanent in turn while something is on the stack', () => {
+    const { game, walker } = withWalker(3);
+    const spell = game.put('A', { zone: 'stack' });
+    expect(objectsIn(game.state, 'stack')).toEqual([spell]);
+
+    expect(canActivateLoyalty(game.state, 'A', walker, 'plus')).toBe(false);
+    expect(legalLoyaltyAbilities(game.state, 'A')).toEqual([]);
   });
 
   it('offers nothing for a planeswalker that has left the battlefield', () => {

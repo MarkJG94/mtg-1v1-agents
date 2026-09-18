@@ -18,7 +18,7 @@ import type { RngState } from '../rng.js';
 import type { MulliganState } from '../setup.js';
 import { type Keywords, noKeywords } from '../targeting.js';
 import type { DelayedTrigger, TriggerInstance } from '../triggers.js';
-import type { GameObject } from './object.js';
+import { ObjectStore } from './object-store.js';
 
 /**
  * Per-player state. Anything that belongs to a player rather than to an object.
@@ -69,7 +69,7 @@ export interface GameState {
   /** Successive priority passes; two in a row resolves or advances (CR 117.4). */
   readonly passesInARow: number;
   readonly players: Readonly<Record<PlayerId, PlayerState>>;
-  readonly objects: ReadonlyMap<ObjectId, GameObject>;
+  readonly objects: ObjectStore;
   /** Zone contents in order. For the library, index 0 is the top; for the stack, the bottom. */
   readonly zones: Readonly<Record<ZoneId, readonly ObjectId[]>>;
   /** Next id to hand out; object ids are never reused within a game. */
@@ -236,7 +236,7 @@ export const createGameState = (options: CreateGameStateOptions): GameState => {
     priority: null,
     passesInARow: 0,
     players,
-    objects: new Map(),
+    objects: ObjectStore.empty,
     zones: emptyZones(),
     nextObjectId: 1,
     nextTimestamp: 1,

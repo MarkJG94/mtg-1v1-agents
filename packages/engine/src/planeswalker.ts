@@ -94,11 +94,25 @@ export interface ActivatableLoyaltyAbility {
   readonly ability: LoyaltyAbility;
 }
 
-/** Every loyalty ability this player could activate right now. */
+/**
+ * Every loyalty ability this player could activate right now.
+ *
+ * The timing conditions are asked first, before anything is walked. CR 606.3 gives a
+ * loyalty ability the timing of a sorcery, and that is a fact about the *turn*, not about
+ * any permanent: outside your own main phase with an empty stack, no planeswalker you
+ * control has an activatable ability and there is nothing on the battlefield worth
+ * looking at. `legalActions` calls this on every priority grant, and four grants in five
+ * are in a step where the answer cannot be anything but none.
+ */
 export const legalLoyaltyAbilities = (
   state: GameState,
   player: PlayerId,
 ): readonly ActivatableLoyaltyAbility[] => {
+  if (state.priority !== player) return [];
+  if (state.activePlayer !== player) return [];
+  if (!isMainPhase(state.step)) return [];
+  if (!isStackEmpty(state)) return [];
+
   const found: ActivatableLoyaltyAbility[] = [];
   for (const id of objectsIn(state, 'battlefield')) {
     for (const ability of getObject(state, id).loyaltyAbilities) {

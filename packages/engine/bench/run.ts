@@ -7,10 +7,12 @@
  *
  * Three things to know before trusting a number here:
  *
- * - **Nothing is cast.** Card definitions arrive in roadmap 2.1, so a game is the turn
- *   loop, priority, mulligans, combat between the creatures put out at the start, the
- *   layer system, state-based actions and cleanup. That is the framework's cost, and the
- *   floor under every real game, but a real game will do more per decision.
+ * - **Games are played, not merely stepped.** Until roadmap 4.2 wired `legalActions` into
+ *   the priority decision, nothing was ever cast: a game was the turn loop, priority,
+ *   mulligans, combat between the creatures put out at the start, the layer system,
+ *   state-based actions and cleanup. A game now draws, plays lands, casts spells, resolves
+ *   them and fires their triggers as well, so these numbers are not comparable with any
+ *   recorded before 4.2 — the workload is a different and much larger one.
  * - **Invariant checking is off.** `playRandomGame` skips the checks `fuzzGame` makes,
  *   which cost several times what playing the game does and are not engine time.
  * - **The seeds are fixed**, so two runs play exactly the same games and any difference
@@ -31,7 +33,13 @@ import { type FuzzOptions, playRandomGame } from '../src/testing/index.js';
 /** docs/02: median game ≤ 5 ms of engine time with a trivial AI, on one core. */
 const BUDGET_MS = 5;
 
-/** Discarded games run before each case, so the JIT has settled by the first timed one. */
+/**
+ * Discarded games run before any case is timed, so the JIT has settled by the first one.
+ *
+ * Every case warms every other case, not only itself. Warming case by case meant the
+ * first case paid for compiling code that the last three then found already hot, which
+ * showed up as the baseline reading slower than a case playing exactly the same games.
+ */
 const WARMUP_GAMES = 20;
 
 interface BenchCase {
@@ -40,6 +48,16 @@ interface BenchCase {
   readonly what: string;
   readonly games: number;
   readonly options: FuzzOptions;
+  /**
+   * Seeds to play, when they should be another case's rather than this one's own.
+   *
+   * A case that exists to price one setting has to play the *same games* with it on and
+   * off, or it prices the seeds instead. Seeding from the case name meant
+   * `no-loop-detection` played two hundred different games from `baseline` and reported
+   * the difference between them as the cost of CR 726 hashing — which at one point read
+   * as nineteen per cent of a game for a check that, at the default threshold, never ran.
+   */
+  readonly seedsFrom?: string;
 }
 
 const CASES: readonly BenchCase[] = [
@@ -63,9 +81,10 @@ const CASES: readonly BenchCase[] = [
   },
   {
     name: 'no-loop-detection',
-    what: 'the baseline without CR 726 hashing, to price it',
+    what: 'the same games as the baseline without CR 726 hashing, to price it',
     games: 200,
     options: { creatures: 3, librarySize: 30, detectLoops: false },
+    seedsFrom: 'baseline',
   },
 ];
 
@@ -94,36 +113,75 @@ export interface BenchReport {
 const quantile = (sorted: readonly number[], q: number): number =>
   sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? 0;
 
-const runCase = (benchCase: BenchCase, games: number): CaseResult => {
-  for (let i = 0; i < WARMUP_GAMES; i += 1) {
-    playRandomGame(`${benchCase.name}:warmup-${i}`, benchCase.options);
+/** Play every case's shape without timing it, so no case is measured on a cold engine. */
+const warmUp = (cases: readonly BenchCase[]): void => {
+  for (const benchCase of cases) {
+    const seeds = benchCase.seedsFrom ?? benchCase.name;
+    for (let i = 0; i < WARMUP_GAMES; i += 1) {
+      playRandomGame(`${seeds}:warmup-${i}`, benchCase.options);
+    }
+  }
+};
+
+interface Timings {
+  readonly times: number[];
+  decisions: number;
+  turns: number;
+}
+
+/**
+ * Play every case's games interleaved, one from each in turn, rather than finishing one
+ * case before starting the next.
+ *
+ * Whichever case goes first pays for a colder process: inline caches, the code cache and
+ * the heap all settle as games are played, and running four cases back to back made the
+ * first read several per cent slower than the last. That is not a property of the case,
+ * and it showed plainly once `no-loop-detection` began playing the baseline's own games
+ * and still came out faster than it. Interleaving spreads whatever drift is left evenly
+ * over all of them, so the cases can be compared with each other and not only with a
+ * recorded baseline.
+ */
+const runCases = (
+  cases: readonly BenchCase[],
+  games: (benchCase: BenchCase) => number,
+): Map<string, Timings> => {
+  const timings = new Map<string, Timings>();
+  for (const benchCase of cases) timings.set(benchCase.name, { times: [], decisions: 0, turns: 0 });
+
+  const most = Math.max(...cases.map(games));
+  for (let i = 0; i < most; i += 1) {
+    for (const benchCase of cases) {
+      if (i >= games(benchCase)) continue;
+      const timing = timings.get(benchCase.name);
+      if (timing === undefined) continue;
+      const seeds = benchCase.seedsFrom ?? benchCase.name;
+
+      const started = performance.now();
+      const result = playRandomGame(`${seeds}-${i}`, benchCase.options);
+      timing.times.push(performance.now() - started);
+      timing.decisions += result.decisions.length;
+      timing.turns += result.turns;
+    }
   }
 
-  const times: number[] = [];
-  let decisions = 0;
-  let turns = 0;
+  return timings;
+};
 
-  for (let i = 0; i < games; i += 1) {
-    const started = performance.now();
-    const result = playRandomGame(`${benchCase.name}-${i}`, benchCase.options);
-    times.push(performance.now() - started);
-    decisions += result.decisions.length;
-    turns += result.turns;
-  }
-
+const summarise = (benchCase: BenchCase, timing: Timings): CaseResult => {
+  const { times, decisions, turns } = timing;
   const total = times.reduce((sum, ms) => sum + ms, 0);
   const sorted = [...times].sort((a, b) => a - b);
 
   return {
     name: benchCase.name,
-    games,
+    games: times.length,
     decisions,
     turns,
-    meanMs: total / games,
+    meanMs: total / times.length,
     medianMs: quantile(sorted, 0.5),
     p95Ms: quantile(sorted, 0.95),
     minMs: sorted[0] ?? 0,
-    gamesPerSecond: (games / total) * 1000,
+    gamesPerSecond: (times.length / total) * 1000,
     decisionsPerSecond: (decisions / total) * 1000,
   };
 };
@@ -178,7 +236,12 @@ const main = (): void => {
     throw new Error(`--games must be a positive number, got "${values.games}"`);
   }
 
-  const results = CASES.map((benchCase) => runCase(benchCase, override ?? benchCase.games));
+  warmUp(CASES);
+  const gamesFor = (benchCase: BenchCase): number => override ?? benchCase.games;
+  const timings = runCases(CASES, gamesFor);
+  const results = CASES.map((benchCase) =>
+    summarise(benchCase, timings.get(benchCase.name) ?? { times: [], decisions: 0, turns: 0 }),
+  );
 
   for (const benchCase of CASES) console.log(`${benchCase.name}: ${benchCase.what}`);
   console.log('');

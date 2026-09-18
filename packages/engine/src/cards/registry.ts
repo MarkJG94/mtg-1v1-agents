@@ -15,13 +15,37 @@ import { definitionFor } from './evaluate.js';
  * docs/03 gives for an unsupported card.
  */
 
-const infoFrom = (definition: CardDefinition): CardInfo => ({
-  isLand: hasType(definition, 'land'),
-  manaCost: definition.manaCost,
-  sorcerySpeed: isSorcerySpeed(definition),
-  colours: definition.colours,
-  targets: spellAbilityOf(definition)?.targets ?? [],
-});
+/**
+ * What `legalActions` asks about a card, derived once per definition.
+ *
+ * Nothing here depends on the game: a card's types, its cost, its colours and the target
+ * specs of its spell ability are all printed on it. `legalActions` asks this about every
+ * card in hand on every priority grant — six hundred grants a game — and it used to read
+ * the types, walk the abilities for the spell and build a fresh object each time, then
+ * throw the object away. Held weakly and keyed on the definition, so the answer outlives
+ * the call without outliving the card.
+ *
+ * The identity matters as much as the cost: `legalActions` keys its payability and
+ * targeting caches on `manaCost` and `targets` by reference, so that four copies of one
+ * card in hand ask each question once. Those come off the definition either way — this
+ * makes the object around them stable too.
+ */
+const infos = new WeakMap<CardDefinition, CardInfo>();
+
+const infoFrom = (definition: CardDefinition): CardInfo => {
+  const known = infos.get(definition);
+  if (known !== undefined) return known;
+
+  const info: CardInfo = {
+    isLand: hasType(definition, 'land'),
+    manaCost: definition.manaCost,
+    sorcerySpeed: isSorcerySpeed(definition),
+    colours: definition.colours,
+    targets: spellAbilityOf(definition)?.targets ?? [],
+  };
+  infos.set(definition, info);
+  return info;
+};
 
 /** Every mana ability of the permanents a player controls (CR 605). */
 export const manaAbilitiesOf = (state: GameState, player: PlayerId): readonly ManaAbility[] =>

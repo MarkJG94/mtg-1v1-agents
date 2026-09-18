@@ -196,6 +196,52 @@ const sbaKindForLoss = (state: GameState, losers: readonly PlayerId[]): SbaKind 
 };
 
 /**
+ * Boards already known to be settled, so a sweep that would find nothing does not run.
+ *
+ * State-based actions are checked before every priority grant (CR 704.3), and the
+ * overwhelming majority of those checks find nothing: passing priority, counting a pass
+ * and storing a decision all leave the board exactly as it was. The sweep still walked
+ * every permanent, asked each for its characteristics and looked for legendary
+ * duplicates, once per decision.
+ *
+ * What a sweep reads is the object map, the continuous effects, the zone lists and the
+ * two players — nothing else. Derived characteristics come from the first three, and
+ * `gather` reads life, poison and the empty-library flag from the fourth. So if all four
+ * are the same objects they were when the board last came up clean, the answer is the
+ * same answer, and it is the same by identity rather than by comparison: `updateState`
+ * shares whatever the patch did not touch.
+ *
+ * Keyed on the object map for the same reason `characteristics` is — it is the field
+ * that changes least often — and held weakly, so a state the game has moved past is
+ * collected rather than pinned here for the rest of the game.
+ */
+interface SettledBoard {
+  readonly effects: GameState['effects'];
+  readonly zones: GameState['zones'];
+  readonly players: GameState['players'];
+}
+
+const settled = new WeakMap<GameState['objects'], SettledBoard>();
+
+const knownSettled = (state: GameState): boolean => {
+  const known = settled.get(state.objects);
+  return (
+    known !== undefined &&
+    known.effects === state.effects &&
+    known.zones === state.zones &&
+    known.players === state.players
+  );
+};
+
+const rememberSettled = (state: GameState): void => {
+  settled.set(state.objects, {
+    effects: state.effects,
+    zones: state.zones,
+    players: state.players,
+  });
+};
+
+/**
  * Check and perform state-based actions until none apply (CR 704.3).
  *
  * Returns as soon as the game ends or a choice is needed, so the caller can hand the
@@ -206,6 +252,8 @@ export const checkStateBasedActions = (
   emitter: EventEmitter,
   limit = 100,
 ): GameState => {
+  if (knownSettled(state)) return state;
+
   let current = state;
 
   for (let pass = 0; pass < limit; pass += 1) {
@@ -219,7 +267,10 @@ export const checkStateBasedActions = (
       // Nothing mechanical left; the legend rule is all that can still apply.
       const groups = legendGroups(current);
       const group = groups[0];
-      if (!group) return current;
+      if (!group) {
+        rememberSettled(current);
+        return current;
+      }
 
       return updateState(current, {
         pendingDecision: {

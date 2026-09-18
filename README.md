@@ -28,17 +28,19 @@ TypeScript monorepo (pnpm workspaces). `packages/engine` (pure TS rules engine),
 
 ## Status
 
-Phases 0 and 1 are **done**, and phase 2 has begun: cards are data now, and the engine
-plays them — a script is YAML in a closed vocabulary, `@mtg/cards` turns it into a card
-definition, and the engine casts it, pays for it and resolves it. What is here from
-phase 1 is the
-state model, turn structure, mana, the stack and priority, targeting, combat, state-based
-actions, triggered abilities, the layer system, replacement and prevention effects,
-planeswalkers, game setup with the London mulligan, a scenario builder and invariant
-fuzzer, and benchmarks — a game plays in about 2.2 ms with the random agent, inside the
-5 ms target. Next in phase 2: the validator, a bootstrap set of hand-written scripts, and
-the resolver that puts them together. The first milestone is the end-to-end thin slice
-described in the roadmap.
+Phases 0 to 2 are **done**, phase 3's auto-scripter is built and short of its coverage
+target, and phase 4 has begun. What is here from phase 1 is the state model, turn
+structure, mana, the stack and priority, targeting, combat, state-based actions, triggered
+abilities, the layer system, replacement and prevention effects, planeswalkers, game setup
+with the London mulligan, a scenario builder and invariant fuzzer, and benchmarks. Cards
+are data: a script is YAML in a closed vocabulary, `@mtg/cards` turns it into a card
+definition, and the engine casts it, pays for it and resolves it — for a bootstrap set
+written by hand, and for whatever the auto-scripter can read off a card's oracle text,
+which is 11% of Scryfall against a 25% target. Agents come next: a play agent is given a
+view of the game rather than the game, and a priority decision now offers everything a
+player could actually do. A game plays in about 5.2 ms with the random agent, against a
+5 ms target — the roadmap's 4.2 note says where the rest of it is. The first milestone is
+the end-to-end thin slice described in the roadmap.
 
 What runs today: `pnpm dev` starts the Fastify API and the Vite dev server together,
 `pnpm fetch:scryfall` builds the card projection from Scryfall's bulk data, `pnpm bench`

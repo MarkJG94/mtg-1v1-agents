@@ -1,6 +1,7 @@
 import { asOracleId, type ObjectId, type PlayerId } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
 import {
+  activeEffects,
   addEffect,
   characteristicsOf,
   expireEndOfTurnEffects,
@@ -150,6 +151,29 @@ describe('layer 7: power and toughness', () => {
     g.state = updateObject(g.state, id, { counters: { '+1/+1': 2 } });
     g.effect(id, { kind: 'modifyPowerToughness', power: 1, toughness: 1 });
     expect([powerOf(g.state, id), toughnessOf(g.state, id)]).toEqual([5, 5]);
+  });
+
+  /**
+   * A board with nothing in any layer skips the walk altogether and reads the counters
+   * straight off the object (roadmap 4.2), which is most boards for most of a game. The
+   * two have to give the same answer, so this pins the one the short cut computes —
+   * including a creature whose counters cancel it out entirely (CR 704.5f, 704.5q).
+   */
+  it('applies counters on a board with no effects at all', () => {
+    const g = build();
+    const grown = g.put('A', { power: 2, toughness: 2 });
+    const shrunk = g.put('A', { power: 2, toughness: 2 });
+    const noncreature = g.put('A', {});
+    g.state = updateObject(g.state, grown, { counters: { '+1/+1': 3 } });
+    g.state = updateObject(g.state, shrunk, { counters: { '-1/-1': 2 } });
+    g.state = updateObject(g.state, noncreature, { counters: { '+1/+1': 2 } });
+
+    expect(activeEffects(g.state)).toEqual([]);
+    expect([powerOf(g.state, grown), toughnessOf(g.state, grown)]).toEqual([5, 5]);
+    expect([powerOf(g.state, shrunk), toughnessOf(g.state, shrunk)]).toEqual([0, 0]);
+    // Nothing to add to: a permanent with no printed power is not made into a creature
+    // by a counter (CR 613.4d).
+    expect(characteristicsOf(g.state, noncreature).isCreature).toBe(false);
   });
 
   it('counters survive a set effect, because 7d comes after 7b', () => {

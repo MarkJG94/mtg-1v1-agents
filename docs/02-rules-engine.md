@@ -35,7 +35,7 @@ interface GameState {
   priority: PlayerId | null;
   passesInARow: number;
   players: Record<PlayerId, PlayerState>;   // life, poison, mana pool, landsPlayedThisTurn, flags
-  objects: ReadonlyMap<ObjectId, GameObject>;   // every card/token/copy currently in any zone
+  objects: ObjectStore;                     // every card/token/copy in any zone, by id; a ReadonlyMap over an array (ADR 0010)
   zones: Record<ZoneId, ObjectId[]>;        // library/hand/graveyard per player; battlefield/stack/exile/command shared
   nextObjectId: number;
   nextTimestamp: number;                    // layer-system timestamps (CR 613.7)
@@ -73,7 +73,9 @@ A `GameObject` holds `definitionId`, `owner`, `controller`, `zone`, `timestamp`,
 
 The engine pauses with a `pendingDecision` whenever a player must choose. Decision kinds: `mulligan`, `bottomCards`, `priority` (pass or a list of legal actions: cast, activate, play land, special actions), `chooseTargets`, `chooseMode`, `payCost` (which permanents to sacrifice/tap, which mana to spend when ambiguous), `chooseX`, `declareAttackers`, `declareBlockers`, `orderBlockers`, `assignDamage`, `orderTriggers`, `chooseReplacement`, `chooseCardsFromLibrary`, `discard`, `distributeCounters`, `yesNo`, `chooseOption`. Every decision carries the full list of legal options so the AI never has to compute legality itself and fuzzers can pick uniformly.
 
-`legalActions(state, player, cards)` is the single source of truth for what can be cast/activated/played, including timing restrictions and cost payability (the mana solver checks the pool plus what untapped sources could still make, treating a source that offers a choice of colours as one mana with several possible types). It reads what a card *is* — land, cost, sorcery-speed — through a `CardInfoSource`, which card scripts implement in phase 2.1. Where a source's modes would make different amounts of mana it deliberately under-reports, so the function never offers an action the engine would then reject.
+`legalActions(state, player, cards)` is the single source of truth for what can be cast/activated/played, including timing restrictions and cost payability (the mana solver checks the pool plus what untapped sources could still make, treating a source that offers a choice of colours as one mana with several possible types). It reads what a card *is* — land, cost, sorcery-speed — through a `CardInfoSource`, which `cards/registry.ts` implements over the definitions in the game. Where a source's modes would make different amounts of mana it deliberately under-reports, so the function never offers an action the engine would then reject.
+
+Every priority decision carries its answer (roadmap 4.2): `withPriority` grants priority and computes the options from the state that results, because `legalActions` refuses to answer for a player who does not hold it. A cast action carries the targets that casting will then choose (CR 601.2c), one action per legal combination, since the engine has no separate "now choose targets" decision — and at most 24 of them per spell, because the combinations multiply and truncating under-reports in the direction this file is already committed to.
 
 ## Stack and priority
 
@@ -109,22 +111,35 @@ Combat is a sub-state machine: `declareAttackers` (legal attackers computed with
 - `characteristics()` memoisation invalidated only by state version bumps; effect lists are usually short so linear scans are fine.
 - No allocation-heavy patterns in the hot path (avoid spread on large arrays; zones as plain arrays; object pool for events).
 
-Measured (roadmap 1.14, `pnpm bench`): a median game with the random agent takes **2.2 ms**
-over ~510 decisions, about 400 games and 200,000 decisions a second on one core. Nothing is
-cast yet, so that is the framework's cost — the turn loop, priority, combat, the layer
-system, state-based actions, cleanup — and the floor under a real game rather than an
-estimate of one.
+Measured (roadmap 4.2, `pnpm bench`): a median game with the random agent takes **5.2 ms**
+over ~630 decisions, about 190 games and 120,000 decisions a second on one core. The
+wide-combat case is inside the budget at 3.1 ms; the baseline and long-game cases are 4%
+and 8% over it.
 
-Getting there meant fixing the engine's hottest function rather than the benchmark. Loop
-detection hashed a full position at every decision point and was nine tenths of a game's
-time; it now mixes integers as integers and, more importantly, only watches a turn once it
-has run longer than any ordinary turn (`config.loopCheckAfter`). A loop never stops being
-one, so a detector that starts late still catches it. The same investigation found the
-projection was ignoring `state.combat`, which was ending 36% of wide-board games as false
-draws. See ADR 0005.
+**These are not comparable with the 2.2 ms recorded at roadmap 1.14.** That measured a
+game in which nothing was ever cast, because card definitions did not reach the priority
+decision until 4.2: the turn loop, priority, combat between the creatures put out at the
+start, the layer system, state-based actions and cleanup. A game now draws, plays lands,
+casts spells, resolves them and fires their triggers as well, on a board that grows. The
+same engine measured 46 ms a game the day that was connected, and the work since is what
+brought it to 5.2.
+
+Two rounds of that work are recorded. Loop detection hashed a full position at every
+decision point and was nine tenths of a game at 1.14; it now mixes integers as integers
+and only watches a turn once it has run longer than any ordinary turn
+(`config.loopCheckAfter`). A loop never stops being one, so a detector that starts late
+still catches it — and the same investigation found the projection was ignoring
+`state.combat`, which was ending 36% of wide-board games as false draws (ADR 0005). At 4.2
+the object table stopped being a `Map` rehashed on every write and became an array indexed
+by object id, which was a fifth of the engine's time (ADR 0010).
 
 Benchmarks live in `packages/engine/bench` and run in CI, which compares each run against
-the last one recorded on `main` and fails on a regression greater than 20%.
+the last one recorded on `main` and fails on a regression greater than 20%. Cases are
+played interleaved, a game from each in turn, after a warm-up over all of them: run one
+case to completion before the next and whichever goes first pays for a colder process,
+which was reading as several per cent that belonged to no case. A case that exists to
+price one setting — `no-loop-detection` — plays the *same seeds* as the case it is
+compared with, so the difference is the setting rather than the games.
 
 ## Cards
 

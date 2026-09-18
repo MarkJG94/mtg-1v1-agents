@@ -128,7 +128,7 @@ describe('the view is a function of only what is visible', () => {
 
   /** The same game with every hidden card renamed and renumbered, and nothing else moved. */
   const reshuffleTheUnseen = (state: GameState): GameState => {
-    const objects = new Map(state.objects);
+    let objects = state.objects;
     const zones = { ...state.zones };
     let next = state.nextObjectId;
 
@@ -137,10 +137,14 @@ describe('the view is a function of only what is visible', () => {
       for (const id of state.zones[zone]) {
         const object = objects.get(id);
         if (object === undefined) continue;
-        objects.delete(id);
+        objects = objects.without(id);
         next += 1;
         const renumbered = next as unknown as ObjectId;
-        objects.set(renumbered, { ...object, id: renumbered, name: `unseen-${renumbered}` });
+        objects = objects.withObject(renumbered, {
+          ...object,
+          id: renumbered,
+          name: `unseen-${renumbered}`,
+        });
         fresh.push(renumbered);
       }
       zones[zone] = fresh;

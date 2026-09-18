@@ -1,5 +1,6 @@
 import { asOracleId, type ObjectId, type PlayerId, playerZone } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
+import { addEffect } from './characteristics.js';
 import { createEventEmitter, type EventEmitter } from './events/emitter.js';
 import { stateFromSeed } from './rng.js';
 import { applyLegendRule, checkStateBasedActions, legendGroups } from './sba.js';
@@ -374,5 +375,78 @@ describe('repeating until nothing applies (CR 704.3)', () => {
     g.put('A', { power: 2, toughness: 2 });
     const before = g.state;
     expect(check(before, g.emitter)).toBe(before);
+  });
+});
+
+/**
+ * The settled-board memo (roadmap 4.2).
+ *
+ * A sweep that finds nothing is remembered against the four things it read, so the next
+ * one over the same board can be skipped — which is most of them, because passing
+ * priority and storing a decision change nothing a state-based action looks at. The
+ * danger is the opposite of a slow engine: a board remembered as settled that has since
+ * stopped being settled is a creature that should be dead and is not, and no test of the
+ * rules themselves would notice, because the rules are right and never asked.
+ *
+ * So each of these settles a board first — which is what puts it in the memo — and then
+ * changes exactly one of the four and checks the sweep still runs.
+ */
+describe('a board remembered as settled is re-checked when it changes', () => {
+  /** Sweep once so the board is remembered, and hand back a state that is unchanged. */
+  const settle = (g: ReturnType<typeof build>): GameState => {
+    const before = g.state;
+    expect(check(before, g.emitter)).toBe(before);
+    return before;
+  };
+
+  it('still sees a player who has since lost, with every object the same', () => {
+    const g = build();
+    g.put('A', { power: 2, toughness: 2 });
+    const settled = settle(g);
+
+    // `updatePlayer` rewrites the players record and shares everything else, so this is
+    // the same object table and the same zones as the board just found clean.
+    const dying = updatePlayer(settled, 'B', { life: 0 });
+    expect(dying.objects).toBe(settled.objects);
+    expect(dying.zones).toBe(settled.zones);
+
+    expect(check(dying, g.emitter).result).toMatchObject({ winner: 'A', reason: 'life' });
+  });
+
+  it('still sees a creature that has since taken lethal damage', () => {
+    const g = build();
+    const creature = g.put('A', { power: 2, toughness: 2 });
+    const settled = settle(g);
+
+    const damaged = updateObject(settled, creature, { damage: 2 });
+    expect(objectsIn(check(damaged, g.emitter), 'battlefield')).toEqual([]);
+  });
+
+  /**
+   * An effect is the case the object table cannot see: nothing about the creature changes,
+   * and it dies because something else on the board now says it is a 0/0 (CR 704.5f).
+   */
+  it('still sees a creature an effect has since shrunk to nothing', () => {
+    const g = build();
+    const creature = g.put('A', { power: 2, toughness: 2 });
+    const settled = settle(g);
+
+    const shrunk = addEffect(settled, {
+      source: creature,
+      affects: { kind: 'allCreatures' },
+      change: { kind: 'modifyPowerToughness', power: -2, toughness: -2 },
+      duration: { kind: 'untilEndOfTurn' },
+    }).state;
+    expect(shrunk.objects).toBe(settled.objects);
+
+    expect(objectsIn(check(shrunk, g.emitter), 'battlefield')).toEqual([]);
+  });
+
+  /** And the memo has to be doing something: an unchanged board is answered from it. */
+  it('answers an unchanged board without sweeping it again', () => {
+    const g = build();
+    g.put('A', { power: 2, toughness: 2 });
+    const settled = settle(g);
+    expect(check(settled, g.emitter)).toBe(settled);
   });
 });
