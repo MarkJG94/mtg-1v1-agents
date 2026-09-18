@@ -1,12 +1,22 @@
-import { type Colour, isMainPhase, type ObjectId, type PlayerId, playerZone } from '@mtg/shared';
+import {
+  type Colour,
+  type EventTarget,
+  isMainPhase,
+  type ObjectId,
+  type PlayerId,
+  playerZone,
+} from '@mtg/shared';
+import type { TargetSpec } from './cards/definition.js';
+import { matchesFilter } from './cards/evaluate.js';
 import type { ManaAbility } from './mana/ability.js';
 import type { ManaCost } from './mana/cost.js';
 import { canPayFromSources, type PotentialMana } from './mana/payment.js';
 import { legalLoyaltyAbilities } from './planeswalker.js';
-import { isStackEmpty, splitSecondActive } from './stack.js';
+import { isStackEmpty, splitSecondActive } from './stack-query.js';
 import type { GameState } from './state/game-state.js';
 import { isGameOver } from './state/game-state.js';
 import { getObject, objectsIn } from './state/update.js';
+import { allTargets, canBeTargeted } from './targeting.js';
 import { landsRemainingThisTurn } from './turn/land.js';
 
 /**
@@ -28,6 +38,8 @@ export interface CardInfo {
   readonly sorcerySpeed: boolean;
   /** The spell's colours, which decide what protection stops it. */
   readonly colours: readonly Colour[];
+  /** What the spell ability targets (CR 601.2c), so the choices can be enumerated. */
+  readonly targets: readonly TargetSpec[];
 }
 
 export interface CardInfoSource {
@@ -40,7 +52,17 @@ export interface CardInfoSource {
 export type LegalAction =
   | { readonly kind: 'pass' }
   | { readonly kind: 'playLand'; readonly object: ObjectId }
-  | { readonly kind: 'cast'; readonly object: ObjectId; readonly cost: ManaCost }
+  | {
+      readonly kind: 'cast';
+      readonly object: ObjectId;
+      readonly cost: ManaCost;
+      /**
+       * The targets this particular casting would choose, in the order the spell's specs
+       * declare them. One entry per legal combination, so a burn spell with three legal
+       * targets appears as three actions rather than one with a choice still to make.
+       */
+      readonly targets: readonly EventTarget[];
+    }
   /** A planeswalker's loyalty ability (CR 606). Its cost is counters, not mana. */
   | {
       readonly kind: 'activateLoyalty';
@@ -78,10 +100,7 @@ export const potentialManaFor = (
       const types = new Set<PotentialMana['types'][number]>();
       let snow = false;
       for (const mode of ability.modes) {
-        const flattened = mode.flatMap((production) =>
-          Array.from({ length: production.amount }, () => production),
-        );
-        const production = flattened[slot];
+        const production = productionAt(mode, slot);
         if (!production) continue;
         types.add(production.type);
         snow = snow || (production.snow ?? false);
@@ -91,6 +110,26 @@ export const potentialManaFor = (
   }
 
   return potential;
+};
+
+/**
+ * Which production fills slot `slot` of a mode, counting `amount` as that many slots.
+ *
+ * Walked rather than materialised. This used to flatten the whole mode into an array for
+ * every slot of every ability on every call, and `legalActions` runs on every priority
+ * grant — about six hundred times a game, twice over. That allocation was half the cost
+ * of the function and a third of the cost of a whole game.
+ */
+const productionAt = (
+  mode: ManaAbility['modes'][number],
+  slot: number,
+): ManaAbility['modes'][number][number] | undefined => {
+  let seen = 0;
+  for (const production of mode) {
+    seen += production.amount;
+    if (slot < seen) return production;
+  }
+  return undefined;
 };
 
 /** Whether a land may be played right now (CR 305.1). */
@@ -104,6 +143,40 @@ const canPlayLandNow = (state: GameState, player: PlayerId): boolean =>
 const canCastNow = (state: GameState, player: PlayerId, sorcerySpeed: boolean): boolean =>
   !sorcerySpeed ||
   (state.activePlayer === player && isMainPhase(state.step) && isStackEmpty(state));
+
+/**
+ * What the board could still tap for, cached against the objects it was derived from.
+ *
+ * Every priority grant asks this, and answering it walks every permanent, reads its
+ * definition and flattens its mana abilities. But the answer depends only on the objects
+ * — who controls what, what is tapped, what is where — and `updateObjects` copies the
+ * object map whenever any of that changes. So the map's identity is exactly the right
+ * key: unchanged map, unchanged answer, and a run of priority passes through a step pays
+ * for it once instead of six times.
+ *
+ * Not keyed on the state, which changes on every update including ones that touch nothing
+ * an untapped land cares about.
+ */
+const potentialCache = new WeakMap<GameState['objects'], Map<PlayerId, readonly PotentialMana[]>>();
+
+const cachedPotentialMana = (
+  state: GameState,
+  player: PlayerId,
+  cards: CardInfoSource,
+): readonly PotentialMana[] => {
+  let byPlayer = potentialCache.get(state.objects);
+  if (byPlayer === undefined) {
+    byPlayer = new Map();
+    potentialCache.set(state.objects, byPlayer);
+  }
+
+  const known = byPlayer.get(player);
+  if (known !== undefined) return known;
+
+  const computed = potentialManaFor(state, player, cards.manaAbilitiesFor?.(state, player) ?? []);
+  byPlayer.set(player, computed);
+  return computed;
+};
 
 export const legalActions = (
   state: GameState,
@@ -129,9 +202,23 @@ export const legalActions = (
     });
   }
 
-  const abilities = cards.manaAbilitiesFor?.(state, player) ?? [];
-  const potential = potentialManaFor(state, player, abilities);
+  // Priced lazily: working out what the board could still tap for means walking every
+  // permanent, and most priority grants are answered without anyone casting anything —
+  // an empty hand, or a hand of nothing but lands in a step where lands cannot be played.
   const pool = state.players[player].manaPool;
+  let potential: readonly PotentialMana[] | null = null;
+  const payable = new Map<ManaCost, boolean>();
+  const targetings = new Map<readonly TargetSpec[], readonly (readonly EventTarget[])[]>();
+  const canPay = (cost: ManaCost): boolean => {
+    const known = payable.get(cost);
+    if (known !== undefined) return known;
+    potential ??= cachedPotentialMana(state, player, cards);
+    // Cards come by their cost from their definition, so four copies of one card in hand
+    // share the object this is keyed on and the solver runs once for all of them.
+    const answer = canPayFromSources(pool, potential, cost, { life: state.players[player].life });
+    payable.set(cost, answer);
+    return answer;
+  };
 
   for (const id of objectsIn(state, playerZone(player, 'hand'))) {
     const info = cards.infoFor(state, id);
@@ -144,14 +231,99 @@ export const legalActions = (
     }
 
     if (!canCastNow(state, player, info.sorcerySpeed)) continue;
-    if (!canPayFromSources(pool, potential, info.manaCost, { life: state.players[player].life })) {
-      continue;
+    if (!canPay(info.manaCost)) continue;
+
+    // Four copies of one card in hand ask the same question, and the answer depends only
+    // on the board — so the enumeration is keyed on the spec list, which comes from the
+    // definition and is therefore the same object for every copy.
+    let choices = targetings.get(info.targets);
+    if (choices === undefined) {
+      choices = targetChoices(state, player, id, info);
+      targetings.set(info.targets, choices);
     }
-    actions.push({ kind: 'cast', object: id, cost: info.manaCost });
+    for (const targets of choices) {
+      actions.push({ kind: 'cast', object: id, cost: info.manaCost, targets });
+    }
   }
 
   return actions;
 };
+
+/**
+ * How many castings of one spell are offered when its targets can be chosen several ways.
+ *
+ * A cap rather than a complete enumeration, because the combinations multiply: a spell
+ * with two targets on a board of ten permanents has ninety of them, and a search that had
+ * to score all ninety would spend the whole turn on one card. Truncating **under-reports**,
+ * which is the direction this file is already committed to — every action offered is one
+ * the engine will accept, and a play that is legal but not offered costs a better line
+ * rather than a crash.
+ */
+const MOST_TARGETINGS = 24;
+
+/**
+ * Every way this spell could have its targets chosen, or `[[]]` for one that has none.
+ *
+ * Targets are chosen as the spell is cast (CR 601.2c), and the engine has no separate
+ * "now choose targets" decision — so the choice has to be part of the action rather than
+ * something answered afterwards. Each combination is checked exactly the way casting will
+ * check it, filter and targetability both, so an offered action cannot be refused.
+ *
+ * A spell whose targets *must* be chosen and cannot legally be is not offered at all
+ * (CR 601.2c): "destroy target creature" with no creature on the board is not castable,
+ * and offering it with an empty list would be offering an illegal cast.
+ */
+const targetChoices = (
+  state: GameState,
+  player: PlayerId,
+  source: ObjectId,
+  info: CardInfo,
+): readonly (readonly EventTarget[])[] => {
+  if (info.targets.length === 0) return [[]];
+
+  const card = { controller: player, colours: info.colours };
+  const candidates = allTargets(state).filter((target) => canBeTargeted(state, target, card).legal);
+  const context = { source, controller: player, targets: {}, x: 0 };
+
+  // One list of candidates per slot: a spec taking two targets contributes two slots that
+  // draw from the same pool, and the duplicate check below keeps them distinct.
+  const slots: (readonly EventTarget[])[] = [];
+  for (const spec of info.targets) {
+    const allowed = candidates.filter((target) =>
+      matchesFilter(state, context, spec.filter, target),
+    );
+    for (let i = 0; i < (spec.count ?? 1); i += 1) slots.push(allowed);
+  }
+
+  let combinations: EventTarget[][] = [[]];
+  for (const slot of slots) {
+    const grown: EventTarget[][] = [];
+    for (const so_far of combinations) {
+      for (const target of slot) {
+        // CR 601.2c: the same target cannot be chosen twice for one instance of "target".
+        if (so_far.some((chosen) => sameTarget(chosen, target))) continue;
+        grown.push([...so_far, target]);
+        if (grown.length >= MOST_TARGETINGS) break;
+      }
+      if (grown.length >= MOST_TARGETINGS) break;
+    }
+    combinations = grown;
+    if (combinations.length === 0) break;
+  }
+
+  // "Up to N" is satisfied by choosing none, and that is sometimes the only legal choice
+  // (CR 601.2c). A spell whose targets are all optional therefore always has at least one
+  // way to be cast, even on an empty board.
+  if (info.targets.every((spec) => spec.upTo === true)) {
+    return [[], ...combinations.filter((each) => each.length > 0)];
+  }
+  return combinations;
+};
+
+const sameTarget = (left: EventTarget, right: EventTarget): boolean =>
+  left.kind === 'player' && right.kind === 'player'
+    ? left.player === right.player
+    : left.kind === 'object' && right.kind === 'object' && left.object === right.object;
 
 /** Whether the object is one the player could cast right now. */
 export const canCast = (

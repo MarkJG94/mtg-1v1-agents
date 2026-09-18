@@ -1,6 +1,7 @@
 import type { EventTarget, ObjectId, PlayerId } from '@mtg/shared';
 import type { BlockDeclaration } from './combat.js';
 import type { RulesEvent } from './events/rules-event.js';
+import type { LegalAction } from './legal-actions.js';
 
 /**
  * Decisions (docs/01 "Engine execution model", docs/02 "Decisions").
@@ -16,16 +17,20 @@ import type { RulesEvent } from './events/rules-event.js';
  * `mulligan` and `bottomCards` in 1.12.
  */
 
-/** What a player may do while holding priority. */
-export type PriorityAction = { readonly kind: 'pass' };
+/**
+ * What a player may do while holding priority — which is exactly `legalActions`, since
+ * that is the single source of truth for legality (docs/02) and a second list would be a
+ * second opinion.
+ */
+export type PriorityAction = LegalAction;
 
 export interface PriorityDecision {
   readonly kind: 'priority';
   readonly player: PlayerId;
   /**
-   * The actions the engine knows are legal. For now that is only passing: enumerating
-   * what can be cast, activated or played is `legalActions`, which is roadmap 1.5. Until
-   * then a driver holding priority calls `putOnStack` directly.
+   * Everything the engine knows this player may do: pass, play a land, cast a spell with
+   * its targets already chosen, activate a loyalty ability. Built by `priorityOptions`,
+   * and the invariant docs/09 asks for is that nothing offered here is then refused.
    */
   readonly options: readonly PriorityAction[];
 }
@@ -163,7 +168,13 @@ export class UnexpectedDecisionError extends Error {
   }
 }
 
-/** The decision handed to whoever receives priority (CR 117.1). */
+/**
+ * A priority decision with nothing but passing on it.
+ *
+ * Kept for the places that build a decision without a state to ask — tests about the
+ * decision pipeline itself. Real play goes through `priorityOptions`, which fills the
+ * options in from `legalActions`.
+ */
 export const priorityDecision = (player: PlayerId): PriorityDecision => ({
   kind: 'priority',
   player,

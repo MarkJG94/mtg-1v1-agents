@@ -3,7 +3,7 @@ import type { CardInfo, CardInfoSource } from '../legal-actions.js';
 import type { ManaAbility } from '../mana/ability.js';
 import type { GameState } from '../state/game-state.js';
 import { objectsIn } from '../state/update.js';
-import { type CardDefinition, hasType, isSorcerySpeed } from './definition.js';
+import { type CardDefinition, hasType, isSorcerySpeed, spellAbilityOf } from './definition.js';
 import { definitionFor } from './evaluate.js';
 
 /**
@@ -20,6 +20,7 @@ const infoFrom = (definition: CardDefinition): CardInfo => ({
   manaCost: definition.manaCost,
   sorcerySpeed: isSorcerySpeed(definition),
   colours: definition.colours,
+  targets: spellAbilityOf(definition)?.targets ?? [],
 });
 
 /** Every mana ability of the permanents a player controls (CR 605). */

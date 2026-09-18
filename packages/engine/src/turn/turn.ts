@@ -8,6 +8,7 @@ import {
   skipsPriority,
   steps,
 } from '@mtg/shared';
+import { castSpell } from '../cards/cast.js';
 import { resolveTop } from '../cards/resolve.js';
 import { expireEndOfTurnEffects } from '../characteristics.js';
 import {
@@ -27,7 +28,7 @@ import {
 import {
   type Decision,
   type DecisionResponse,
-  priorityDecision,
+  type PriorityAction,
   UnexpectedDecisionError,
 } from '../decision.js';
 import type { EventEmitter } from '../events/emitter.js';
@@ -36,6 +37,8 @@ import type { MoveZoneEvent } from '../events/rules-event.js';
 import { drawGame } from '../game-end.js';
 import { hashState, isRepeatedState, rememberState } from '../loop.js';
 import { emptyManaPool, isManaPoolEmpty } from '../mana/pool.js';
+import { activateLoyaltyAbility } from '../planeswalker.js';
+import { withPriority } from '../priority.js';
 import { expireEndOfTurnReplacements } from '../replacement.js';
 import { applyLegendRule, checkStateBasedActions } from '../sba.js';
 import { applyBottomCards, applyMulligan } from '../setup.js';
@@ -51,6 +54,7 @@ import {
   triggersFromStep,
   triggersInApnapOrder,
 } from '../triggers.js';
+import { playLand } from './land.js';
 
 /**
  * Turn structure (CR 500): walking the steps, and the turn-based actions that happen
@@ -410,7 +414,7 @@ const stackOneTrigger = (
 
 /** Hand a player priority and stop for their decision (CR 117.1). */
 const grantPriority = (state: GameState, player: PlayerId): GameState =>
-  updateState(state, { priority: player, pendingDecision: priorityDecision(player) });
+  withPriority(state, player);
 
 /**
  * Run the game forward until a player must decide, or it ends.
@@ -517,7 +521,13 @@ export const applyDecision = (
   } else if (decision.kind === 'bottomCards' && response.kind === 'bottomCards') {
     next = afterSetup(applyBottomCards(cleared, emitter, decision.player, response.cards), emitter);
   } else {
-    next = applyPriority(cleared, emitter, decision as Extract<Decision, { kind: 'priority' }>);
+    const priority = decision as Extract<Decision, { kind: 'priority' }>;
+    if (response.kind !== 'priority') {
+      throw new UnexpectedDecisionError(
+        `the game is waiting for a priority decision, and the answer was "${response.kind}"`,
+      );
+    }
+    next = applyPriority(cleared, emitter, priority, response.action);
   }
 
   return advanceToDecision(next, emitter);
@@ -553,16 +563,38 @@ const afterSetup = (state: GameState, emitter: EventEmitter): GameState =>
     : state;
 
 /**
- * A pass. Two passes in a row resolve the top of the stack, or end the step when the
- * stack is empty (CR 117.4). Anything else the player might do is not a decision option
- * yet — a driver holding priority calls `putOnStack` directly — so this only handles
- * passing until `legalActions` arrives in roadmap 1.5.
+ * What a player does with priority: pass, or take one of the actions `legalActions`
+ * offered (CR 117.1).
+ *
+ * Everything but passing leaves the player still holding priority — casting a spell or
+ * playing a land does not give it up (CR 117.3c) — so those return without touching the
+ * pass count's meaning. Only a pass advances the two-passes-in-a-row that resolves the
+ * top of the stack or ends the step (CR 117.4).
  */
 const applyPriority = (
   state: GameState,
   emitter: EventEmitter,
   decision: Extract<Decision, { kind: 'priority' }>,
+  action: PriorityAction,
 ): GameState => {
+  switch (action.kind) {
+    case 'pass':
+      break;
+    case 'playLand':
+      // Playing a land is a special action: it uses no stack, so the player simply has
+      // priority again afterwards with a shorter list of things they may do.
+      return withPriority(
+        playLand(state, emitter, decision.player, action.object),
+        decision.player,
+      );
+    case 'cast':
+      // `castSpell` hands priority back itself (CR 117.3c), with the options recomputed,
+      // because putting a spell on the stack is what restarts the pass count.
+      return castSpell(state, emitter, decision.player, action.object, { targets: action.targets });
+    case 'activateLoyalty':
+      return activateLoyaltyAbility(state, emitter, decision.player, action.object, action.ability);
+  }
+
   const passes = state.passesInARow + 1;
   if (passes < playerIds.length) {
     return grantPriority(updateState(state, { passesInARow: passes }), opponentOf(decision.player));
@@ -581,9 +613,16 @@ const applyPriority = (
   );
   // CR 117.5: before anyone actually receives priority, state-based actions are checked
   // and anything that has triggered goes on the stack. `advanceToDecision` is the one
-  // place that does all of it in order, so resolution hands back to it rather than
-  // granting priority itself and leaving a trigger waiting a whole round.
-  return resolved.pendingDecision === null ? advanceToDecision(resolved, emitter) : resolved;
+  // place that does all of it in order — and `applyDecision` calls it on whatever this
+  // returns, so resolution hands the state back rather than running it forward here.
+  //
+  // It used to call `advanceToDecision` itself when nothing was pending, and then
+  // `applyDecision` called it a second time on the result. Both calls settle on the same
+  // position, and the second one hashed it again — so loop detection saw every
+  // post-resolution position twice and called the game a draw. Nothing could reach it
+  // until 4.2 let a fuzz game put a spell on the stack, and the default threshold of two
+  // hundred decisions a turn hid it from every game but an eagerly-checked one.
+  return resolved;
 };
 
 /** Put one player's queued triggers on the stack in the order they chose. */

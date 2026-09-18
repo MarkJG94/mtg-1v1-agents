@@ -7,9 +7,9 @@ import {
   playerZone,
   type ZoneId,
 } from '@mtg/shared';
-import { priorityDecision } from './decision.js';
 import type { EventEmitter } from './events/emitter.js';
 import { runEvent } from './events/perform.js';
+import { withPriority } from './priority.js';
 import type { GameState } from './state/game-state.js';
 import {
   createObject,
@@ -18,7 +18,6 @@ import {
   moveObject,
   objectsIn,
   updateObject,
-  updateState,
 } from './state/update.js';
 import { canBeTargeted, type TargetSource } from './targeting.js';
 
@@ -66,14 +65,11 @@ export interface StackProperties {
 export const topOfStack = (state: GameState): ObjectId | undefined =>
   objectsIn(state, 'stack').at(-1);
 
-export const isStackEmpty = (state: GameState): boolean => objectsIn(state, 'stack').length === 0;
+// Both moved to `stack-query.ts`, which imports nothing from here, so that
+// `legal-actions.ts` can ask them without the two files importing each other.
+export { isStackEmpty, splitSecondActive } from './stack-query.js';
 
-/**
- * Whether a split-second spell is waiting to resolve (CR 702.61a). While one is, players
- * may not cast spells or activate abilities that are not mana abilities.
- */
-export const splitSecondActive = (state: GameState): boolean =>
-  objectsIn(state, 'stack').some((id) => getObject(state, id).stack?.splitSecond === true);
+import { splitSecondActive } from './stack-query.js';
 
 export class IllegalStackActionError extends Error {
   constructor(message: string) {
@@ -152,11 +148,7 @@ export const putOnStack = (
   // The caster receives priority again (CR 117.3c), and the pass count restarts because
   // a spell went on the stack. Handing priority back here rather than leaving the caller
   // to do it keeps the state always answerable.
-  return updateState(moved, {
-    passesInARow: 0,
-    priority: player,
-    pendingDecision: priorityDecision(player),
-  });
+  return withPriority(moved, player, { passesInARow: 0 });
 };
 
 const describeTarget = (target: EventTarget): string =>
@@ -363,9 +355,5 @@ export const putActivatedAbilityOnStack = (
   });
   emitter.emit(created, { type: 'putOnStack', object: id });
 
-  return updateState(created, {
-    passesInARow: 0,
-    priority: ability.controller,
-    pendingDecision: priorityDecision(ability.controller),
-  });
+  return withPriority(created, ability.controller, { passesInARow: 0 });
 };

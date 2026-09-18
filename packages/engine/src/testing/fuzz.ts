@@ -14,6 +14,7 @@ import {
 } from '../state/game-state.js';
 import { checkStateInvariants, createObject, getObject, objectsIn } from '../state/update.js';
 import { applyDecision } from '../turn/turn.js';
+import { fuzzDeck, fuzzLand } from './fuzz-cards.js';
 import { randomDecision } from './random-agent.js';
 
 /**
@@ -29,9 +30,12 @@ import { randomDecision } from './random-agent.js';
  * prefix is docs/09's next refinement and wants the shrinking that a property-testing
  * library gives; the seed alone has been enough so far.
  *
- * Without card definitions (roadmap 2.1) nothing can be cast, so what this exercises is
- * the framework: the turn loop, priority, mulligans, combat, state-based actions,
- * cleanup, the caps and loop detection. That is most of what phase 1 built.
+ * It used to exercise only the framework — the turn loop, priority, mulligans, combat,
+ * state-based actions, cleanup, the caps and loop detection — because nothing could be
+ * cast: the priority decision offered only `pass`. 4.2 wired `legalActions` into that
+ * decision and dealt the fuzzer a small deck (`fuzz-cards.ts`), so games now pay costs,
+ * choose targets, put spells and triggered abilities on the stack and resolve them. That
+ * is a different and much larger surface, which is the point.
  */
 
 export interface FuzzOptions extends Partial<CreateGameStateOptions> {
@@ -142,6 +146,7 @@ const buildBoard = (seed: string, options: FuzzOptions): GameState => {
   let state = createGameState({
     rng: createRng(seed).save(),
     onPlay: rng.pick(playerIds),
+    definitions: fuzzDeck,
     ...options,
   });
 
@@ -149,8 +154,11 @@ const buildBoard = (seed: string, options: FuzzOptions): GameState => {
 
   for (const player of playerIds) {
     for (let i = 0; i < (options.librarySize ?? 30); i += 1) {
+      // Half lands, half spells: a deck that cannot pay for anything fuzzes the same
+      // passing-only game the fuzzer played before it had cards at all.
+      const card = i % 2 === 0 ? fuzzLand : rng.pick(fuzzDeck);
       state = createObject(state, {
-        definitionId,
+        definitionId: card.oracleId,
         owner: player,
         zone: playerZone(player, 'library'),
       }).state;

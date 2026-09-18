@@ -1,6 +1,7 @@
 import type { Colour, GameResult, ObjectId, OracleId, PlayerId, Step, ZoneId } from '@mtg/shared';
 import type { CardType } from '../cards/vocabulary.js';
 import type { Keywords } from '../keywords.js';
+import type { ManaType } from '../mana/pool.js';
 
 /**
  * What one player can see (docs/04 "Play agent").
@@ -47,6 +48,18 @@ export interface VisibleObject {
   readonly types: readonly CardType[];
   /** The printed mana value, for curve and castability terms in an evaluator. */
   readonly manaValue: number;
+  /**
+   * The colours in this card's mana cost, which is what deciding whether a hand is
+   * castable actually needs — a card's own colour is not the same thing, and a land's is
+   * neither (a Forest is colourless and taps for green).
+   */
+  readonly costColours: readonly Colour[];
+  /**
+   * Every mana type this permanent's own mana abilities could make (CR 605), as the union
+   * over their modes. Public: what a land taps for is written on it. Empty for anything
+   * that makes no mana, which is most cards.
+   */
+  readonly producesMana: readonly ManaType[];
 
   // --- Per-object rules state ---
   readonly tapped: boolean;

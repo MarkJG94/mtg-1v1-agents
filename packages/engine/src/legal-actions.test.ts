@@ -21,6 +21,7 @@ const info = (overrides: Partial<CardInfo> = {}): CardInfo => ({
   manaCost: parseManaCost('{R}'),
   sorcerySpeed: false,
   colours: ['R'],
+  targets: [],
   ...overrides,
 });
 
@@ -122,6 +123,7 @@ describe('casting spells', () => {
       kind: 'cast',
       object: ids[0],
       cost: parseManaCost('{R}'),
+      targets: [],
     });
   });
 

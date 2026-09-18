@@ -8,10 +8,11 @@ import {
   playerZone,
   type ZoneId,
 } from '@mtg/shared';
+import type { CardDefinition } from '../cards/definition.js';
 import { characteristicsOf } from '../characteristics.js';
 import type { CombatState } from '../combat.js';
-import { manaValue } from '../mana/cost.js';
-import { manaPoolCounts } from '../mana/pool.js';
+import { costColours, manaValue } from '../mana/cost.js';
+import { type ManaType, manaPoolCounts } from '../mana/pool.js';
 import type { GameState } from '../state/game-state.js';
 import type { GameObject } from '../state/object.js';
 import type {
@@ -98,6 +99,8 @@ const visible = (state: GameState, object: GameObject): VisibleObject => {
 
     types: definition === undefined ? [] : [...definition.types],
     manaValue: definition === undefined ? 0 : manaValue(definition.manaCost),
+    costColours: definition === undefined ? [] : [...costColours(definition.manaCost)],
+    producesMana: definition === undefined ? [] : manaTypesOf(definition),
 
     tapped: object.tapped,
     damage: object.damage,
@@ -110,6 +113,20 @@ const visible = (state: GameState, object: GameObject): VisibleObject => {
     attachedTo: object.attachedTo,
     attachments: [...object.attachments],
   };
+};
+
+/**
+ * The mana types a card's own abilities could make, without saying how many or in what
+ * combination. Enough for "can I cast this", which is what an evaluator asks; the exact
+ * question is `canPayFromSources`, and that needs a state.
+ */
+const manaTypesOf = (definition: CardDefinition): readonly ManaType[] => {
+  const types = new Set<ManaType>();
+  for (const ability of definition.abilities) {
+    if (ability.kind !== 'mana') continue;
+    for (const mode of ability.modes) for (const produced of mode) types.add(produced.type);
+  }
+  return [...types];
 };
 
 const side = (state: GameState, player: PlayerId): OpponentSideView => {

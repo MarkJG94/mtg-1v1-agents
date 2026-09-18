@@ -26,7 +26,63 @@ import { updateState } from './state/update.js';
  * which produce a new state object and so a new cache entry.
  */
 
-const cache = new WeakMap<GameState, Map<ObjectId, Characteristics>>();
+/**
+ * Everything memoised about one board, and what it was derived from.
+ *
+ * Keyed on the object map rather than on the state, because a `GameState` is a new object
+ * after every update and almost none of those updates touch anything a characteristic
+ * depends on: granting priority, storing a decision, counting a pass. `updateState`
+ * spreads, so the object map, the effect list and the battlefield keep their identity
+ * across all of those — and when all three are unchanged, so is every answer here.
+ *
+ * Before this, a board of twenty-five permanents recomputed all twenty-five from printed
+ * values on every one of six hundred states in a game, because state-based actions ask
+ * about each of them the moment a state is new.
+ */
+interface BoardCache {
+  readonly effects: GameState['effects'];
+  readonly battlefield: readonly ObjectId[];
+  readonly byId: Map<ObjectId, Characteristics>;
+  readonly active: readonly ContinuousEffect[];
+  readonly byLayer: ReadonlyMap<Layer, readonly ContinuousEffect[]>;
+}
+
+const cache = new WeakMap<GameState['objects'], BoardCache>();
+
+const boardCache = (state: GameState): BoardCache => {
+  const existing = cache.get(state.objects);
+  if (
+    existing !== undefined &&
+    existing.effects === state.effects &&
+    existing.battlefield === state.zones.battlefield
+  ) {
+    return existing;
+  }
+
+  const active = [...state.effects, ...staticEffects(state)].filter((effect) => {
+    if (effect.duration.kind !== 'whileSourceOnBattlefield') return true;
+    return state.objects.get(effect.source)?.zone === 'battlefield';
+  });
+
+  const byLayer = new Map<Layer, ContinuousEffect[]>();
+  for (const effect of active) {
+    const bucket = byLayer.get(effect.layer);
+    if (bucket === undefined) byLayer.set(effect.layer, [effect]);
+    else bucket.push(effect);
+  }
+  // Timestamp order within a layer (CR 613.7), settled once rather than per object.
+  for (const bucket of byLayer.values()) bucket.sort((a, b) => a.timestamp - b.timestamp);
+
+  const fresh: BoardCache = {
+    effects: state.effects,
+    battlefield: state.zones.battlefield,
+    byId: new Map(),
+    active,
+    byLayer,
+  };
+  cache.set(state.objects, fresh);
+  return fresh;
+};
 
 export const counterCount = (object: GameObject, kind: string): number =>
   object.counters[kind] ?? 0;
@@ -39,10 +95,7 @@ export const counterCount = (object: GameObject, kind: string): number =>
  * rather than stored (see `cards/statics.ts`).
  */
 export const activeEffects = (state: GameState): readonly ContinuousEffect[] =>
-  [...state.effects, ...staticEffects(state)].filter((effect) => {
-    if (effect.duration.kind !== 'whileSourceOnBattlefield') return true;
-    return state.objects.get(effect.source)?.zone === 'battlefield';
-  });
+  boardCache(state).active;
 
 const selectorMatches = (
   state: GameState,
@@ -212,7 +265,7 @@ const applyLayer = (
 };
 
 const computeFor = (state: GameState, object: GameObject): Characteristics => {
-  const applicable = activeEffects(state);
+  const applicable = boardCache(state).byLayer;
   let working = printedOf(object);
 
   for (const layer of layers) {
@@ -229,10 +282,8 @@ const computeFor = (state: GameState, object: GameObject): Characteristics => {
       continue;
     }
 
-    const inLayer = applicable
-      .filter((effect) => effect.layer === layer)
-      .sort((a, b) => a.timestamp - b.timestamp);
-    if (inLayer.length === 0) continue;
+    const inLayer = applicable.get(layer);
+    if (inLayer === undefined || inLayer.length === 0) continue;
 
     working = applyLayer(state, object, working, inLayer);
   }
@@ -254,17 +305,12 @@ export const characteristics = (state: GameState, id: ObjectId): Characteristics
   const object = state.objects.get(id);
   if (!object) return null;
 
-  let perState = cache.get(state);
-  if (!perState) {
-    perState = new Map();
-    cache.set(state, perState);
-  }
-
-  const cached = perState.get(id);
+  const board = boardCache(state);
+  const cached = board.byId.get(id);
   if (cached) return cached;
 
   const computed = computeFor(state, object);
-  perState.set(id, computed);
+  board.byId.set(id, computed);
   return computed;
 };
 
