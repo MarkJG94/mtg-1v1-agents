@@ -34,3 +34,5 @@ export * from './targeting.js';
 export * from './triggers.js';
 export * from './turn/land.js';
 export * from './turn/turn.js';
+export * from './view/player-view.js';
+export * from './view/project.js';

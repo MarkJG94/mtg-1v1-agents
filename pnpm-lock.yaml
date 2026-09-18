@@ -223,9 +223,6 @@ importers:
 
   packages/agents:
     dependencies:
-      '@mtg/cards':
-        specifier: workspace:*
-        version: link:../cards
       '@mtg/engine':
         specifier: workspace:*
         version: link:../engine
@@ -233,6 +230,9 @@ importers:
         specifier: workspace:*
         version: link:../shared
     devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.20.2
       tsup:
         specifier: 'catalog:'
         version: 8.5.1(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.13)(typescript@7.0.2)(yaml@2.9.1)
