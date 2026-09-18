@@ -144,40 +144,6 @@ const canCastNow = (state: GameState, player: PlayerId, sorcerySpeed: boolean): 
   !sorcerySpeed ||
   (state.activePlayer === player && isMainPhase(state.step) && isStackEmpty(state));
 
-/**
- * What the board could still tap for, cached against the objects it was derived from.
- *
- * Every priority grant asks this, and answering it walks every permanent, reads its
- * definition and flattens its mana abilities. But the answer depends only on the objects
- * — who controls what, what is tapped, what is where — and `updateObjects` copies the
- * object map whenever any of that changes. So the map's identity is exactly the right
- * key: unchanged map, unchanged answer, and a run of priority passes through a step pays
- * for it once instead of six times.
- *
- * Not keyed on the state, which changes on every update including ones that touch nothing
- * an untapped land cares about.
- */
-const potentialCache = new WeakMap<GameState['objects'], Map<PlayerId, readonly PotentialMana[]>>();
-
-const cachedPotentialMana = (
-  state: GameState,
-  player: PlayerId,
-  cards: CardInfoSource,
-): readonly PotentialMana[] => {
-  let byPlayer = potentialCache.get(state.objects);
-  if (byPlayer === undefined) {
-    byPlayer = new Map();
-    potentialCache.set(state.objects, byPlayer);
-  }
-
-  const known = byPlayer.get(player);
-  if (known !== undefined) return known;
-
-  const computed = potentialManaFor(state, player, cards.manaAbilitiesFor?.(state, player) ?? []);
-  byPlayer.set(player, computed);
-  return computed;
-};
-
 export const legalActions = (
   state: GameState,
   player: PlayerId,
@@ -212,7 +178,7 @@ export const legalActions = (
   const canPay = (cost: ManaCost): boolean => {
     const known = payable.get(cost);
     if (known !== undefined) return known;
-    potential ??= cachedPotentialMana(state, player, cards);
+    potential ??= potentialManaFor(state, player, cards.manaAbilitiesFor?.(state, player) ?? []);
     // Cards come by their cost from their definition, so four copies of one card in hand
     // share the object this is keyed on and the solver runs once for all of them.
     const answer = canPayFromSources(pool, potential, cost, { life: state.players[player].life });

@@ -1,4 +1,11 @@
-import { type ObjectId, type PlayerId, playerIds, playerZone, type SbaKind } from '@mtg/shared';
+import {
+  type ObjectId,
+  type PlayerId,
+  playerIds,
+  playerZone,
+  type SbaKind,
+  type ZoneId,
+} from '@mtg/shared';
 import {
   characteristicsOf,
   counterCount,
@@ -54,8 +61,15 @@ const gather = (state: GameState): PendingActions => {
   }
 
   // CR 704.5e: a token anywhere but the battlefield ceases to exist.
-  for (const [id, object] of state.objects) {
-    if (object.token && object.zone !== 'battlefield') vanishing.push(id);
+  //
+  // Walked by zone rather than over every object in the game. A library of thirty cards
+  // and a graveyard of ten are most of `state.objects`, and this check runs on every
+  // state-based action sweep — which is once per decision — to ask a question only a
+  // token can answer yes to.
+  for (const zone of tokenCanStrandIn) {
+    for (const id of state.zones[zone]) {
+      if (getObject(state, id).token) vanishing.push(id);
+    }
   }
 
   for (const id of objectsIn(state, 'battlefield')) {
@@ -103,6 +117,23 @@ const gather = (state: GameState): PendingActions => {
 
   return { losers, destroyed, vanishing, unattaching, annihilating };
 };
+
+/**
+ * Where a token can be found outside the battlefield.
+ *
+ * It ceases to exist the moment it arrives, so this is only ever the zone it was just
+ * moved to: a graveyard, exile, the stack for a copy, or a hand for a bounce. Never a
+ * library — nothing shuffles a token in, because it stops existing on the way.
+ */
+const tokenCanStrandIn: readonly ZoneId[] = [
+  'exile',
+  'stack',
+  'command',
+  ...playerIds.flatMap((player): readonly ZoneId[] => [
+    playerZone(player, 'graveyard'),
+    playerZone(player, 'hand'),
+  ]),
+];
 
 const isEmpty = (actions: PendingActions): boolean =>
   actions.losers.length === 0 &&

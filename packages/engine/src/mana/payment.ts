@@ -228,22 +228,6 @@ const search = (
  * exact for real cards (Sol Ring always makes two colourless) but would over-report a
  * hypothetical source offering "{G}{G} or {U}".
  */
-/**
- * The fewest mana this cost could possibly take, ignoring colours.
- *
- * A lower bound and never an over-estimate: generic mana needs one each, and every other
- * symbol needs at least one *unless* it can be paid with life instead — phyrexian mana,
- * which is hybrid where one alternative is life (CR 107.4f). `{2/W}` counts as one,
- * because paying the `{W}` half is the cheaper alternative in mana.
- */
-const leastMana = (cost: ManaCost, xValue: number): number => {
-  let least = cost.generic + cost.variable * xValue;
-  for (const symbol of cost.symbols) {
-    if (!symbol.options.some((option) => option.kind === 'life')) least += 1;
-  }
-  return least;
-};
-
 export const canPayFromSources = (
   pool: ManaPool,
   potential: readonly PotentialMana[],
@@ -254,12 +238,6 @@ export const canPayFromSources = (
   if (!Number.isInteger(xValue) || xValue < 0) {
     throw new RangeError(`X must be a non-negative integer, got ${xValue}`);
   }
-  // A cheap necessary condition before the search, because this is asked far more often
-  // than it is answered yes: `legalActions` prices every card in hand on every priority
-  // grant, about six hundred times a game, and most of those cards cannot be afforded.
-  // Counting the mana a cost needs at *least* rules those out without allocating a
-  // candidate list or entering the solver at all.
-  if (pool.length + potential.length < leastMana(cost, xValue)) return false;
 
   const canSpend = options.canSpend ?? (() => true);
   const fromPool = pool.filter((unit) => canSpend(unit)).map(potentialFromUnit);
