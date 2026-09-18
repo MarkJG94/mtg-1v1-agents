@@ -1,0 +1,39 @@
+{
+  "name": "@mtg/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Fastify HTTP + WebSocket API, SQLite persistence and the simulation worker pool",
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fastify/static": "catalog:",
+    "@fastify/websocket": "catalog:",
+    "@mtg/agents": "workspace:*",
+    "@mtg/cards": "workspace:*",
+    "@mtg/engine": "workspace:*",
+    "@mtg/shared": "workspace:*",
+    "@mtg/sim": "workspace:*",
+    "better-sqlite3": "catalog:",
+    "drizzle-orm": "catalog:",
+    "fastify": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "catalog:",
+    "@types/node": "catalog:",
+    "@types/ws": "catalog:",
+    "drizzle-kit": "catalog:",
+    "tsup": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "ws": "catalog:"
+  }
+}

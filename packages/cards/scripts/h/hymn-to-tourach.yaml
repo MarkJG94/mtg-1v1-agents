@@ -1,0 +1,25 @@
+# Hymn to Tourach
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Target player discards two cards at random.
+
+oracleId: 992d9a72-d34d-47d7-96fb-37f0efb515ef
+name: "Hymn to Tourach"
+manaCost: "{B}{B}"
+types: [sorcery]
+colours: [B]
+text: "Target player discards two cards at random."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets: [{ id: p, filter: player }]
+    effects: [{ op: discardAtRandom, player: $p, count: 2 }]
+
+tests:
+  - name: the target discards two at random
+    setup:
+      opponent: { handSize: 3 }
+    targets: [opponent]
+    expect:
+      handSize: { opponent: 1 }

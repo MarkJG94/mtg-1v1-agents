@@ -1,0 +1,30 @@
+# Wall of Omens
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Defender
+#   1. When this creature enters, draw a card.
+
+oracleId: 5f601f48-d24b-4883-9fde-b3f620e7c9ea
+name: "Wall of Omens"
+manaCost: "{1}{W}"
+types: [creature]
+subtypes: [wall]
+colours: [W]
+power: 0
+toughness: 4
+keywords: [defender]
+text: "Defender When this creature enters, draw a card."
+
+abilities:
+  - kind: triggered
+    id: etb-draw
+    covers: [1]
+    when: { kind: selfEntersBattlefield }
+    effects: [{ op: draw, player: you, count: 1 }]
+
+tests:
+  - name: draws a card as it enters
+    expect:
+      zone: { this: battlefield }
+      handSize: { you: 1 }
+      keywords: { this: [defender] }

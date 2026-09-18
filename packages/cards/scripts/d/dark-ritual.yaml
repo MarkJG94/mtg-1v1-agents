@@ -1,0 +1,22 @@
+# Dark Ritual
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Add {B}{B}{B}.
+
+oracleId: 53f7c868-b03e-4fc2-8dcf-a75bbfa3272b
+name: "Dark Ritual"
+manaCost: "{B}"
+types: [instant]
+colours: [B]
+text: "Add {B}{B}{B}."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    effects: [{ op: addMana, player: you, produce: [{ type: B, amount: 3 }] }]
+
+tests:
+  - name: adds three black mana
+    setup: { lands: 1 }
+    expect:
+      manaPool: 3

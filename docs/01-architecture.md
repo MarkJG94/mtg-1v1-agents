@@ -40,7 +40,7 @@ The server runs three kinds of work:
 ## Data flow
 
 ```
-Scryfall bulk JSON ──(scripts/fetch-scryfall)──▶ data/scryfall/oracle-cards.json
+Scryfall bulk JSONL ─(scripts/fetch-scryfall)──▶ data/scryfall/cards.jsonl  (see ADR 0001)
                                                         │
                                                         ▼
                                              packages/cards: CardDatabase (in-memory index by
@@ -74,7 +74,7 @@ State is immutable-by-convention with structural sharing via a small persistent-
 
 ## Card lifecycle
 
-1. Scryfall bulk data is fetched once (`pnpm fetch:scryfall`) and reloaded on server start into `CardDatabase`.
+1. Scryfall bulk data is fetched once (`pnpm fetch:scryfall`) into `data/scryfall/cards.jsonl` and reloaded on server start into `CardDatabase`. The fetcher streams gzipped JSON Lines and skips non-card layouts; see ADR 0001.
 2. A card is **requested** when the seed-deck generator or the replacement search wants it.
 3. `ScriptResolver.resolve(oracleId)`: hand script → cached auto script → run auto-scripter → validation. Result is one of `supported`, `unsupported(reason)`, or `partial(reasons)` (partial scripts are never played; see 03).
 4. Only `supported` cards enter decks. Every `unsupported` request is written to `unsupported_requests` with the failure reason and shown in the UI's coverage page so hand scripts can be prioritised by demand.

@@ -1,0 +1,25 @@
+# Colossal Dreadmaw
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Trample
+
+oracleId: 08c7db90-c0cf-4482-b7ee-bb033e5996d2
+name: "Colossal Dreadmaw"
+manaCost: "{4}{G}{G}"
+types: [creature]
+subtypes: [dinosaur]
+colours: [G]
+power: 6
+toughness: 6
+keywords: [trample]
+text: "Trample (This creature can deal excess combat damage to the player or planeswalker it's attacking.)"
+
+abilities: []
+
+tests:
+  - name: resolves as a 6/6 with its keywords
+    expect:
+      zone: { this: battlefield }
+      power: { this: 6 }
+      toughness: { this: 6 }
+      keywords: { this: [trample] }

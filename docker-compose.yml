@@ -1,0 +1,20 @@
+services:
+  mtg:
+    build: .
+    image: mtg-1v1-agents
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      PORT: 8080
+      DATA_DIR: /data
+      # Defaults to CPU cores - 1 when unset.
+      SIM_WORKERS: "${SIM_WORKERS:-}"
+      SCRYFALL_IMAGE_CACHE: "${SCRYFALL_IMAGE_CACHE:-lazy}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+    volumes:
+      # SQLite database, Scryfall bulk data and the lazy image cache.
+      - mtg-data:/data
+
+volumes:
+  mtg-data:

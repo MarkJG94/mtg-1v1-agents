@@ -1,0 +1,30 @@
+# Uncaged Fury
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Target creature gets +1/+1 and gains double strike until end of turn.
+
+oracleId: 7aac51ef-ae03-4a9e-9a48-46223787f291
+name: "Uncaged Fury"
+manaCost: "{2}{R}"
+types: [instant]
+colours: [R]
+text: "Target creature gets +1/+1 and gains double strike until end of turn."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets: [{ id: t, filter: creature }]
+    effects:
+      - { op: pump, object: $t, power: 1, toughness: 1 }
+      - { op: grantKeyword, object: $t, keyword: doubleStrike }
+
+tests:
+  - name: pumps and grants double strike
+    setup:
+      you:
+        creatures: [{ name: bear, power: 2, toughness: 2 }]
+    targets: [bear]
+    expect:
+      power: { bear: 3 }
+      toughness: { bear: 3 }
+      keywords: { bear: [doubleStrike] }

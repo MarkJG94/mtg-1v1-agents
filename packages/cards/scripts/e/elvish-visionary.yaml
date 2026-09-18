@@ -1,0 +1,27 @@
+# Elvish Visionary
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. When this creature enters, draw a card.
+
+oracleId: c6a3a882-a127-4590-93d7-679ef4313efe
+name: "Elvish Visionary"
+manaCost: "{1}{G}"
+types: [creature]
+subtypes: [elf, shaman]
+colours: [G]
+power: 1
+toughness: 1
+text: "When this creature enters, draw a card."
+
+abilities:
+  - kind: triggered
+    id: etb-draw
+    covers: [0]
+    when: { kind: selfEntersBattlefield }
+    effects: [{ op: draw, player: you, count: 1 }]
+
+tests:
+  - name: draws a card as it enters
+    expect:
+      zone: { this: battlefield }
+      handSize: { you: 1 }

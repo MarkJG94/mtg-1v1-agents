@@ -1,0 +1,24 @@
+# Lava Spike
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Lava Spike deals 3 damage to target player or planeswalker.
+
+oracleId: 2837888c-bfa8-4955-9334-0605ad409f7e
+name: "Lava Spike"
+manaCost: "{R}"
+types: [sorcery]
+subtypes: [arcane]
+colours: [R]
+text: "Lava Spike deals 3 damage to target player or planeswalker."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets: [{ id: t, filter: { or: [player, planeswalker] } }]
+    effects: [{ op: damage, to: $t, amount: 3 }]
+
+tests:
+  - name: deals three to a player
+    targets: [opponent]
+    expect:
+      life: { opponent: 17 }

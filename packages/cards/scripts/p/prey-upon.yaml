@@ -1,0 +1,30 @@
+# Prey Upon
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Target creature you control fights target creature you don't control.
+
+oracleId: b3c12848-528d-4005-878f-4f950a07240a
+name: "Prey Upon"
+manaCost: "{G}"
+types: [sorcery]
+colours: [G]
+text: "Target creature you control fights target creature you don't control. (Each deals damage equal to its power to the other.)"
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets:
+      - { id: mine, filter: { is: creature, controller: you } }
+      - { id: theirs, filter: { is: creature, controller: opponent } }
+    effects: [{ op: fight, first: $mine, second: $theirs }]
+
+tests:
+  - name: the creatures fight, and the smaller one dies
+    setup:
+      you:
+        creatures: [{ name: mine, power: 4, toughness: 4 }]
+      opponent:
+        creatures: [{ name: theirs, power: 2, toughness: 2 }]
+    targets: [mine, theirs]
+    expect:
+      zone: { theirs: "B:graveyard" }

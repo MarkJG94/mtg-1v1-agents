@@ -1,0 +1,30 @@
+# Wrath of God
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Destroy all creatures.
+#   1. They can't be regenerated.
+
+oracleId: 34515b16-c9a4-4f98-8c77-416a7a523407
+name: "Wrath of God"
+manaCost: "{2}{W}{W}"
+types: [sorcery]
+colours: [W]
+text: "Destroy all creatures. They can't be regenerated."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    effects:
+      - op: forEach
+        of: creature
+        effects: [{ op: destroy, object: $each }]
+
+tests:
+  - name: destroys every creature
+    setup:
+      you:
+        creatures: [{ name: mine, power: 2, toughness: 2 }]
+      opponent:
+        creatures: [{ name: theirs, power: 3, toughness: 3 }]
+    expect:
+      zone: { mine: "A:graveyard", theirs: "B:graveyard" }

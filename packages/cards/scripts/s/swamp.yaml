@@ -1,0 +1,25 @@
+# Swamp
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   (no rules text)
+
+oracleId: 56719f6a-1a6c-4c0a-8d21-18f7d7350b68
+name: "Swamp"
+manaCost: ""
+types: [land]
+supertypes: [basic]
+subtypes: [swamp]
+colours: []
+text: "({T}: Add {B}.)"
+
+abilities:
+  - kind: mana
+    id: tap-for-b
+    modes: [[{ type: B }]]
+
+tests:
+  - name: taps for one mana
+    activateMana: tap-for-b
+    expect:
+      manaPool: 1
+      tapped: { this: true }

@@ -1,0 +1,37 @@
+{
+  "name": "mtg-1v1-agents",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/*\" build && pnpm -r --filter \"./apps/*\" build",
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "lint": "biome check --error-on-warnings .",
+    "format": "biome check --write .",
+    "typecheck": "pnpm -r typecheck && tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "bench": "tsx packages/engine/bench/run.ts",
+    "bench:compare": "tsx scripts/compare-benchmarks.ts",
+    "cards:schema": "tsx scripts/write-card-schema.ts",
+    "cards:new": "tsx scripts/new-card-script.ts",
+    "cards:corpus": "tsx scripts/fetch-corpus.ts",
+    "cards:goldens": "tsx scripts/write-goldens.ts",
+    "cards:coverage": "tsx scripts/cards-coverage.ts",
+    "fetch:scryfall": "tsx scripts/fetch-scryfall.ts",
+    "check": "pnpm lint && pnpm typecheck && pnpm cards:schema --check && pnpm cards:goldens --check && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "@mtg/cards": "workspace:*",
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}
