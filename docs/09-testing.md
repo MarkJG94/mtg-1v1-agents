@@ -90,7 +90,8 @@ What this catches is **illegal states**, not wrong-but-legal outcomes. A rule th
 
 - Sanity ladders: `search` beats `greedy` beats `random` with statistically significant margins over 500 games (checked with a binomial test; guards against an evaluator regression that makes the AI worse).
 - Determinism: same seed → identical decisions.
-- Information hiding: a compile-time test that `packages/agents` imports only `PlayerView`.
+- Information hiding, in two halves. A structural test that no file under `packages/agents/src` imports `@mtg/engine` — by name or by a relative path that climbs out of the package — and a walk of `@mtg/engine/view`'s own runtime import graph asserting it never reaches `state/game-state.ts`. The second is what stops the first from being a naming convention. Both are checked by reading import specifiers rather than by the type system, so a computed dynamic import would slip past; see ADR 0009 for why that trade is the right one.
+- That the view depends on nothing hidden: two states differing only in the opponent's hand and the libraries — renumbered and renamed — must project to the same view, while the opponent's own view must differ. Stated as an equivalence rather than a list of fields, because the failure mode is a leak nobody thought to look for: ten tests that each named a field and checked it was absent all stayed green when a new field carrying the opponent's hand was added.
 - Mulligan and sideboarding decisions on hand-built cases.
 
 ### 6. Simulation and server tests

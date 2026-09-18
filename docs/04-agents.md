@@ -13,11 +13,26 @@ Interface:
 
 ```ts
 interface PlayAgent {
-  decide(state: GameState, decision: Decision, view: PlayerView, rng: Rng): DecisionAnswer;
+  readonly level: AgentLevel;
+  decide(view: PlayerView, decision: Decision, rng: Rng): DecisionResponse;
 }
 ```
 
-`PlayerView` is the information-hiding wrapper: the agent sees its own hand, both battlefields, graveyards, exile, stack, life totals, the number of cards in the opponent's hand and library, and revealed cards. It never sees the opponent's hand or library order (the engine would let it; the view forbids it, and a test asserts that the agent module only imports the view type).
+**There is no `GameState` parameter**, and that is the whole of the information hiding (**ADR 0009**). This interface was first written as `decide(state, decision, view, rng)`, which hands the agent the very thing the view exists to withhold; the state is gone, and the agents package cannot import the module it is declared in.
+
+`PlayerView` is what one player knows, built by `viewFor(state, player)` — the only place in the system that decides that, so the rule lives once with tests rather than in every agent that happens to remember it. The agent sees its own hand, both battlefields, both graveyards, exile, the stack, life and poison totals, mana pools, and the size of everything it cannot see.
+
+Three things make the hiding real rather than a convention:
+
+- **It is in the types.** The opponent's side has no `hand` field to read, rather than one that happens to be empty. There is nothing to reach for, and the compiler says so.
+- **A view is plain data** with no back-reference to the state it came from, so it cannot be unwrapped.
+- **`@mtg/engine/view`** is a separate entry point carrying the view, the decision vocabulary and the RNG interface, and nothing whose runtime import graph reaches `state/game-state.ts`. `packages/agents` imports that and never `@mtg/engine`; `import-boundary.test.ts` checks both halves, and the second is what stops the first from being a naming convention.
+
+**Neither library is in the view, including the viewer's own.** Nobody knows a library's order (CR 401.2), and knowing the contents is most of knowing the order — a view that showed A their own library would let an agent play as though every draw were already decided. Both come through as a count.
+
+Objects are reported as `characteristics()` sees them rather than as they were printed, because an evaluator that judged a board from printed power would misread every anthem in Magic.
+
+**Revealed cards are not in the view yet**, and docs/04 previously listed them. The engine does not track them: nothing writes down that a card was revealed by a `reveal` op or looked at by a scry, so there is nothing to project. Closing it means a `revealed` record on `GameState` written by those ops; it is named here rather than faked, because a view that quietly showed nothing would look exactly like one that was hiding correctly.
 
 ### Architecture: evaluator + bounded search
 
@@ -30,7 +45,7 @@ interface PlayAgent {
    - threats: opponent's on-board lethal potential in one and two turns (a small combat projection).
    Weights start hand-tuned; the sim exposes an offline **weight-tuning harness** (play evaluator A vs B for 1,000 games) so weights can be improved by hill-climbing without changing code paths.
 
-2. **Search** for `priority` decisions: enumerate legal actions, for each simulate (engine `step` on a cloned state, with the opponent modelled as passing and with hidden information sampled — the opponent's hand is drawn at random from the cards not visible, i.e. a determinisation) to the end of the current phase or to the next decision, then evaluate. Depth-2 by default (my action → opponent's best cheap response), widened with a small beam for main-phase sequencing (play land → cast → cast). Time/step budget per decision is a setting; default aims for ≤ 20 ms.
+2. **Search** for `priority` decisions: enumerate legal actions, for each simulate (engine `step` on a state **built from the view** — the agent has no other, per ADR 0009 — with the opponent modelled as passing and with hidden information sampled — the opponent's hand is drawn at random from the cards not visible, i.e. a determinisation) to the end of the current phase or to the next decision, then evaluate. Depth-2 by default (my action → opponent's best cheap response), widened with a small beam for main-phase sequencing (play land → cast → cast). Time/step budget per decision is a setting; default aims for ≤ 20 ms.
 
 3. **Combat** uses a dedicated attack/block solver rather than generic search: enumerate attack subsets (pruned to those that survive or trade profitably or present lethal), let the opponent model pick the best blocks with the same solver, evaluate the resulting board. Block declaration mirrors this from the defender's side, considering chump blocks only when facing lethal.
 
