@@ -126,6 +126,16 @@ Item 1's harness, in `packages/sim/src/tuning.ts` and `pnpm tune` (`scripts/tune
 - **The winner's curse is answered, not ignored.** Twenty proposals at 5% will pass about one that is no better, and the games that passed it are the games that flattered it. So a climb that kept anything finishes by playing its result against its start on seeds no step was judged on, and that held-out match is the number to believe.
 - `parseWeights` now refuses the sets a proposal could produce that would break an agent without making a number non-finite: `spareLand` at or above `landBeyondTarget` (a spare land would never be played), and a land count or life threshold that is not a whole number.
 
+**What it found on fuzz boards: nothing to change, and why.** No climb kept a step, so `weights/default.json` is unchanged:
+
+| climb | steps | kept | split exactly even | clearly worse |
+|---|---:|---:|---:|---|
+| greedy, ±25%, 200 games a step | 30 | 0 | 20 | — |
+| greedy, ×2 or ÷2, 200 games a step | 40 | 0 | 30 | `cardInHand` 3 (17–183), `land` 1 (19–179), `creatureToughness` 0.25 (52–134), `spellAtOwnCreature` 0.6 (73–107) |
+| search, ±25%, 200 games a step | 12 | 0 | 10 | — |
+
+(The search climb ran before refused moves were remembered, and played `spareLand` 0.05 → 0.0625 three times over — 86–86, 74–74 and 83–83 — which is why they now are.) A step that splits exactly even is what a move that changes no decision gives, and most do, for reasons the boards explain: the fuzz deck has no planeswalkers and no poison, and its one land makes every colour, so four terms (`planeswalkerLoyalty`, `loyaltyActivation`, `poison`, `missingColour`) cannot matter; greedy's `afterAction` never changes a life total, so the life terms cannot separate two of its options; and every fuzz hand clears any mulligan bar, which is 4.5's finding again (`keepBoard` at 1.25, 2, 3.125 all split even). The moves that did change decisions made the agent worse, several of them badly — the default sits on a local optimum these boards can see. Two direct questions got direct answers: **the threat term is not what makes the search's draws** (4.4) — `lethalOnBoard` halved and doubled at the `search` level went 161–162 and 161–161 over 400 games, with 77 and 78 draws against each other either way — and **the mulligan threshold cannot be tuned on these boards** (4.5). Both want real decks, which phase 5 brings.
+
 ### Why not an LLM here
 
 Thousands of games per cycle at tens of decisions per game rules out an LLM in the play loop on cost and latency. The `PlayAgent` interface would allow one later (for example a "coach" that adjusts evaluator weights per matchup).
