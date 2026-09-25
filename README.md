@@ -42,8 +42,8 @@ player could actually do. A game plays in about 5.2 ms with the random agent, ag
 5 ms target — the roadmap's 4.2 note says where the rest of it is. All four agent
 levels play whole games — `random`, `greedy` (a tunable static evaluator), and `search`
 and `deep`, which play each candidate forward by the real rules in samples of the game
-as the player knows it — and the sanity ladder holds: search beats greedy beats random
-over 500 games a rung. The first milestone is the end-to-end thin slice described in the
+as the player knows it and fight with a dedicated combat solver — and the sanity ladder
+holds: search beats greedy beats random over 500 games a rung. The first milestone is the end-to-end thin slice described in the
 roadmap.
 
 What runs today: `pnpm dev` starts the Fastify API and the Vite dev server together,

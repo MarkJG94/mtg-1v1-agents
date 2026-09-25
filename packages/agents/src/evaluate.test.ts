@@ -154,6 +154,47 @@ describe('threats', () => {
     expect(evaluateTerms(safe, w).terms.threats).toBe(0);
   });
 
+  /** A creature left at home stops the biggest attacker it can reach (roadmap 4.4). */
+  it('counts the blockers that will be there to meet the attack', () => {
+    const guarded = viewOf({
+      mine: [creature(1, 1)],
+      theirs: [creature(4, 4), creature(2, 2)],
+      myLife: 5,
+    });
+    expect(evaluateTerms(guarded, w).terms.threats).toBe(0);
+  });
+
+  /**
+   * Tapped creatures stay tapped until their controller's next untap step (CR 502.3), so
+   * on the viewer's own turn a creature that attacked is no blocker against the reply.
+   */
+  it('does not count a tapped blocker on the viewer’s own turn', () => {
+    const open = viewOf({
+      mine: [creature(1, 1, { tapped: true })],
+      theirs: [creature(4, 4), creature(2, 2)],
+      myLife: 5,
+    });
+    expect(evaluateTerms(open, w).terms.threats).toBe(-w.lethalOnBoard);
+  });
+
+  it('lets a flyer past a blocker that cannot reach it (CR 702.9b)', () => {
+    const view = viewOf({
+      mine: [creature(1, 1)],
+      theirs: [creature(5, 5, { keywords: { flying: true } })],
+      myLife: 5,
+    });
+    expect(evaluateTerms(view, w).terms.threats).toBe(-w.lethalOnBoard);
+  });
+
+  /** This turn's attack uses what can attack now; next turn's, everything (CR 302.6). */
+  it('does not count a summoning-sick creature toward an attack still to come this turn', () => {
+    const sick = creature(6, 6, { sick: true });
+    expect(evaluateTerms(viewOf({ mine: [sick], theirLife: 5 }), w).terms.threats).toBe(0);
+    expect(
+      evaluateTerms(viewOf({ mine: [{ ...sick }], theirLife: 5, step: 'end' }), w).terms.threats,
+    ).toBe(w.lethalOnBoard);
+  });
+
   it('does not count a creature with defender as a threat (CR 702.3)', () => {
     const wall = viewOf({ theirs: [creature(9, 9, { keywords: { defender: true } })], myLife: 5 });
     expect(evaluateTerms(wall, w).terms.threats).toBe(0);

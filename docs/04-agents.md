@@ -50,7 +50,7 @@ Objects are reported as `characteristics()` sees them rather than as they were p
    - cards in library is an empty-library penalty only (the next draw loses, CR 704.5b), not a count against the turn number;
    - lands are scored up to a target count and very little beyond it, rather than against the turn;
    - colours needed but not made are charged to the viewer only, since only the viewer's hand can be read;
-   - threats look one turn ahead and ignore blockers — the combat solver (4.4) is where blocks are worked out.
+   - threats look one attack ahead and count the blockers that will be there for it — each stops the biggest attacker it can reach, and which creatures take part follows from whose turn it is, since tapped creatures stay tapped until their controller's next untap step (CR 502.3). This is what makes an attack that leaves nothing home pay for it (4.4).
 
 2. **Search** for `priority` decisions: enumerate legal actions, for each simulate (engine `step` on a **determinisation** — the game as the agent knows it, with hidden information sampled: the opponent's hand drawn from cards they have shown, both libraries unknown; built by the engine from the state with everything hidden replaced, and handed to the agent as a `Simulator`, per **ADR 0012**) to the end of the current step, then evaluate. Depth-2 by default (my action → opponent's best cheap response), widened with a small beam for main-phase sequencing (play land → cast → cast). Time/step budget per decision is a setting; default aims for ≤ 20 ms.
 
@@ -82,7 +82,7 @@ Neither agent recomputes blocking legality: the `declareBlockers` decision carri
 
 **The simulator** (ADR 0012). With every decision the driver passes a `Simulator` alongside the view. `sample(rng)` returns a *world*: the real game with every card the player cannot see replaced — the opponent's hand drawn, with replacement, from cards the opponent has shown in public zones (unknown cards if none), both libraries unknown cards, definitions cut down to what the player can see, a fresh generator, and the loop detector's hashes dropped. `apply`, `decision`, `view` and `status` run a world by the real rules. A world depends only on what the player can see — `determinise.test.ts` swaps every hidden card, the generator and the loop hashes and requires an identical world, the same test the view is held to. `World` is opaque to the agent, and the agents package still imports nothing but `@mtg/engine/view`.
 
-**The search** (`packages/agents/src/search.ts`) runs on priority decisions that offer more than passing; everything else is greedy's until the combat solver (4.4).
+**The search** (`packages/agents/src/search.ts`) runs on priority decisions that offer more than passing, and on attacks and blocks with the combat solver (below); mulligans, discards and orderings are greedy's.
 
 - It samples `samples` worlds and scores a candidate by its mean over them.
 - A line is played to the **horizon**: the stack empty and the game in a different step from the one the decision was made in, so a spell resolves, its triggers fire and state-based actions kill what they kill before anything is scored.
@@ -90,12 +90,30 @@ Neither agent recomputes blocking legality: the `declareBlockers` decision carri
 - **The budget is in engine steps, not time**, so a game stays a pure function of its seed. Candidates are only compared at a depth all of them reached — the one-step look in every world, then the full search if the budget covered every candidate — because comparing a finished candidate with one the budget cut short favours whichever was searched first, which is passing. Ties at depth are broken by the one-step look.
 - An optional observer receives a `SearchReport` (each candidate's one-step and full scores, and the steps spent), for tests and for a UI that wants to say why.
 
-| level | samples | beam | follow-ups | replies | responses | budget (steps) |
-|---|---:|---:|---:|---:|---:|---:|
-| `search` | 2 | 3 | 2 | 1 | 2 | 600 |
-| `deep` | 4 | 5 | 3 | 2 | 3 | 4,000 |
+| level | samples | beam | follow-ups | replies | responses | budget (steps) | combat candidates |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `search` | 2 | 3 | 2 | 1 | 2 | 600 | 3 |
+| `deep` | 4 | 5 | 3 | 2 | 3 | 4,000 | 5 |
 
-Measured over the 500-game ladder, a searched decision at the `search` level costs 3.6 ms on average and 15.2 ms at the 99th percentile, inside the 20 ms aim above (the slowest of 7,406 took 55 ms); a game against greedy takes about 80 ms. `deep` costs about 11 ms a decision on average. Search beats greedy 273–194 with 33 draws over 500 games (p = 1.5 × 10⁻⁴).
+Measured over the 500-game ladder, a searched priority decision at the `search` level costs 3.5 ms on average and 15.2 ms at the 99th percentile, inside the 20 ms aim above; an attack decision 1.8 ms and a block decision 0.7 ms; a game against greedy about 110 ms. `deep` costs about 11 ms a priority decision on average. Search beats greedy 290–137 with 73 draws over 500 games (p = 5.2 × 10⁻¹⁴).
+
+### The combat solver, as built (4.4)
+
+Item 3 above, in `packages/agents/src/combat/`. It works from the view alone, so it needs no simulator, and the search checks its best answers against one.
+
+- **The model** (`model.ts`) works out a combat's result the way the engine's `assignCombatDamage` deals it: a first-strike step only if a first or double striker is in the fight, lethal damage to each blocker in order and the rest to the last (or over it, with trample), one point lethal with deathtouch, nothing from an attacker whose blockers have all gone unless it tramples, simultaneous damage and then deaths, indestructible survivors, lifelink. It returns the board after combat — dead creatures in graveyards, attackers tapped unless they have vigilance, survivors healed as cleanup will heal them — for the evaluator to score. It does not see prevention, replacement effects, "can't be blocked" beyond flying and protection, or triggers.
+- **Blocks** (`solveBlocks`) improve one attacker at a time — no block, each single blocker, pairs among its four likeliest blockers — until a pass changes nothing, the attacker putting its damage on the weakest blocker first. Never a lone blocker on menace; a chump (the blocker dies, the attacker lives) only when the unblocked damage would be lethal. When the viewer is blocking it maximises its own score and takes legality from the decision's `canBlock`; when it is predicting the opponent's blocks it minimises its own score and applies the two rules the view can check, flying/reach and protection from a colour.
+- **Attacks** (`solveAttacks`) try no attack, everything, each creature alone, every creature worth sending alone together, and everything but one — each against the defender's predicted blocks — and rank them. Only the defending player is attacked; planeswalkers are left alone.
+- **In the search**, an attack decision plays the solver's best `combatCandidates` attacks and not attacking through the real combat in every world, the opponent blocking with the solver; a block decision does the same for the solver's blocks, no blocks and greedy's blocks. A combat line is scored once damage has been dealt. With no budget left, the solver's own choice stands.
+
+What it is worth, measured by switching it off (`combatCandidates: 0`) with everything else the same, over the same 500 games against greedy:
+
+| search vs greedy | wins | losses | draws |
+|---|---:|---:|---:|
+| with the combat solver | 290 | 137 | 73 |
+| greedy's combat rules | 275 | 193 | 32 |
+
+Search's share of decided games goes from 59% to 68%. The draws more than double, and that is the solver too: a board that keeps its blockers home against a counter-attack is a board that stalls more often, and a stalled board runs into the turn cap. Greedy keeps its rules of thumb — it is the baseline the ladder measures the other levels by.
 
 ### Why not an LLM here
 

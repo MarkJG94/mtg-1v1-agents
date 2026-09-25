@@ -201,19 +201,66 @@ const tempoValue = (view: PlayerView, weights: Weights): number => {
 
 // --- Threats ---
 
-/**
- * Whether a side's creatures, all attacking next turn, could deal the other side's life
- * total. Crude on purpose: it ignores blockers, and the combat solver in 4.4 is where
- * blocks get worked out properly. What it does catch is the position an evaluator must
- * never walk into — one where the opponent's board is already lethal.
- */
-const threatsValue = (view: PlayerView, weights: Weights): number => {
-  const potential = (side: SideView): number =>
-    permanentsOf(view, side)
-      .filter((object) => object.isCreature && !object.keywords.defender)
-      .reduce((sum, object) => sum + Math.max(0, object.power ?? 0), 0);
+/** Steps in which the active player's attack this turn is still to come. */
+const beforeCombat: ReadonlySet<PlayerView['step']> = new Set([
+  'untap',
+  'upkeep',
+  'draw',
+  'precombatMain',
+  'beginCombat',
+]);
 
-  const ours = potential(view.you) >= view.opponent.life ? weights.lethalOnBoard : 0;
-  const theirs = potential(view.opponent) >= view.you.life ? weights.lethalOnBoard : 0;
-  return ours - theirs;
+/**
+ * Whether a side's next attack could deal the other side's life total, **counting the
+ * blockers that will be there to meet it** (roadmap 4.4). Each blocker is assumed to
+ * stop the biggest attacker it can reach — flying needs flying or reach (CR 702.9b) —
+ * and whatever is left unblocked is the threat.
+ *
+ * Which creatures take part depends on whose turn it is, because tapped creatures stay
+ * tapped until their controller's next untap step (CR 502.3):
+ *
+ * - if the attacker's combat this turn is still to come, only its untapped creatures
+ *   that can attack now do, against the defender's untapped creatures;
+ * - otherwise the attacker's next attack is next turn, after everything it has untaps —
+ *   and the defender's blockers are only its untapped ones if the defender is the active
+ *   player, whose tapped creatures will still be tapped through the attacker's turn.
+ *
+ * That last case is the one the combat solver needs: a creature that attacks is tapped,
+ * and a board that attacked with everything can have nothing left to block with.
+ */
+const lethalAgainst = (view: PlayerView, attacker: SideView, defender: SideView): boolean => {
+  const pending = view.activePlayer === attacker.player && beforeCombat.has(view.step);
+  const attackers = permanentsOf(view, attacker).filter(
+    (object) =>
+      object.isCreature &&
+      !object.keywords.defender &&
+      (object.power ?? 0) > 0 &&
+      (!pending || (!object.tapped && (!object.summoningSick || object.keywords.haste))),
+  );
+  const blockersTapped = pending || view.activePlayer === defender.player;
+  const blockers = permanentsOf(view, defender).filter(
+    (object) => object.isCreature && (!blockersTapped || !object.tapped),
+  );
+
+  const unblocked = [...attackers].sort((a, b) => (b.power ?? 0) - (a.power ?? 0));
+  for (const blocker of blockers) {
+    const index = unblocked.findIndex(
+      (a) => !a.keywords.flying || blocker.keywords.flying || blocker.keywords.reach,
+    );
+    if (index >= 0) unblocked.splice(index, 1);
+  }
+  const damage = unblocked.reduce(
+    (sum, object) => sum + (object.power ?? 0) * (object.keywords.doubleStrike ? 2 : 1),
+    0,
+  );
+  return damage >= defender.life;
 };
+
+/**
+ * Whether either side's next attack is lethal, blockers counted. A position the opponent
+ * can win from next turn is one an evaluator must never walk into; one the viewer can win
+ * from is worth reaching.
+ */
+const threatsValue = (view: PlayerView, weights: Weights): number =>
+  (lethalAgainst(view, view.you, view.opponent) ? weights.lethalOnBoard : 0) -
+  (lethalAgainst(view, view.opponent, view.you) ? weights.lethalOnBoard : 0);

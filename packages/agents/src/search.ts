@@ -1,6 +1,8 @@
 import type {
   Decision,
   DecisionResponse,
+  DeclareAttackersDecision,
+  DeclareBlockersDecision,
   PlayerView,
   PriorityAction,
   PriorityDecision,
@@ -9,10 +11,20 @@ import type {
   World,
   WorldStatus,
 } from '@mtg/engine/view';
+import { combatPolicy } from './combat/policy.js';
+import { chooseBlocks, solveAttacks } from './combat/solver.js';
 import { evaluate } from './evaluate.js';
 import { greedyAgent } from './greedy.js';
 import type { PlayAgent } from './play-agent.js';
 import { defaultWeights, type Weights } from './weights.js';
+
+/** The steps a combat decision's line plays through before it is scored. */
+const combatSteps: ReadonlySet<PlayerView['step']> = new Set([
+  'declareAttackers',
+  'declareBlockers',
+  'firstStrikeDamage',
+  'combatDamage',
+]);
 
 /**
  * The `search` and `deep` levels (docs/04 "Architecture: evaluator + bounded search").
@@ -44,8 +56,13 @@ import { defaultWeights, type Weights } from './weights.js';
  * part-way is not compared on its half-finished score; the decision falls back to the
  * candidates that finished, or to the one-step looks if none did.
  *
- * Every other kind of decision — mulligans, attacks, blocks — is greedy's. The combat
- * solver of roadmap 4.4 replaces greedy's combat rules for both levels.
+ * **Combat** is the combat solver's (roadmap 4.4, `combat/solver.ts`), which works out
+ * attacks and blocks from a model of combat damage rather than the engine. The search
+ * checks the solver's best few answers the same way it checks priority actions — each
+ * played through the real combat in every world, the opponent blocking with the solver
+ * too — so what the model cannot see (a prevention shield, a trigger) is still caught.
+ *
+ * Every other kind of decision — mulligans, discards, ordering — is greedy's.
  */
 
 export interface SearchSettings {
@@ -61,6 +78,12 @@ export interface SearchSettings {
   readonly responses: number;
   /** Engine steps — decisions applied in a world — that one decision may spend. */
   readonly budget: number;
+  /**
+   * The combat solver's best attacks checked against the engine at each attack decision
+   * (its blocks, no blocks and greedy's blocks at each block decision). Zero leaves combat
+   * to greedy's rules of thumb, which is how the solver's own worth is measured.
+   */
+  readonly combatCandidates: number;
 }
 
 /** What one search saw, for a test or a UI that wants to say why it chose what it did. */
@@ -78,8 +101,24 @@ export interface SearchReport {
 }
 
 export const searchLevels = {
-  search: { samples: 2, beam: 3, followUps: 2, replies: 1, responses: 2, budget: 600 },
-  deep: { samples: 4, beam: 5, followUps: 3, replies: 2, responses: 3, budget: 4_000 },
+  search: {
+    samples: 2,
+    beam: 3,
+    followUps: 2,
+    replies: 1,
+    responses: 2,
+    budget: 600,
+    combatCandidates: 3,
+  },
+  deep: {
+    samples: 4,
+    beam: 5,
+    followUps: 3,
+    replies: 2,
+    responses: 3,
+    budget: 4_000,
+    combatCandidates: 5,
+  },
 } as const satisfies Record<'search' | 'deep', SearchSettings>;
 
 export const searchAgent = (
@@ -89,12 +128,31 @@ export const searchAgent = (
   observe?: (report: SearchReport) => void,
 ): PlayAgent => {
   const greedy = greedyAgent(weights);
+  const solving = settings.combatCandidates > 0;
+  const policy = solving ? combatPolicy(weights) : greedy;
   return {
     level,
     decide: (view, decision, rng, simulator): DecisionResponse => {
-      if (decision.kind !== 'priority') return greedy.decide(view, decision, rng, simulator);
+      if (
+        solving &&
+        (decision.kind === 'declareAttackers' || decision.kind === 'declareBlockers')
+      ) {
+        const candidates = combatCandidates(
+          view,
+          decision,
+          weights,
+          settings,
+          greedy,
+          rng,
+          simulator,
+        );
+        if (candidates.length < 2)
+          return candidates[0] ?? policy.decide(view, decision, rng, simulator);
+        return new Search(view, simulator, rng, weights, settings, policy).chooseAmong(candidates);
+      }
+      if (decision.kind !== 'priority') return policy.decide(view, decision, rng, simulator);
       if (decision.options.every((option) => option.kind === 'pass')) return passing;
-      const search = new Search(view, simulator, rng, weights, settings, greedy);
+      const search = new Search(view, simulator, rng, weights, settings, policy);
       const report = search.choose(decision);
       observe?.(report);
       return { kind: 'priority', action: report.chosen };
@@ -103,6 +161,50 @@ export const searchAgent = (
 };
 
 const passing = { kind: 'priority', action: { kind: 'pass' } } as const;
+
+/**
+ * The answers worth checking at a combat decision, the solver's choice first: its best
+ * few attacks and not attacking; or its blocks, not blocking, and greedy's blocks.
+ */
+const combatCandidates = (
+  view: PlayerView,
+  decision: DeclareAttackersDecision | DeclareBlockersDecision,
+  weights: Weights,
+  settings: SearchSettings,
+  greedy: PlayAgent,
+  rng: Rng,
+  simulator: Simulator,
+): DecisionResponse[] => {
+  const responses: DecisionResponse[] = [];
+  if (decision.kind === 'declareAttackers') {
+    const defender = decision.defenders.find((target) => target.kind === 'player');
+    if (defender === undefined) return [{ kind: 'declareAttackers', attackers: [] }];
+    const ranked = solveAttacks(view, decision, weights);
+    const chosen = [...ranked.slice(0, settings.combatCandidates)];
+    if (!chosen.some((candidate) => candidate.attackers.length === 0)) {
+      chosen.push({ attackers: [], blocks: new Map(), score: 0 });
+    }
+    for (const candidate of chosen) {
+      responses.push({
+        kind: 'declareAttackers',
+        attackers: candidate.attackers.map((attacker) => ({ attacker, defender })),
+      });
+    }
+  } else {
+    responses.push(
+      { kind: 'declareBlockers', blocks: chooseBlocks(view, decision, weights) },
+      { kind: 'declareBlockers', blocks: [] },
+      greedy.decide(view, decision, rng, simulator),
+    );
+  }
+  const seen = new Set<string>();
+  return responses.filter((response) => {
+    const key = JSON.stringify(response);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
 
 /** One decision's search: its worlds, its budget, and the horizon it plays to. */
 class Search {
@@ -119,7 +221,38 @@ class Search {
     private readonly policy: PlayAgent,
   ) {
     this.me = view.viewer;
-    this.root = { turn: view.turn, step: view.step };
+    // A priority decision is settled once the game leaves its step; a combat decision
+    // once combat damage has been dealt, which takes several steps to reach.
+    const combat = view.step === 'declareAttackers' || view.step === 'declareBlockers';
+    this.root = { turn: view.turn, stays: combat ? combatSteps : new Set([view.step]) };
+  }
+
+  /**
+   * Answer a combat decision: each candidate played through the real combat in every
+   * world, the mean kept, the best taken — and, if the budget runs out first, the
+   * solver's own choice, which is the first candidate.
+   */
+  chooseAmong(candidates: readonly DecisionResponse[]): DecisionResponse {
+    const worlds: World[] = [];
+    for (let i = 0; i < this.settings.samples; i += 1) {
+      worlds.push(this.simulator.sample(this.rng.fork(`world:${i}`)));
+    }
+    const scores: number[] = [];
+    for (const candidate of candidates) {
+      let total = 0;
+      for (const world of worlds) {
+        if (this.exhausted()) return candidates[0] ?? candidate;
+        this.spent += 1;
+        total += this.value(this.simulator.apply(world, candidate), 0, 0);
+      }
+      if (this.exhausted()) return candidates[0] ?? candidate;
+      scores.push(total / Math.max(1, worlds.length));
+    }
+    let best = 0;
+    for (let i = 1; i < scores.length; i += 1) {
+      if ((scores[i] ?? 0) > (scores[best] ?? 0)) best = i;
+    }
+    return candidates[best] ?? passing;
   }
 
   choose(decision: PriorityDecision): SearchReport {
@@ -287,11 +420,11 @@ class Search {
     return [{ kind: 'pass' }, ...ranked];
   }
 
-  /** Settled: the stack is empty and the game has left the step the decision was made in. */
+  /** Settled: the stack is empty and the game has left the step (or the combat) it was in. */
   private atHorizon(status: WorldStatus): boolean {
     if (status.result !== null) return true;
     if (status.stackSize > 0) return false;
-    return status.turn !== this.root.turn || status.step !== this.root.step;
+    return status.turn !== this.root.turn || !this.root.stays.has(status.step);
   }
 
   private act(world: World, action: PriorityAction): World {
@@ -299,7 +432,7 @@ class Search {
     return this.simulator.apply(world, { kind: 'priority', action });
   }
 
-  /** Anything that is not a priority decision, answered the way greedy would. */
+  /** Anything that is not a priority decision, answered by the policy: greedy, and the solver. */
   private answer(world: World, decision: Exclude<Decision, PriorityDecision>): World {
     this.spent += 1;
     const view = this.simulator.view(world, decision.player);

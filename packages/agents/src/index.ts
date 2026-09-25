@@ -11,10 +11,13 @@
  * A searching agent still plays the game forward: the driver hands it a simulator of
  * determinisations built from what it can see (ADR 0012), not the game itself.
  *
- * Phase 4 of docs/10-roadmap.md fills the rest in: the evaluator and all four levels —
- * `random`, `greedy`, `search` and `deep` — are here; the combat solver is 4.4.
+ * Phase 4 of docs/10-roadmap.md fills the rest in: the evaluator, all four levels —
+ * `random`, `greedy`, `search` and `deep` — and the combat solver the search levels use.
  */
 export * from './after-action.js';
+export * from './combat/model.js';
+export * from './combat/policy.js';
+export * from './combat/solver.js';
 export * from './evaluate.js';
 export * from './greedy.js';
 export * from './play-agent.js';

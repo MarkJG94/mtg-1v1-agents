@@ -1,4 +1,5 @@
 import {
+  combatPolicy,
   greedyAgent,
   type PlayAgent,
   type SearchReport,
@@ -277,8 +278,153 @@ describe('the shape of the search', () => {
   });
 });
 
-describe('everything but priority is greedy’s, until the combat solver (4.4)', () => {
-  it('answers every other decision exactly as greedy does', () => {
+describe('combat is the solver’s, checked against the engine (roadmap 4.4)', () => {
+  /** Play greedy against greedy until `wanted` says the pending decision is the one. */
+  const stateWhere = (seed: string, wanted: (state: GameState) => boolean): GameState => {
+    const greedy = greedyAgent();
+    let found: GameState | null = null;
+    const watching: PlayAgent = {
+      level: 'greedy',
+      decide: (view, decision, rng, simulator) => {
+        if (found === null && decision.player === 'A') {
+          const probe = simulator.sample(createRng('probe')) as unknown as GameState;
+          if (wanted(probe)) found = probe;
+        }
+        return greedy.decide(view, decision, rng, simulator);
+      },
+    };
+    for (let i = 0; i < 20 && found === null; i += 1) {
+      playGame(
+        fuzzBoard(`${seed}-${i}`, { creatures: 3 }),
+        { A: watching, B: greedy },
+        `${seed}-${i}`,
+      );
+    }
+    if (found === null) throw new Error(`no game reached the decision "${seed}" wanted`);
+    return found;
+  };
+
+  const attackWithChoices = () =>
+    stateWhere('attacks', (state) => {
+      const decision = state.pendingDecision;
+      return decision?.kind === 'declareAttackers' && decision.legal.length >= 2;
+    });
+
+  const blockWithChoices = () =>
+    stateWhere('blocks', (state) => {
+      const decision = state.pendingDecision;
+      return (
+        decision?.kind === 'declareBlockers' &&
+        decision.canBlock.some((e) => e.attackers.length > 0)
+      );
+    });
+
+  it('plays each of the solver’s attacks through the real combat in every world', () => {
+    const state = attackWithChoices();
+    const { simulator, counts } = counting(simulatorFor(state, 'A'));
+    let declared = 0;
+    const watching: Simulator = {
+      ...simulator,
+      apply: (world, response) => {
+        if (response.kind === 'declareAttackers') declared += 1;
+        return simulator.apply(world, response);
+      },
+    };
+    const response = ask(searchAgent(), state, watching);
+    expect(response.kind).toBe('declareAttackers');
+    expect(counts.samples).toBe(searchLevels.search.samples);
+    // At least two candidates — the solver's best and not attacking — in every world.
+    expect(declared).toBeGreaterThanOrEqual(2 * searchLevels.search.samples);
+    expect(declared % searchLevels.search.samples).toBe(0);
+  });
+
+  it('plays each candidate block through the real combat in every world', () => {
+    const state = blockWithChoices();
+    let declared = 0;
+    const inner = simulatorFor(state, 'A');
+    const watching: Simulator = {
+      ...inner,
+      apply: (world, response) => {
+        if (response.kind === 'declareBlockers') declared += 1;
+        return inner.apply(world, response);
+      },
+    };
+    const response = ask(searchAgent(), state, watching);
+    expect(response.kind).toBe('declareBlockers');
+    expect(declared).toBeGreaterThanOrEqual(2 * searchLevels.search.samples);
+  });
+
+  /**
+   * A combat decision is only settled once damage has been dealt, several steps later — a
+   * horizon at the next step would score every attack before anything had hit anything.
+   */
+  it('scores a combat only after its damage has been dealt', () => {
+    const state = attackWithChoices();
+    const inner = simulatorFor(state, 'A');
+    const scoredAt = new Set<string>();
+    const watching: Simulator = {
+      ...inner,
+      view: (world, player) => {
+        const view = inner.view(world, player);
+        if (player === 'A') scoredAt.add(view.step);
+        return view;
+      },
+    };
+    ask(searchAgent(), state, watching);
+    // Not attacking skips straight to the end of combat, so that alone would show a late
+    // step; what matters is that no line is scored before its damage has been dealt.
+    expect(scoredAt.size).toBeGreaterThan(0);
+    for (const early of ['declareAttackers', 'declareBlockers', 'firstStrikeDamage']) {
+      expect(scoredAt.has(early)).toBe(false);
+    }
+  });
+
+  /**
+   * Inside its worlds the opponent blocks with the solver too, so an attack is judged
+   * against the blocks a good defender would make: here, two 3/3s ganging up on a 4/4,
+   * which greedy's one-for-one rules never do.
+   */
+  it('has the opponent block with the solver inside its worlds', () => {
+    const state = game({ seed: 'gang', definitions: fuzzDeck, onPlay: 'A' })
+      .player('A')
+      .battlefield({ name: 'big', power: 4, toughness: 4 })
+      .library(10)
+      .player('B')
+      .battlefield({ name: 'one', power: 3, toughness: 3 }, { name: 'two', power: 3, toughness: 3 })
+      .library(10)
+      .start()
+      .to('declareAttackers')
+      .get();
+    const inner = simulatorFor(state, 'A');
+    const blocksSeen: number[] = [];
+    const watching: Simulator = {
+      ...inner,
+      apply: (world, response) => {
+        if (response.kind === 'declareBlockers') blocksSeen.push(response.blocks.length);
+        return inner.apply(world, response);
+      },
+    };
+    ask(searchAgent(), state, watching);
+    expect(blocksSeen.length).toBeGreaterThan(0);
+    expect(blocksSeen.every((count) => count === 2)).toBe(true);
+  });
+
+  /** With no budget to check anything, the answer is the solver's own. */
+  it('falls back on the solver’s choice when the budget cannot check it', () => {
+    const state = attackWithChoices();
+    const broke = searchAgent('search', undefined, { ...searchLevels.search, budget: 0 });
+    expect(ask(broke, state)).toEqual(ask(combatPolicy(), state));
+  });
+
+  /** The ablation the ladder measures the solver by: switch it off, and combat is greedy's. */
+  it('leaves combat to greedy when the solver is switched off', () => {
+    const off = searchAgent('search', undefined, { ...searchLevels.search, combatCandidates: 0 });
+    for (const state of [attackWithChoices(), blockWithChoices()]) {
+      expect(ask(off, state)).toEqual(ask(greedyAgent(), state));
+    }
+  });
+
+  it('answers every decision but priority and combat exactly as greedy does', () => {
     const greedy = greedyAgent();
     const search = searchAgent();
     let compared = 0;
@@ -286,14 +432,21 @@ describe('everything but priority is greedy’s, until the combat solver (4.4)',
       level: 'search',
       decide: (view, decision: Decision, rng, simulator) => {
         const answer = search.decide(view, decision, rng, simulator);
-        if (decision.kind !== 'priority') {
+        const combat = decision.kind === 'declareAttackers' || decision.kind === 'declareBlockers';
+        if (decision.kind !== 'priority' && !combat) {
           compared += 1;
           expect(answer).toEqual(greedy.decide(view, decision, rng, simulator));
         }
         return answer;
       },
     };
-    playGame(fuzzBoard('others', { creatures: 3 }), { A: comparing, B: greedy }, 'others');
+    for (let i = 0; i < 6; i += 1) {
+      playGame(
+        fuzzBoard(`others-${i}`, { creatures: 3 }),
+        { A: comparing, B: greedy },
+        `others-${i}`,
+      );
+    }
     expect(compared).toBeGreaterThan(5);
   });
 });
