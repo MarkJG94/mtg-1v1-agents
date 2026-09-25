@@ -581,6 +581,36 @@ describe('combat through the decision flow', () => {
     expect(blocking.pendingDecision).toMatchObject({ kind: 'declareBlockers', player: 'B' });
   });
 
+  /**
+   * The decision says which blocker may meet which attacker (docs/02: every decision
+   * carries its legal options), so an agent never has to redo evasion from the view. A
+   * ground creature cannot block a flyer (CR 702.9b); a creature with reach can.
+   */
+  it('says which blocker may block which attacker, evasion included', () => {
+    const { state, emitter, mine, theirs } = withCreatures(
+      [
+        { power: 2, toughness: 2, keys: { flying: true } },
+        { power: 2, toughness: 2 },
+      ],
+      [
+        { power: 1, toughness: 1 },
+        { power: 1, toughness: 3, keys: { reach: true } },
+      ],
+    );
+    const [flyer, walker] = mine as [ObjectId, ObjectId];
+    const [ground, reacher] = theirs as [ObjectId, ObjectId];
+    const attacked = attackWithAll(state, emitter, [flyer, walker]);
+    const blocking = untilDecision(attacked, emitter, 'declareBlockers');
+
+    expect(blocking.pendingDecision).toMatchObject({
+      kind: 'declareBlockers',
+      canBlock: [
+        { blocker: ground, attackers: [walker] },
+        { blocker: reacher, attackers: [flyer, walker] },
+      ],
+    });
+  });
+
   it('carries an unblocked attack through to the player’s life total', () => {
     const { state, emitter, mine } = withCreatures([{ power: 3, toughness: 3 }]);
     let current = attackWithAll(state, emitter, [mine[0] as ObjectId]);

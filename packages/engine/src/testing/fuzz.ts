@@ -140,8 +140,14 @@ const assertInvariants = (state: GameState, seed: string, decisionsMade: number)
   if (problems.length > 0) throw new InvariantViolation(seed, decisionsMade, problems, state);
 };
 
-/** Build the starting position: libraries, and some creatures so combat happens. */
-const buildBoard = (seed: string, options: FuzzOptions): GameState => {
+/**
+ * Build the starting position: libraries, and some creatures so combat happens.
+ *
+ * Exported for drivers outside the engine that want the same games the fuzzer plays —
+ * the agent ladder in `@mtg/sim` plays its agents on these boards, and a board that
+ * matched the fuzzer's is one whose rules the fuzzer has already been over.
+ */
+export const fuzzBoard = (seed: string, options: FuzzOptions = {}): GameState => {
   const rng = createRng(`${seed}:board`);
   let state = createGameState({
     rng: createRng(seed).save(),
@@ -196,7 +202,7 @@ const playGame = (
   const decisions: DecisionResponse[] = [];
   const maxDecisions = options.maxDecisions ?? 5_000;
 
-  let state = setUpGame(buildBoard(seed, options), emitter);
+  let state = setUpGame(fuzzBoard(seed, options), emitter);
   check(state, 0);
 
   while (!isGameOver(state) && decisions.length < maxDecisions) {
@@ -251,7 +257,7 @@ export const fuzzGame = (seed: string, options: FuzzOptions = {}): FuzzResult =>
  */
 export const replayIsIdentical = (result: FuzzResult, options: FuzzOptions = {}): boolean => {
   const emitter = createEventEmitter();
-  let state = setUpGame(buildBoard(result.seed, options), emitter);
+  let state = setUpGame(fuzzBoard(result.seed, options), emitter);
 
   for (const response of result.decisions) {
     if (isGameOver(state) || state.pendingDecision === null) break;

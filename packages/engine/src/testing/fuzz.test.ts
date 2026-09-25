@@ -40,7 +40,7 @@ describe('the random agent', () => {
       { kind: 'bottomCards', player: 'A', count: 0, from: [] },
       { kind: 'discard', player: 'A', count: 0, from: [] },
       { kind: 'declareAttackers', player: 'A', legal: [], defenders: [] },
-      { kind: 'declareBlockers', player: 'B', attackers: [], available: [] },
+      { kind: 'declareBlockers', player: 'B', attackers: [], available: [], canBlock: [] },
       { kind: 'orderBlockers', player: 'A', attacker: 1, blockers: [] },
       { kind: 'orderTriggers', player: 'A', triggers: [] },
       { kind: 'chooseOption', player: 'A', reason: 'legendRule', options: [1] },

@@ -21,6 +21,7 @@ import {
   emptyCombat,
   endCombat,
   legalAttackers,
+  legalBlocksFor,
   legalDefenders,
   needsFirstStrikeStep,
   orderBlockers,
@@ -239,6 +240,10 @@ const performDeclareBlockers = (state: GameState): GameState => {
       player: defendingPlayer(state),
       attackers,
       available,
+      canBlock: available.map((blocker) => ({
+        blocker,
+        attackers: legalBlocksFor(state, blocker),
+      })),
     },
   });
 };

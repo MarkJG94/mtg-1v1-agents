@@ -39,7 +39,9 @@ written by hand, and for whatever the auto-scripter can read off a card's oracle
 which is 11% of Scryfall against a 25% target. Agents come next: a play agent is given a
 view of the game rather than the game, and a priority decision now offers everything a
 player could actually do. A game plays in about 5.2 ms with the random agent, against a
-5 ms target — the roadmap's 4.2 note says where the rest of it is. The first milestone is
+5 ms target — the roadmap's 4.2 note says where the rest of it is. The first two agent
+levels play whole games: `random`, and `greedy`, which scores positions with a tunable
+static evaluator and beats `random` in 171 of 200 games. The first milestone is
 the end-to-end thin slice described in the roadmap.
 
 What runs today: `pnpm dev` starts the Fastify API and the Vite dev server together,

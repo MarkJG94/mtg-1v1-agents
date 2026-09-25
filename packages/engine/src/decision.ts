@@ -84,6 +84,20 @@ export interface DeclareBlockersDecision {
   readonly attackers: readonly ObjectId[];
   /** Untapped creatures the defending player controls. */
   readonly available: readonly ObjectId[];
+  /**
+   * For each available blocker, the attackers it may legally block on its own (CR 509.1b)
+   * — evasion and protection already applied, in the order of `available`.
+   *
+   * Every decision carries its full list of legal options (docs/02), and without this one
+   * did not: an agent had the blockers and the attackers but not which could meet which,
+   * so it had to redo flying and protection from the view and would throw whenever it got
+   * them wrong. Menace is not here because it is not a fact about one pairing — it is a
+   * rule about the whole declaration (CR 702.110b), and the attacker's keywords say so.
+   */
+  readonly canBlock: readonly {
+    readonly blocker: ObjectId;
+    readonly attackers: readonly ObjectId[];
+  }[];
 }
 
 /** Ordering the blockers of one attacker for damage assignment (CR 509.2). */

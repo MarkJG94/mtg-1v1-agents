@@ -45,6 +45,13 @@ Objects are reported as `characteristics()` sees them rather than as they were p
    - threats: opponent's on-board lethal potential in one and two turns (a small combat projection).
    Weights start hand-tuned; the sim exposes an offline **weight-tuning harness** (play evaluator A vs B for 1,000 games) so weights can be improved by hill-climbing without changing code paths.
 
+   **As built (4.3).** `evaluate(view, weights)` in `packages/agents/src/evaluate.ts`, with the weights in `weights/default.json` (checked at compile time against the `Weights` type, and at run time by `parseWeights` for any file the tuning harness loads). `evaluateTerms` returns each term separately. Most terms are symmetric — a side is scored the same way for either player and the total is the viewer's score minus the opponent's — and where docs/04 asked for something the view cannot show, the term is left out rather than guessed:
+   - the opponent's *visible burn* needs their hand, so it is not scored; the life term is linear with an extra slope below a danger threshold;
+   - cards in library is an empty-library penalty only (the next draw loses, CR 704.5b), not a count against the turn number;
+   - lands are scored up to a target count and very little beyond it, rather than against the turn;
+   - colours needed but not made are charged to the viewer only, since only the viewer's hand can be read;
+   - threats look one turn ahead and ignore blockers — the combat solver (4.4) is where blocks are worked out.
+
 2. **Search** for `priority` decisions: enumerate legal actions, for each simulate (engine `step` on a state **built from the view** — the agent has no other, per ADR 0009 — with the opponent modelled as passing and with hidden information sampled — the opponent's hand is drawn at random from the cards not visible, i.e. a determinisation) to the end of the current phase or to the next decision, then evaluate. Depth-2 by default (my action → opponent's best cheap response), widened with a small beam for main-phase sequencing (play land → cast → cast). Time/step budget per decision is a setting; default aims for ≤ 20 ms.
 
 3. **Combat** uses a dedicated attack/block solver rather than generic search: enumerate attack subsets (pruned to those that survive or trade profitably or present lethal), let the opponent model pick the best blocks with the same solver, evaluate the resulting board. Block declaration mirrors this from the defender's side, considering chump blocks only when facing lethal.
@@ -60,6 +67,16 @@ Objects are reported as `characteristics()` sees them rather than as they were p
 - All randomness goes through the injected RNG; determinisations are seeded from it.
 - Cloning state for search uses the engine's structural-sharing helper; benchmarks track "decisions per second".
 - The agent has a `level` setting: `random` (fuzzing), `greedy` (evaluator, no search), `search` (default), `deep` (wider beam and depth 3, for tie-break batches or verification).
+
+### The `random` and `greedy` levels, as built (4.3)
+
+**`random`** (`packages/agents/src/random.ts`) is a *player*, not the engine's fuzzer: it gets a view and a decision like every agent and picks uniformly from what the decision offers. The engine's own random agent in `@mtg/engine/testing` reads the whole state, because hunting rules bugs is its job.
+
+**`greedy`** (`packages/agents/src/greedy.ts`) is "evaluator, no search" — but with no simulator either, since ADR 0009 keeps `step` out of the agents package. At a priority decision it scores each legal action as `evaluate(afterAction(view, action)) − evaluate(view) + prior(view, action)` and takes the best, passing unless something scores above zero. `afterAction` moves only what the view can show (a land played, a permanent arriving summoning sick, mana tapped); `prior` credits what it cannot (a spell aimed at an opposing creature, at the opponent, at the agent's own creature), with its own tunable weights. **ADR 0011** records why, and the determinised search replaces both. Every other decision uses the rules of thumb above from the view alone: mulligan by land count and an early play in the lands' colours (the projected turn-3 board is the search's), attack with what no untapped blocker can kill for less value, block to kill for free, then to trade down, and chump only when what gets through would be lethal. It never draws from the generator, so the same position always gets the same answer.
+
+Neither agent recomputes blocking legality: the `declareBlockers` decision carries `canBlock`, which attackers each available blocker may legally block (docs/02). The one rule about a declaration as a whole — an attacker with menace needs two blockers, CR 702.110b — is applied from the view by `withoutLoneMenaceBlocks`.
+
+`@mtg/sim`'s `playGame(board, agents, seed)` is where agents meet real games: the only place a view is made, with each seat drawing from its own generator forked from the seed by seat.
 
 ### Why not an LLM here
 

@@ -8,7 +8,12 @@
  * because the failure it prevents is invisible: an agent that peeked would not crash, it
  * would simply win, and nothing in a run would say why.
  *
- * Phase 4 of docs/10-roadmap.md fills the rest in: the evaluator and `greedy` in 4.2,
- * the bounded search in 4.3, the combat solver in 4.4.
+ * Phase 4 of docs/10-roadmap.md fills the rest in: the evaluator and the `random` and
+ * `greedy` levels are here; the bounded search is 4.3's other half, the combat solver 4.4.
  */
+export * from './after-action.js';
+export * from './evaluate.js';
+export * from './greedy.js';
 export * from './play-agent.js';
+export * from './random.js';
+export * from './weights.js';
