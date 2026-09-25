@@ -15,6 +15,7 @@ describe('runSettingsSchema', () => {
       trialMatches: 20,
       turnCap: 40,
       agentLevel: 'search',
+      maxSideboardSwaps: 4,
       seedDeck: 'constrainedRandom',
       seedDeckColours: [],
       seedDeckLands: 24,

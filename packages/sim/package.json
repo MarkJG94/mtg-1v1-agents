@@ -21,6 +21,7 @@
     "@mtg/shared": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -14,6 +14,7 @@
 | `trialMatches` | 20 | Matches per trial candidate. |
 | `turnCap` | 40 | Game is a draw past this. |
 | `agentLevel` | `search` | See 04. |
+| `maxSideboardSwaps` | 4 | Pairs of cards swapped between games 2 and 3 of a match. See 04. |
 | `seedDeck` | `constrainedRandom` | Or a pasted 75. |
 | `seedDeckColours` | random 1–3 | |
 | `seedDeckLands` | 24 (±2) | |

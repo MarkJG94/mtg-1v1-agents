@@ -26,4 +26,5 @@ export * from './schema.js';
 export * from './scryfall.js';
 export * from './smoke.js';
 export * from './store.js';
+export * from './tags.js';
 export * from './validate.js';

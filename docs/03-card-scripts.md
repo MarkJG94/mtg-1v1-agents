@@ -92,6 +92,10 @@ The vocabulary above is the target; this is where it stands.
 
 The loader checks what a shape check cannot: that every op exists, that it has the arguments it needs and none it does not, that a `$target` was actually declared by the ability that mentions it, and that a `when`, an `affects` or a `change` names something the engine really has — all against the engine's own exported lists, so the two can never drift.
 
+## Tags (roadmap 4.6)
+
+`cardTags(definition)` in `packages/cards/src/tags.ts` reads two lists off a script for the sideboarding agent (docs/04). **`is`** — what the card is: its card types, `spell` for every nonland card, and the roles its ops give it: `burn` (damage that can go to a player), `counterspell`, `lifegain`, `graveyard` (returns cards from one). **`vs`** — what it answers: the kinds its removal-shaped ops (destroy, exile, bounce, damage, fight, gain control, a toughness-lowering pump, counter) can be pointed at, as the filters of their targets or their `forEach` say. `and` keeps what every part allows, `or` what any part does, a filter confined to the controller's own things answers nothing, and "noncreature" excludes creatures. Gaining life answers `burn`, split second answers `counterspell`, and exiling from a graveyard answers `graveyard`. Tags are as good as the script: they are read from the definition, never from the card's name. The vocabulary (`CardKind`) lives in `@mtg/shared`, because the agents that read the tags may not import this package.
+
 ## Validation
 
 `validateScript(script, scryfallCard)` runs four checks and returns one of three verdicts.

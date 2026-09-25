@@ -63,6 +63,8 @@ export const runSettingsSchema = z.object({
   /** Turns after which an unfinished game is a draw. */
   turnCap: z.int().min(1).max(500).default(40),
   agentLevel: z.enum(agentLevels).default('search'),
+  /** Pairs of cards the sideboarding agent may swap between games 2 and 3 (docs/04). */
+  maxSideboardSwaps: z.int().min(0).max(15).default(4),
 
   // --- Seed deck ---
   seedDeck: z.enum(seedDeckModes).default('constrainedRandom'),
