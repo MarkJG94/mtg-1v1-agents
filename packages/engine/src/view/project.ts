@@ -1,4 +1,5 @@
 import {
+  allZoneIds,
   isHiddenZone,
   kindOfZone,
   type ObjectId,
@@ -40,9 +41,18 @@ export const viewFor = (state: GameState, viewer: PlayerId): PlayerView => {
   const them = opponentOf(viewer);
   const objects = new Map<ObjectId, VisibleObject>();
 
-  for (const [id, object] of state.objects) {
-    if (!canSee(viewer, object)) continue;
-    objects.set(id, visible(state, object));
+  // Zone by zone rather than object by object: whether a zone can be seen is one question,
+  // where asking it of every card in both libraries was most of what a view cost the
+  // search (4.8). Every object is in exactly one zone (the fuzzer asserts it), and sorting
+  // by id keeps the order the object table has.
+  const ids: ObjectId[] = [];
+  for (const zone of allZoneIds) {
+    if (canSeeZone(viewer, zone)) for (const id of state.zones[zone]) ids.push(id);
+  }
+  ids.sort((a, b) => a - b);
+  for (const id of ids) {
+    const object = state.objects.get(id);
+    if (object !== undefined) objects.set(id, visible(state, object));
   }
 
   return {
@@ -71,8 +81,11 @@ export const viewFor = (state: GameState, viewer: PlayerId): PlayerView => {
  * (CR 401.2). That last part is why this asks the zone's *kind* rather than only who owns
  * it: a player may look through their own hand, never their own library.
  */
-export const canSee = (viewer: PlayerId, object: GameObject): boolean => {
-  const zone: ZoneId = object.zone;
+export const canSee = (viewer: PlayerId, object: GameObject): boolean =>
+  canSeeZone(viewer, object.zone);
+
+/** Whether this player knows what the cards in a zone are; see `canSee`. */
+export const canSeeZone = (viewer: PlayerId, zone: ZoneId): boolean => {
   if (!isHiddenZone(zone)) return true;
   if (kindOfZone(zone) === 'library') return false;
   return ownerOfZone(zone) === viewer;
@@ -81,6 +94,7 @@ export const canSee = (viewer: PlayerId, object: GameObject): boolean => {
 const visible = (state: GameState, object: GameObject): VisibleObject => {
   const traits = characteristicsOf(state, object.id);
   const definition = state.definitions.get(object.definitionId);
+  const facts = definition === undefined ? unknownFacts : printedFacts(definition);
 
   return {
     id: object.id,
@@ -97,10 +111,10 @@ const visible = (state: GameState, object: GameObject): VisibleObject => {
     keywords: traits.keywords,
     legendary: traits.legendary,
 
-    types: definition === undefined ? [] : [...definition.types],
-    manaValue: definition === undefined ? 0 : manaValue(definition.manaCost),
-    costColours: definition === undefined ? [] : [...costColours(definition.manaCost)],
-    producesMana: definition === undefined ? [] : manaTypesOf(definition),
+    types: facts.types,
+    manaValue: facts.manaValue,
+    costColours: facts.costColours,
+    producesMana: facts.producesMana,
 
     tapped: object.tapped,
     damage: object.damage,
@@ -113,6 +127,37 @@ const visible = (state: GameState, object: GameObject): VisibleObject => {
     attachedTo: object.attachedTo,
     attachments: [...object.attachments],
   };
+};
+
+/** What a view says about a card that comes from its definition alone. */
+type PrintedFacts = Pick<VisibleObject, 'types' | 'manaValue' | 'costColours' | 'producesMana'>;
+
+const unknownFacts: PrintedFacts = Object.freeze({
+  types: Object.freeze([]),
+  manaValue: 0,
+  costColours: Object.freeze([]),
+  producesMana: Object.freeze([]),
+});
+
+/**
+ * Worked out once per definition rather than once per object per view: a definition never
+ * changes, and the search makes a view at every position it scores, which made these
+ * several per cent of a searched game (4.8). Frozen, because every view shares them.
+ */
+const printed = new WeakMap<CardDefinition, PrintedFacts>();
+
+const printedFacts = (definition: CardDefinition): PrintedFacts => {
+  let facts = printed.get(definition);
+  if (facts === undefined) {
+    facts = Object.freeze({
+      types: Object.freeze([...definition.types]),
+      manaValue: manaValue(definition.manaCost),
+      costColours: Object.freeze([...costColours(definition.manaCost)]),
+      producesMana: Object.freeze(manaTypesOf(definition)),
+    });
+    printed.set(definition, facts);
+  }
+  return facts;
 };
 
 /**

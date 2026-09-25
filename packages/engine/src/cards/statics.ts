@@ -23,13 +23,16 @@ const idFor = (object: ObjectId, index: number): number => -(object * 64 + index
 
 const definitionsOnBattlefield = (
   state: GameState,
-): readonly { readonly object: ObjectId; readonly definition: CardDefinition }[] =>
-  state.zones.battlefield.flatMap((object) => {
-    const found = state.objects.get(object);
-    if (found === undefined) return [];
-    const definition = state.definitions.get(found.definitionId);
-    return definition === undefined ? [] : [{ object, definition }];
-  });
+): readonly { readonly object: ObjectId; readonly definition: CardDefinition }[] => {
+  const found: { object: ObjectId; definition: CardDefinition }[] = [];
+  for (const object of state.zones.battlefield) {
+    const permanent = state.objects.get(object);
+    const definition =
+      permanent === undefined ? undefined : state.definitions.get(permanent.definitionId);
+    if (definition !== undefined) found.push({ object, definition });
+  }
+  return found;
+};
 
 /** Every continuous effect the static abilities of permanents in play are making. */
 export const staticEffects = (state: GameState): readonly ContinuousEffect[] => {
@@ -54,8 +57,42 @@ export const staticEffects = (state: GameState): readonly ContinuousEffect[] => 
   return effects;
 };
 
+/**
+ * Replacements by board: what they depend on is which permanents are in play and who
+ * controls them, so the object table and the battlefield together are the key — the same
+ * reasoning as `boardCache` in characteristics.ts, with the definitions checked too, since a
+determinised world cuts them down. Every event asks, and most events in a
+ * search's lines leave both untouched (4.8).
+ */
+const replacementCache = new WeakMap<
+  GameState['objects'],
+  {
+    readonly battlefield: readonly ObjectId[];
+    readonly definitions: GameState['definitions'];
+    readonly replacements: readonly ReplacementEffect[];
+  }
+>();
+
 /** Every replacement effect the permanents in play are making. */
 export const staticReplacements = (state: GameState): readonly ReplacementEffect[] => {
+  const cached = replacementCache.get(state.objects);
+  if (
+    cached !== undefined &&
+    cached.battlefield === state.zones.battlefield &&
+    cached.definitions === state.definitions
+  ) {
+    return cached.replacements;
+  }
+  const replacements = replacementsInPlay(state);
+  replacementCache.set(state.objects, {
+    battlefield: state.zones.battlefield,
+    definitions: state.definitions,
+    replacements,
+  });
+  return replacements;
+};
+
+const replacementsInPlay = (state: GameState): readonly ReplacementEffect[] => {
   const replacements: ReplacementEffect[] = [];
 
   for (const { object, definition } of definitionsOnBattlefield(state)) {

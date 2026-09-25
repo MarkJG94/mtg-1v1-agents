@@ -8,11 +8,14 @@ import {
   searchLevels,
 } from '@mtg/agents';
 import {
+  applyDecision,
+  createEventEmitter,
   createRng,
   type Decision,
   type DecisionResponse,
   type GameState,
   type Simulator,
+  setUpGame,
   simulatorFor,
   viewFor,
   type World,
@@ -68,6 +71,7 @@ const counting = (inner: Simulator) => {
     },
     view: (world, player) => inner.view(world, player),
     status: (world) => inner.status(world),
+    sameDeal: (a, b) => inner.sameDeal(a, b),
   };
   return { simulator, counts };
 };
@@ -275,6 +279,90 @@ describe('the shape of the search', () => {
     expect(state.objects).toBe(before.objects);
     expect(state.zones).toBe(before.zones);
     expect(state.rng).toBe(before.rng);
+  });
+});
+
+/**
+ * Remembering lines (roadmap 4.8): within one decision the search works out a line once
+ * and reuses it, and plays a repeated deal once. It is meant to make the search faster
+ * and nothing else — so every decision, every score and every step charged against the
+ * budget must be what the search that remembers nothing would have said.
+ */
+describe('remembering lines changes the work, never the answer', () => {
+  /** Positions from real games where the searcher had something to choose between. */
+  const positions = (() => {
+    const found: GameState[] = [];
+    const agent = searchAgent('search');
+    for (const seed of ['remember-1', 'remember-2']) {
+      const emitter = createEventEmitter();
+      let state = setUpGame(fuzzBoard(seed, { creatures: 3, librarySize: 30 }), emitter);
+      while (state.result === null && state.pendingDecision !== null && found.length < 40) {
+        const decision: Decision = state.pendingDecision;
+        const choosing =
+          decision.kind === 'priority'
+            ? decision.options.some((option) => option.kind !== 'pass')
+            : decision.kind === 'declareAttackers' || decision.kind === 'declareBlockers';
+        if (choosing) found.push(state);
+        state = applyDecision(state, emitter, ask(agent, state));
+      }
+    }
+    return found;
+  })();
+
+  const run = (state: GameState, settings: Partial<SearchSettings>) => {
+    const reports: SearchReport[] = [];
+    const { simulator, counts } = counting(
+      simulatorFor(state, state.pendingDecision?.player ?? 'A'),
+    );
+    const agent = searchAgent(
+      'search',
+      undefined,
+      { ...searchLevels.search, ...settings },
+      (report) => reports.push(report),
+    );
+    return { response: ask(agent, state, simulator), reports, applies: counts.applies };
+  };
+
+  /**
+   * Small budgets run out part-way, which is where a remembered line must not be reused
+   * unless playing it again would have fitted too.
+   */
+  it('reaches the same decisions, scores and spending at every budget', () => {
+    expect(positions.length).toBeGreaterThan(20);
+    let saved = 0;
+    for (const budget of [20, 60, 150, searchLevels.search.budget]) {
+      for (const state of positions) {
+        const on = run(state, { budget, remember: true });
+        const off = run(state, { budget, remember: false });
+        expect(on.response).toEqual(off.response);
+        expect(on.reports).toEqual(off.reports);
+        expect(on.applies).toBeLessThanOrEqual(off.applies);
+        saved += off.applies - on.applies;
+      }
+    }
+    expect(saved).toBeGreaterThan(0);
+  });
+
+  /**
+   * With nothing shown by the opponent, every sample deals them the same unknown hand, so
+   * a second sample is the first again and costs no engine step at all.
+   */
+  it('plays a repeated deal once', () => {
+    const state = mainPhase((s) =>
+      s
+        .player('A')
+        .battlefield(land)
+        .hand(bear, { name: 'extra', ...land })
+        .library(10)
+        .player('B')
+        .battlefield(land)
+        .hand({ name: 'unseen' })
+        .library(10),
+    );
+    const one = run(state, { samples: 1 });
+    const two = run(state, { samples: 2 });
+    expect(two.applies).toBe(one.applies);
+    expect(run(state, { samples: 2, remember: false }).applies).toBeGreaterThan(two.applies);
   });
 });
 

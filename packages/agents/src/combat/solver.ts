@@ -81,7 +81,18 @@ export const solveBlocks = (problem: BlockProblem): BlockSolution => {
     return object === undefined ? 0 : (object.toughness ?? 0) - object.damage;
   };
 
-  const project = (blocks: ReadonlyMap<ObjectId, readonly ObjectId[]>) => {
+  // A later pass tries every option again, most of them against blocks it has already
+  // scored; the same blocks, in the same order, always project the same (4.8).
+  const projected = new Map<string, BlockSolution>();
+  const project = (blocks: ReadonlyMap<ObjectId, readonly ObjectId[]>): BlockSolution => {
+    const key = [...blocks].map(([attacker, blockers]) => `${attacker}:${blockers}`).join('|');
+    const known = projected.get(key);
+    if (known !== undefined) return known;
+    const solution = projectFresh(blocks);
+    projected.set(key, solution);
+    return solution;
+  };
+  const projectFresh = (blocks: ReadonlyMap<ObjectId, readonly ObjectId[]>): BlockSolution => {
     // The attacker will put its damage on the weakest blocker first (greedy's order).
     const ordered = new Map(
       [...blocks].map(([attacker, blockers]) => [

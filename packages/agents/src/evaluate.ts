@@ -171,12 +171,15 @@ const manaValue = (view: PlayerView, side: SideView, weights: Weights): number =
   // cannot make. Charging the opponent too would need their hand, which is the point.
   if (side.player !== view.viewer) return developed;
 
-  const makes = new Set<string>(permanents.flatMap((object) => object.producesMana));
-  const needs = new Set<Colour>(
-    objectsSeenIn(view, view.you.hand).flatMap((object) => object.costColours),
-  );
-  const missing = [...needs].filter((colour) => !makes.has(colour)).length;
-  return developed - weights.missingColour * missing;
+  // Loops rather than `flatMap`, which allocated an array per object at every position
+  // the search scores (4.8).
+  const makes = new Set<string>();
+  for (const object of permanents) for (const type of object.producesMana) makes.add(type);
+  const missing = new Set<Colour>();
+  for (const card of objectsSeenIn(view, view.you.hand)) {
+    for (const colour of card.costColours) if (!makes.has(colour)) missing.add(colour);
+  }
+  return developed - weights.missingColour * missing.size;
 };
 
 // --- Tempo ---

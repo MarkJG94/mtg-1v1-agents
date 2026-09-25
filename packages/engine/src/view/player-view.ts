@@ -149,12 +149,20 @@ export interface PlayerView {
 export const seen = (view: PlayerView, id: ObjectId): VisibleObject | null =>
   view.objects.get(id) ?? null;
 
-/** Every visible object in a zone, in the zone's own order. */
+/**
+ * Every visible object in a zone, in the zone's own order.
+ *
+ * A loop rather than `flatMap`, which built a one-element array for every object: this
+ * runs under every evaluation the search makes, and was a tenth of a searched game (4.8).
+ */
 export const objectsSeenIn = (
   view: PlayerView,
   ids: readonly ObjectId[],
-): readonly VisibleObject[] =>
-  ids.flatMap((id) => {
+): readonly VisibleObject[] => {
+  const objects: VisibleObject[] = [];
+  for (const id of ids) {
     const object = view.objects.get(id);
-    return object === undefined ? [] : [object];
-  });
+    if (object !== undefined) objects.push(object);
+  }
+  return objects;
+};

@@ -1,4 +1,4 @@
-import { playerZone } from '@mtg/shared';
+import { asOracleId, playerZone } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
 import { determinise, simulatorFor, unknownCard } from './determinise.js';
 import { createEventEmitter } from './events/emitter.js';
@@ -252,5 +252,77 @@ describe('the simulator a searching agent is handed', () => {
     expect(state.pendingDecision).toBe(before.decision);
     expect(state.objects).toBe(before.objects);
     expect(state.zones).toBe(before.zones);
+  });
+});
+
+/**
+ * `sameDeal` (roadmap 4.8): whether two samples dealt the same hidden cards, so a search
+ * can play the pair once. It compares two samples, each drawn from the view and a
+ * generator, so like the worlds themselves its answer cannot depend on the real cards.
+ */
+describe('whether two samples are the same deal', () => {
+  /** B has shown two different cards, so their hand is drawn from two and deals differ. */
+  const twoShown = () =>
+    game({ seed: 'two-shown' })
+      .player('A')
+      .hand({ name: 'mine' })
+      .library(5)
+      .player('B')
+      .graveyard({ definitionId: asOracleId('shown-1') }, { definitionId: asOracleId('shown-2') })
+      .hand({ name: 'theirs-1' }, { name: 'theirs-2' }, { name: 'theirs-3' })
+      .library(5)
+      .get();
+
+  const deal = (state: GameState, left: string, right: string) => {
+    const simulator = simulatorFor(state, 'A');
+    return simulator.sameDeal(
+      simulator.sample(createRng(left)),
+      simulator.sample(createRng(right)),
+    );
+  };
+
+  it('is the same deal when drawn from the same generator', () => {
+    expect(deal(twoShown(), 'x', 'x')).toBe(true);
+  });
+
+  it('is the same deal whatever the generator when the opponent has shown nothing', () => {
+    const state = game({ seed: 'nothing-shown' })
+      .player('A')
+      .hand({ name: 'mine' })
+      .library(5)
+      .player('B')
+      .hand({ name: 'theirs-1' }, { name: 'theirs-2' })
+      .library(5)
+      .get();
+    for (const seed of ['p', 'q', 'r']) expect(deal(state, 'x', seed)).toBe(true);
+  });
+
+  it('is a different deal when the opponent’s guessed hands differ', () => {
+    const state = twoShown();
+    const hands = (seed: string) => {
+      const world = sample(state, seed);
+      return world.zones[playerZone('B', 'hand')].map((id) => world.objects.get(id)?.definitionId);
+    };
+    const seeds = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    const pairs = seeds.flatMap((left) => seeds.map((right) => [left, right] as const));
+    const different = pairs.filter(([left, right]) => !deal(state, left, right));
+    expect(different.length).toBeGreaterThan(0);
+    for (const [left, right] of pairs) {
+      expect(deal(state, left, right)).toBe(
+        JSON.stringify(hands(left)) === JSON.stringify(hands(right)),
+      );
+    }
+  });
+
+  it('says the same whatever the real hidden cards are', () => {
+    const state = twoShown();
+    const other = withTheUnseenReplaced(state, 'A');
+    for (const [left, right] of [
+      ['a', 'b'],
+      ['c', 'd'],
+      ['a', 'a'],
+    ] as const) {
+      expect(deal(other, left, right)).toBe(deal(state, left, right));
+    }
   });
 });

@@ -57,4 +57,11 @@ export interface Simulator {
   /** The world as one of its players sees it. */
   view(world: World, player: PlayerId): PlayerView;
   status(world: World): WorldStatus;
+  /**
+   * Whether two worlds were dealt the same cards in every zone this player cannot see —
+   * the same determinisation drawn twice, differing only in the generator each will play
+   * on with. A search can play such a pair once (roadmap 4.8). Both worlds come from the
+   * view and a generator alone, so the answer says nothing about the real hidden cards.
+   */
+  sameDeal(a: World, b: World): boolean;
 }

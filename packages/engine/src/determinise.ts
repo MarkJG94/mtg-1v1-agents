@@ -17,7 +17,7 @@ import type { GameObject } from './state/object.js';
 import { ObjectStore } from './state/object-store.js';
 import { createObject } from './state/update.js';
 import { applyDecision } from './turn/turn.js';
-import { canSee, viewFor } from './view/project.js';
+import { canSee, canSeeZone, viewFor } from './view/project.js';
 import type { Simulator, World, WorldStatus } from './view/simulator.js';
 
 /**
@@ -136,6 +136,23 @@ export const simulatorFor = (state: GameState, viewer: PlayerId): Simulator => {
         topOfStack: top === undefined ? null : (game.objects.get(top)?.controller ?? null),
         result: game.result,
       };
+    },
+    sameDeal: (a, b) => {
+      const [left, right] = [asState(a), asState(b)];
+      return allZoneIds.every((zone) => {
+        if (canSeeZone(viewer, zone)) return true;
+        const [x, y] = [left.zones[zone], right.zones[zone]];
+        return (
+          x.length === y.length &&
+          x.every((id, i) => {
+            const other = y[i];
+            return (
+              other !== undefined &&
+              left.objects.get(id)?.definitionId === right.objects.get(other)?.definitionId
+            );
+          })
+        );
+      });
     },
   };
 };

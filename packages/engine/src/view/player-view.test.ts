@@ -76,6 +76,15 @@ describe('what a player is shown', () => {
     expect(libraries.filter((id) => view.objects.has(id))).toEqual([]);
   });
 
+  /** In the object table's own order, whichever zones the view walked to find them (4.8). */
+  it('lists what it can see in the order of the object table', () => {
+    const state = board().get();
+    const view = viewFor(state, 'A');
+    const table = [...state.objects].filter(([id]) => view.objects.has(id)).map(([id]) => id);
+    expect(table.length).toBeGreaterThan(4);
+    expect([...view.objects.keys()]).toEqual(table);
+  });
+
   it('shows both graveyards and both battlefields, which are public (CR 400.2)', () => {
     const scenario = board();
     const view = viewFor(scenario.get(), 'A');

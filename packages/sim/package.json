@@ -12,7 +12,8 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bench": "tsx bench/run.ts"
   },
   "dependencies": {
     "@mtg/agents": "workspace:*",

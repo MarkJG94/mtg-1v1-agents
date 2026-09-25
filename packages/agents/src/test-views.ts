@@ -218,6 +218,9 @@ export const noSimulator: Simulator = {
   view: () => {
     throw new Error('this agent was not expected to search');
   },
+  sameDeal: () => {
+    throw new Error('this agent was not expected to search');
+  },
   status: () => {
     throw new Error('this agent was not expected to search');
   },

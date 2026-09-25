@@ -84,6 +84,11 @@ export interface SearchSettings {
    * to greedy's rules of thumb, which is how the solver's own worth is measured.
    */
   readonly combatCandidates: number;
+  /**
+   * Remember lines within a decision, and play a repeated deal once (see `Search`). It
+   * changes no decision, only the work; off is there to show that, not to be used.
+   */
+  readonly remember: boolean;
 }
 
 /** What one search saw, for a test or a UI that wants to say why it chose what it did. */
@@ -109,6 +114,7 @@ export const searchLevels = {
     responses: 2,
     budget: 600,
     combatCandidates: 3,
+    remember: true,
   },
   deep: {
     samples: 4,
@@ -118,6 +124,7 @@ export const searchLevels = {
     responses: 3,
     budget: 4_000,
     combatCandidates: 5,
+    remember: true,
   },
 } as const satisfies Record<'search' | 'deep', SearchSettings>;
 
@@ -207,11 +214,24 @@ const combatCandidates = (
   });
 };
 
-/** One decision's search: its worlds, its budget, and the horizon it plays to. */
+/**
+ * One decision's search: its worlds, its budget, and the horizon it plays to.
+ *
+ * **Lines are remembered** (4.8). Worlds are immutable, and playing an action in one, or
+ * a world to its horizon, gives the same answer every time — so the one-step look at an
+ * option in the first world, which the shortlist then plays again, and the same position
+ * reached down two lines, are worked out once. A remembered line is still **charged the
+ * steps it took**, and is only reused when the budget would have covered playing it
+ * again; so the budget runs out at exactly the point it always did, and every decision is
+ * the one the search made before it remembered anything. It is faster, not different.
+ */
 class Search {
   private spent = 0;
   private readonly me;
   private readonly root;
+  private readonly acted = new WeakMap<World, Map<string, World>>();
+  private readonly values = new WeakMap<World, Map<number, { value: number; cost: number }>>();
+  private readonly scores = new WeakMap<World, number>();
 
   constructor(
     view: PlayerView,
@@ -234,10 +254,7 @@ class Search {
    * solver's own choice, which is the first candidate.
    */
   chooseAmong(candidates: readonly DecisionResponse[]): DecisionResponse {
-    const worlds: World[] = [];
-    for (let i = 0; i < this.settings.samples; i += 1) {
-      worlds.push(this.simulator.sample(this.rng.fork(`world:${i}`)));
-    }
+    const worlds = this.sampleWorlds();
     const scores: number[] = [];
     for (const candidate of candidates) {
       let total = 0;
@@ -256,11 +273,28 @@ class Search {
     return candidates[best] ?? passing;
   }
 
-  choose(decision: PriorityDecision): SearchReport {
+  /**
+   * The worlds to score in, one per sample. A sample dealt the same hidden cards as an
+   * earlier one is replaced by that one: it is still counted, so the mean is taken over
+   * the same samples in the same order, but every line in it is the remembered line from
+   * the first. Two samples are the same deal about two decisions in five on fuzz boards
+   * (4.8). The only difference that drops is the generator each would have played on
+   * with, which nothing before a horizon draws from unless a card does something random.
+   */
+  private sampleWorlds(): World[] {
     const worlds: World[] = [];
     for (let i = 0; i < this.settings.samples; i += 1) {
-      worlds.push(this.simulator.sample(this.rng.fork(`world:${i}`)));
+      const fresh = this.simulator.sample(this.rng.fork(`world:${i}`));
+      const repeat = this.settings.remember
+        ? worlds.find((world) => this.simulator.sameDeal(world, fresh))
+        : undefined;
+      worlds.push(repeat ?? fresh);
     }
+    return worlds;
+  }
+
+  choose(decision: PriorityDecision): SearchReport {
+    const worlds = this.sampleWorlds();
     const first = worlds[0];
     if (first === undefined) return this.report([], null, null, { kind: 'pass' });
 
@@ -334,6 +368,27 @@ class Search {
    * the opponent's.
    */
   private value(world: World, followUps: number, replies: number): number {
+    if (!this.settings.remember) return this.played(world, followUps, replies);
+    const key = followUps * 1_000 + replies;
+    const known = this.values.get(world)?.get(key);
+    if (known !== undefined && this.spent + known.cost < this.settings.budget) {
+      this.spent += known.cost;
+      return known.value;
+    }
+    const before = this.spent;
+    const value = this.played(world, followUps, replies);
+    // A line the budget cut short is remembered too, but can never be reused: it ran up to
+    // the budget, so playing it again from any later point would not fit either.
+    let byDepth = this.values.get(world);
+    if (byDepth === undefined) {
+      byDepth = new Map();
+      this.values.set(world, byDepth);
+    }
+    byDepth.set(key, { value, cost: this.spent - before });
+    return value;
+  }
+
+  private played(world: World, followUps: number, replies: number): number {
     let current = world;
     for (;;) {
       if (this.exhausted()) return this.score(current);
@@ -430,7 +485,18 @@ class Search {
 
   private act(world: World, action: PriorityAction): World {
     this.spent += 1;
-    return this.simulator.apply(world, { kind: 'priority', action });
+    if (!this.settings.remember) return this.simulator.apply(world, { kind: 'priority', action });
+    const key = JSON.stringify(action);
+    let byAction = this.acted.get(world);
+    const known = byAction?.get(key);
+    if (known !== undefined) return known;
+    const next = this.simulator.apply(world, { kind: 'priority', action });
+    if (byAction === undefined) {
+      byAction = new Map();
+      this.acted.set(world, byAction);
+    }
+    byAction.set(key, next);
+    return next;
   }
 
   /** Anything that is not a priority decision, answered by the policy: greedy, and the solver. */
@@ -444,7 +510,12 @@ class Search {
   }
 
   private score(world: World): number {
-    return evaluate(this.simulator.view(world, this.me), this.weights);
+    if (!this.settings.remember) return evaluate(this.simulator.view(world, this.me), this.weights);
+    const known = this.scores.get(world);
+    if (known !== undefined) return known;
+    const score = evaluate(this.simulator.view(world, this.me), this.weights);
+    this.scores.set(world, score);
+    return score;
   }
 
   private exhausted(): boolean {

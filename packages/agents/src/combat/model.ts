@@ -160,15 +160,19 @@ const afterCombat = (
   life: Readonly<Record<PlayerId, number>>,
 ): PlayerView => {
   const attacking = new Set(plan.attacks.map((attack) => attack.attacker));
-  const objects = new Map(view.objects);
-  for (const [id, object] of view.objects) {
+  const changed = new Map<ObjectId, VisibleObject>();
+  // Only the battlefield: that is where every creature that fought, died or was damaged is.
+  for (const id of view.battlefield) {
+    const object = view.objects.get(id);
+    if (object === undefined) continue;
     if (died.has(id)) {
-      objects.set(id, { ...object, zone: `${object.owner}:graveyard`, tapped: false, damage: 0 });
+      changed.set(id, { ...object, zone: `${object.owner}:graveyard`, tapped: false, damage: 0 });
     } else if (attacking.has(id) || object.damage > 0) {
       const tapped = object.tapped || (attacking.has(id) && !object.keywords.vigilance);
-      objects.set(id, { ...object, tapped, damage: 0 });
+      changed.set(id, { ...object, tapped, damage: 0 });
     }
   }
+  const objects = new Overlay(view.objects, changed);
 
   const side = <S extends SideView>(it: S): S => {
     const graveyard = [...it.graveyard];
@@ -206,3 +210,50 @@ const afterCombat = (
           }),
   };
 };
+
+/**
+ * A map that reads through to `base` except where `changed` has an entry for the same key.
+ *
+ * The solver projects a combat hundreds of times a decision, and each projection changed
+ * a handful of creatures but copied every object the viewer can see to do it, which was
+ * several per cent of a searched game (4.8). `changed` only ever replaces keys `base`
+ * already has, so the size and the order are `base`'s.
+ */
+class Overlay<K, V> implements ReadonlyMap<K, V> {
+  constructor(
+    private readonly base: ReadonlyMap<K, V>,
+    private readonly changed: ReadonlyMap<K, V>,
+  ) {}
+
+  get size(): number {
+    return this.base.size;
+  }
+
+  get(key: K): V | undefined {
+    return this.changed.get(key) ?? this.base.get(key);
+  }
+
+  has(key: K): boolean {
+    return this.base.has(key);
+  }
+
+  forEach(callback: (value: V, key: K, map: ReadonlyMap<K, V>) => void, thisArg?: unknown): void {
+    for (const [key, value] of this) callback.call(thisArg, value, key, this);
+  }
+
+  *entries(): MapIterator<[K, V]> {
+    for (const [key, value] of this.base) yield [key, this.changed.get(key) ?? value];
+  }
+
+  *keys(): MapIterator<K> {
+    yield* this.base.keys();
+  }
+
+  *values(): MapIterator<V> {
+    for (const [, value] of this.entries()) yield value;
+  }
+
+  [Symbol.iterator](): MapIterator<[K, V]> {
+    return this.entries();
+  }
+}
