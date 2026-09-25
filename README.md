@@ -49,7 +49,8 @@ roadmap.
 What runs today: `pnpm dev` starts the Fastify API and the Vite dev server together,
 `pnpm fetch:scryfall` builds the card projection from Scryfall's bulk data, `pnpm bench`
 plays fixed-seed games and reports the time they take, `pnpm ladder` plays the agent levels
-against each other, and `pnpm check` (lint, typecheck, test, build) is green.
+against each other, `pnpm tune` plays one set of evaluator weights against another or
+hill-climbs a set, and `pnpm check` (lint, typecheck, test, build) is green.
 
 `main` is protected: every change lands through a pull request with all three CI jobs —
 lint/typecheck/test/build, benchmarks, and the Docker build — green.

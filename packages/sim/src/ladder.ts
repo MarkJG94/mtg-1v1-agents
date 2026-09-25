@@ -22,6 +22,17 @@ export interface RungOptions {
   readonly seed: string;
   /** The board each game starts from; three creatures a side by default. */
   readonly board?: (seed: string) => GameState;
+  /**
+   * Play each board twice, the agents swapping seats, rather than a fresh board every game.
+   * A board that favours one seat then gives each agent that seat once, so the luck of the
+   * deal cancels within the pair instead of adding to the noise — which is what telling
+   * two close weight sets apart needs (roadmap 4.7). The two games of a pair are not
+   * independent, which the binomial test assumes; but the dependence pairing adds is a
+   * seat's lean splitting the pair one each, which makes results more even rather than
+   * less, so it errs toward calling two agents equal. Two identical agents split every
+   * pair exactly: the second game is the first with the names swapped.
+   */
+  readonly mirrored?: boolean;
 }
 
 export interface RungResult {
@@ -41,7 +52,7 @@ export const playRung = (options: RungOptions): RungResult => {
   let losses = 0;
   let draws = 0;
   for (let i = 0; i < options.games; i += 1) {
-    const seed = `${options.seed}-${i}`;
+    const seed = `${options.seed}-${options.mirrored === true ? Math.floor(i / 2) : i}`;
     const seat: PlayerId = i % 2 === 0 ? 'A' : 'B';
     const agents =
       seat === 'A'

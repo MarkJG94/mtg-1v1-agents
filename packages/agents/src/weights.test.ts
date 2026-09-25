@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { defaultWeights, InvalidWeightsError, parseWeights } from './weights.js';
+import {
+  defaultWeights,
+  InvalidWeightsError,
+  parseWeights,
+  tunableTerms,
+  weightTuning,
+} from './weights.js';
 
 /**
  * The weights file (docs/04). A tuned set arrives as JSON from the tuning harness, so the
@@ -34,5 +40,43 @@ describe('parseWeights', () => {
   it('refuses something that is not an object at all', () => {
     expect(() => parseWeights(null)).toThrow(InvalidWeightsError);
     expect(() => parseWeights([1, 2])).toThrow(InvalidWeightsError);
+  });
+});
+
+/**
+ * The terms that have to agree with each other. The tuning harness (roadmap 4.7) proposes
+ * weights nobody has looked at, and these are the proposals that would break an agent
+ * without making a single number non-finite.
+ */
+describe('parseWeights: terms that must agree', () => {
+  /** Playing a spare land moves its worth from `spareLand` to `landBeyondTarget`. */
+  it('refuses a spare land in hand worth as much as one in play, which is never played', () => {
+    const equal = { ...defaultWeights, spareLand: defaultWeights.landBeyondTarget };
+    expect(() => parseWeights(equal)).toThrow(/spareLand must be below landBeyondTarget/);
+    expect(() =>
+      parseWeights({ ...defaultWeights, spareLand: defaultWeights.landBeyondTarget - 0.01 }),
+    ).not.toThrow();
+  });
+
+  it('refuses a count of lands or of life that is not a whole number', () => {
+    expect(() => parseWeights({ ...defaultWeights, landTarget: 7.5 })).toThrow(/landTarget/);
+    expect(() => parseWeights({ ...defaultWeights, dangerThreshold: -1 })).toThrow(
+      /dangerThreshold/,
+    );
+    expect(() => parseWeights({ ...defaultWeights, dangerThreshold: 0 })).not.toThrow();
+  });
+});
+
+describe('how the harness may move each term', () => {
+  it('names every term, and tunes every one but the value of a win', () => {
+    expect(Object.keys(weightTuning).sort()).toEqual(Object.keys(defaultWeights).sort());
+    expect(tunableTerms).not.toContain('win');
+    expect(tunableTerms).toHaveLength(Object.keys(defaultWeights).length - 1);
+  });
+
+  it('moves the counts by whole steps and everything else by a factor', () => {
+    expect(weightTuning.landTarget).toEqual({ kind: 'count', min: 1 });
+    expect(weightTuning.dangerThreshold).toEqual({ kind: 'count', min: 0 });
+    expect(weightTuning.creaturePower).toEqual({ kind: 'scale' });
   });
 });

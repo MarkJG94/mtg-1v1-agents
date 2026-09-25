@@ -105,7 +105,19 @@ export class InvalidWeightsError extends Error {
   }
 }
 
-/** Accept a weights file only if it names every term, and nothing else, as a finite number. */
+/**
+ * Accept a weights file only if it names every term, and nothing else, as a finite number,
+ * and the terms that have to agree with each other do:
+ *
+ * - `spareLand` below `landBeyondTarget`. Playing a spare land moves it from one to the
+ *   other, so if the spare in hand is worth as much as the land in play the evaluator
+ *   never plays it — the bug `spareLand` was added to fix (4.3).
+ * - `landTarget` and `dangerThreshold` whole and not negative: they are compared with a
+ *   count of lands and a life total, so 7.5 lands means nothing that 8 does not.
+ *
+ * The tuning harness proposes weights no one has looked at, so this is the check that
+ * stands between a proposal and a game.
+ */
 export const parseWeights = (input: unknown): Weights => {
   if (typeof input !== 'object' || input === null || Array.isArray(input)) {
     throw new InvalidWeightsError(['expected an object']);
@@ -123,9 +135,77 @@ export const parseWeights = (input: unknown): Weights => {
     if (!(fields as readonly string[]).includes(key)) problems.push(`${key} is not a weight`);
   }
 
+  if (problems.length === 0) {
+    const weights = record as unknown as Weights;
+    if (!(weights.spareLand < weights.landBeyondTarget)) {
+      problems.push('spareLand must be below landBeyondTarget, or a spare land is never played');
+    }
+    for (const count of ['landTarget', 'dangerThreshold'] as const) {
+      if (!Number.isInteger(weights[count]) || weights[count] < 0) {
+        problems.push(`${count} is a count, and must be a whole number of at least 0`);
+      }
+    }
+  }
+
   if (problems.length > 0) throw new InvalidWeightsError(problems);
   return record as unknown as Weights;
 };
+
+/**
+ * How the tuning harness may move each term (roadmap 4.7).
+ *
+ * - `scale`: multiplied or divided by the harness's step factor, so a term keeps its sign
+ *   and its order of magnitude moves rather than its last decimal.
+ * - `count`: moved by one, never below `min` — a number of lands or points of life.
+ * - `fixed`: not tuned, and `why` says why.
+ *
+ * It lives beside the weights because what a term means is this package's to say; the
+ * harness in `@mtg/sim` only reads it.
+ */
+export type TermTuning =
+  | { readonly kind: 'scale' }
+  | { readonly kind: 'count'; readonly min: number }
+  | { readonly kind: 'fixed'; readonly why: string };
+
+const scale: TermTuning = { kind: 'scale' };
+
+export const weightTuning: { readonly [K in keyof Weights]: TermTuning } = {
+  win: {
+    kind: 'fixed',
+    why: 'it only has to outweigh everything else; scaling it changes no decision until it stops',
+  },
+  life: scale,
+  lifeDanger: scale,
+  dangerThreshold: { kind: 'count', min: 0 },
+  poison: scale,
+  creaturePower: scale,
+  creatureToughness: scale,
+  evasivePower: scale,
+  combatKeyword: scale,
+  summoningSickness: scale,
+  otherPermanent: scale,
+  planeswalkerLoyalty: scale,
+  cardInHand: scale,
+  spareLand: scale,
+  keepBoard: scale,
+  emptyLibrary: scale,
+  land: scale,
+  landTarget: { kind: 'count', min: 1 },
+  landBeyondTarget: scale,
+  missingColour: scale,
+  heldMana: scale,
+  lethalOnBoard: scale,
+  spellAtOpponentCreature: scale,
+  spellAtOpponent: scale,
+  spellAtOwnCreature: scale,
+  spellUntargeted: scale,
+  loyaltyActivation: scale,
+};
+
+/** The terms the harness moves, in the file's order. */
+export const tunableTerms: readonly (keyof Weights)[] = fields.filter(
+  (field) => weightTuning[field].kind !== 'fixed',
+);
 
 /** The hand-tuned starting point. Checked like any other file, so it cannot drift. */
 export const defaultWeights: Weights = parseWeights(defaults);

@@ -117,6 +117,15 @@ What it is worth, measured by switching it off (`combatCandidates: 0`) with ever
 
 Search's share of decided games goes from 59% to 68%. The draws more than double, and that is the solver too: a board that keeps its blockers home against a counter-attack is a board that stalls more often, and a stalled board runs into the turn cap. Greedy keeps its rules of thumb — it is the baseline the ladder measures the other levels by.
 
+### The weight-tuning harness, as built (4.7)
+
+Item 1's harness, in `packages/sim/src/tuning.ts` and `pnpm tune` (`scripts/tune.ts`). It changes no code path: a tuned set is a weights file like `weights/default.json`, let in by `parseWeights`, and played by the same agents the ladder plays.
+
+- **`compareWeights`** plays one set against another at a given level — `pnpm tune compare a.json b.json --games 1000` is docs/04's "evaluator A vs B for 1,000 games". Each board is played **twice with the seats swapped** (`mirrored` on the ladder's `playRung`), so a board's lean toward one seat cancels within the pair instead of adding to the noise; two identical sets split every pair exactly. The verdict is the ladder's exact one-sided binomial test over the decided games.
+- **`hillClimb`** moves one term at a time — a scaled term multiplied or divided by a factor (1.25 by default), a count (`landTarget`, `dangerThreshold`) by one — and keeps the move only if it beats the current best at a one-sided p below `alpha` (5% by default) over fresh seeds. A move refused from the current weights is not played again until they change, and a climb with no move left stops and says it has **converged**. The value of a win is not tuned: it only has to outweigh everything else. How each term may move is `weightTuning`, beside the weights in `@mtg/agents`, because what a term means is that package's to say.
+- **The winner's curse is answered, not ignored.** Twenty proposals at 5% will pass about one that is no better, and the games that passed it are the games that flattered it. So a climb that kept anything finishes by playing its result against its start on seeds no step was judged on, and that held-out match is the number to believe.
+- `parseWeights` now refuses the sets a proposal could produce that would break an agent without making a number non-finite: `spareLand` at or above `landBeyondTarget` (a spare land would never be played), and a land count or life threshold that is not a whole number.
+
 ### Why not an LLM here
 
 Thousands of games per cycle at tens of decisions per game rules out an LLM in the play loop on cost and latency. The `PlayAgent` interface would allow one later (for example a "coach" that adjusts evaluator weights per matchup).

@@ -16,6 +16,7 @@ pnpm dev             # server + web with HMR
 pnpm bench           # engine benchmarks; --json writes a report, --budget sets the ms/game ceiling
 pnpm bench:compare   # compare two benchmark reports; fails on a >20% regression
 pnpm ladder          # the sanity ladder: search > greedy > random, 500 games a rung (nightly)
+pnpm tune            # weight tuning: `compare a.json b.json`, or `climb` from a weights file
 pnpm cards:schema    # regenerate the card-script JSON Schema; --check fails if it is stale
 pnpm fetch:scryfall  # build data/scryfall/cards.jsonl from the bulk data
 ```

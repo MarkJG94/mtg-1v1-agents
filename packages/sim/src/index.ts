@@ -11,3 +11,4 @@
 export * from './game.js';
 export * from './ladder.js';
 export * from './sideboard-cards.js';
+export * from './tuning.js';
