@@ -1,5 +1,5 @@
 import type { DecisionResponse } from '@mtg/engine/view';
-import { greedyAgent } from '../greedy.js';
+import { type AgentKnowledge, greedyAgent } from '../greedy.js';
 import type { PlayAgent } from '../play-agent.js';
 import { defaultWeights, type Weights } from '../weights.js';
 import { chooseBlocks, solveAttacks } from './solver.js';
@@ -12,8 +12,11 @@ import { chooseBlocks, solveAttacks } from './solver.js';
  * it has no budget to check the solver against the engine. It is not a level of its own:
  * `greedy` keeps its rules of thumb, as the baseline the ladder measures the others by.
  */
-export const combatPolicy = (weights: Weights = defaultWeights): PlayAgent => {
-  const greedy = greedyAgent(weights);
+export const combatPolicy = (
+  weights: Weights = defaultWeights,
+  knowledge: AgentKnowledge = {},
+): PlayAgent => {
+  const greedy = greedyAgent(weights, knowledge);
   return {
     level: 'search',
     decide: (view, decision, rng, simulator): DecisionResponse => {

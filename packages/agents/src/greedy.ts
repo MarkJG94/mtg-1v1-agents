@@ -1,11 +1,9 @@
 import type {
-  BottomCardsDecision,
   Decision,
   DecisionResponse,
   DeclareAttackersDecision,
   DeclareBlockersDecision,
   DiscardDecision,
-  MulliganDecision,
   PlayerView,
   PriorityAction,
   PriorityDecision,
@@ -16,6 +14,7 @@ import type { ObjectId } from '@mtg/shared';
 import { afterAction, isPermanentCard } from './after-action.js';
 import { type Block, withoutLoneMenaceBlocks } from './blocks.js';
 import { creatureValue, evaluate } from './evaluate.js';
+import { bottomCards, mulliganChoice, type PlayDrawRecord, playOrDraw } from './opening.js';
 import type { PlayAgent } from './play-agent.js';
 import { defaultWeights, type Weights } from './weights.js';
 
@@ -41,16 +40,21 @@ import { defaultWeights, type Weights } from './weights.js';
  * Deterministic: it never draws from the generator. Ties go to the first option, which for
  * a priority decision is always passing.
  */
-export const greedyAgent = (weights: Weights = defaultWeights): PlayAgent => ({
+export const greedyAgent = (
+  weights: Weights = defaultWeights,
+  knowledge: AgentKnowledge = {},
+): PlayAgent => ({
   level: 'greedy',
   decide: (view: PlayerView, decision: Decision): DecisionResponse => {
     switch (decision.kind) {
       case 'priority':
         return { kind: 'priority', action: bestAction(view, decision, weights) };
+      case 'playOrDraw':
+        return { kind: 'playOrDraw', choice: playOrDraw(knowledge.playDraw) };
       case 'mulligan':
-        return { kind: 'mulligan', action: mulliganChoice(view, decision) };
+        return { kind: 'mulligan', action: mulliganChoice(view, decision, weights) };
       case 'bottomCards':
-        return { kind: 'bottomCards', cards: worstCards(view, decision, weights) };
+        return { kind: 'bottomCards', cards: bottomCards(view, decision, weights) };
       case 'discard':
         return { kind: 'discard', cards: worstCards(view, decision, weights) };
       case 'declareAttackers':
@@ -74,6 +78,14 @@ export const greedyAgent = (weights: Weights = defaultWeights): PlayAgent => ({
     }
   },
 });
+
+/**
+ * What an agent knows from games before this one (docs/04 "Opponent modelling"). Only the
+ * play/draw record for now; the knowledge record of phase 5 adds to it.
+ */
+export interface AgentKnowledge {
+  readonly playDraw?: PlayDrawRecord;
+}
 
 // --- Priority ---
 
@@ -134,42 +146,17 @@ export const prior = (view: PlayerView, action: PriorityAction, weights: Weights
 
 const isLand = (object: VisibleObject): boolean => object.types.includes('land');
 
-/**
- * docs/04's rule: keep a hand with two to five lands — fewer allowed as the hand shrinks —
- * that can cast something by turn two in the colours its lands make, and never go below
- * five cards.
- */
-const mulliganChoice = (view: PlayerView, decision: MulliganDecision): 'keep' | 'mulligan' => {
-  if (!decision.options.includes('mulligan')) return 'keep';
-  const keeping = decision.hand.length - decision.taken;
-  if (keeping <= 5) return 'keep';
-
-  const hand = objectsSeenIn(view, decision.hand);
-  const lands = hand.filter(isLand);
-  const enoughLand = lands.length >= 2 && lands.length <= Math.min(5, keeping - 2);
-
-  const colours = new Set<string>(lands.flatMap((land) => land.producesMana));
-  const earlyPlay = hand.some(
-    (card) =>
-      !isLand(card) &&
-      card.manaValue <= 2 &&
-      card.costColours.every((colour) => colours.has(colour)),
-  );
-
-  return enoughLand && earlyPlay ? 'keep' : 'mulligan';
-};
-
 // --- Getting rid of cards ---
 
 /**
- * The cards worth least, for putting on the bottom after a mulligan or discarding to hand
- * size. Lands are worth a lot until there are enough of them, counting the ones already on
+ * The cards worth least, for discarding to hand size (CR 514.1); a kept mulligan's
+ * bottoming is `opening.ts`'s, which judges the hand that is left rather than each card. Lands are worth a lot until there are enough of them, counting the ones already on
  * the battlefield; after that, very little. A spell is worth less the more it costs,
  * because a hand that cannot cast it is holding a blank.
  */
 const worstCards = (
   view: PlayerView,
-  decision: BottomCardsDecision | DiscardDecision,
+  decision: DiscardDecision,
   weights: Weights,
 ): readonly ObjectId[] => {
   const inPlay = objectsSeenIn(view, view.you.battlefield).filter(isLand).length;

@@ -36,6 +36,7 @@ describe('the random agent', () => {
 
     const kinds = [
       { kind: 'priority', player: 'A', options: [{ kind: 'pass' }] },
+      { kind: 'playOrDraw', player: 'A', options: ['play', 'draw'] },
       { kind: 'mulligan', player: 'A', hand: [], taken: 0, options: ['keep', 'mulligan'] },
       { kind: 'bottomCards', player: 'A', count: 0, from: [] },
       { kind: 'discard', player: 'A', count: 0, from: [] },
@@ -89,6 +90,18 @@ describe('the invariant fuzzer', () => {
     const results = fuzzGames(games, { turnCap: 8, librarySize: 20 });
     expect(results).toHaveLength(games);
     for (const result of results) expect(result.state.result).not.toBeNull();
+  });
+
+  /** A starting player chosen at the table (CR 103.1), not fixed when the game was made. */
+  it('plays games whose first player is chosen, without violating an invariant', () => {
+    const results = fuzzGames(10, { turnCap: 6, librarySize: 20, chooser: 'B' });
+    const onPlay = new Set(results.map((result) => result.state.config.playerOnPlay));
+    for (const result of results) {
+      expect(result.state.result).not.toBeNull();
+      expect(result.state.config.startingChooser).toBe('B');
+    }
+    // The random chooser picks both answers across ten games, so both paths ran.
+    expect(onPlay).toEqual(new Set(['A', 'B']));
   });
 
   it('reaches combat and kills creatures, so it is exercising something', () => {

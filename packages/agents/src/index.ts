@@ -20,6 +20,7 @@ export * from './combat/policy.js';
 export * from './combat/solver.js';
 export * from './evaluate.js';
 export * from './greedy.js';
+export * from './opening.js';
 export * from './play-agent.js';
 export * from './random.js';
 export * from './search.js';

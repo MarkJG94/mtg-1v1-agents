@@ -1,4 +1,4 @@
-import { type ObjectId, type PlayerId, playerIds, playerZone } from '@mtg/shared';
+import { type ObjectId, opponentOf, type PlayerId, playerIds, playerZone } from '@mtg/shared';
 
 import type { EventEmitter } from './events/emitter.js';
 import { runBatch } from './events/perform.js';
@@ -86,7 +86,8 @@ const returnHandAndShuffle = (state: GameState, player: PlayerId): GameState => 
 };
 
 /**
- * Shuffle, deal opening hands, run the mulligans, and begin turn 1.
+ * Decide who plays first if a player is to choose, then shuffle, deal opening hands, run
+ * the mulligans, and begin turn 1.
  *
  * The counterpart to `startGame`, which skips all of this and assumes the hands are
  * already dealt — which is what the scenario builder in roadmap 1.13 wants, and what
@@ -96,6 +97,41 @@ export const setUpGame = (state: GameState, emitter: EventEmitter): GameState =>
   if (state.turn !== 0)
     throw new MulliganError(`the game has already started (turn ${state.turn})`);
 
+  // CR 103.1: who takes the first turn is settled before anything is shuffled or dealt.
+  const chooser = state.config.startingChooser;
+  if (chooser !== null) {
+    return updateState(state, {
+      pendingDecision: { kind: 'playOrDraw', player: chooser, options: ['play', 'draw'] },
+    });
+  }
+  return dealOpeningHands(state, emitter);
+};
+
+/**
+ * Answer the play-or-draw decision: `play` puts the chooser on the play, `draw` puts
+ * their opponent there (CR 103.1). The rest of the setup follows at once.
+ */
+export const applyPlayOrDraw = (
+  state: GameState,
+  emitter: EventEmitter,
+  player: PlayerId,
+  choice: 'play' | 'draw',
+): GameState => {
+  if (state.config.startingChooser !== player) {
+    throw new MulliganError(`${player} is not the player who chooses who plays first`);
+  }
+  const onPlay = choice === 'play' ? player : opponentOf(player);
+  return dealOpeningHands(
+    updateState(state, {
+      activePlayer: onPlay,
+      config: { ...state.config, playerOnPlay: onPlay },
+    }),
+    emitter,
+  );
+};
+
+/** CR 103.2-103.4: shuffle, deal seven each, and open the mulligans in turn order. */
+const dealOpeningHands = (state: GameState, emitter: EventEmitter): GameState => {
   let next = state;
   for (const player of playerIds) next = shuffleLibrary(next, player);
   for (const player of playerIds) next = drawHand(next, emitter, player);
@@ -111,6 +147,7 @@ export const setUpGame = (state: GameState, emitter: EventEmitter): GameState =>
   emitter.emit(next, {
     type: 'gameStart',
     onPlay: next.config.playerOnPlay,
+    chosenBy: next.config.startingChooser,
     startingLife: next.players[next.config.playerOnPlay].life,
     decks,
   });

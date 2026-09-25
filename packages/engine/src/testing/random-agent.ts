@@ -34,6 +34,9 @@ export const randomDecision = (
       // decision's options (roadmap 2.1); the fuzzer casts nothing for the same reason.
       return { kind: 'priority', action: rng.pick(decision.options) };
 
+    case 'playOrDraw':
+      return { kind: 'playOrDraw', choice: rng.pick(decision.options) };
+
     case 'mulligan':
       return { kind: 'mulligan', action: rng.pick(decision.options) };
 

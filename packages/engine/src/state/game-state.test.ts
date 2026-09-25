@@ -82,6 +82,7 @@ describe('createGameState', () => {
       detectLoops: true,
       loopCheckAfter: DEFAULT_LOOP_CHECK_AFTER,
       playerOnPlay: 'A',
+      startingChooser: null,
     });
   });
 
@@ -106,6 +107,7 @@ describe('createGameState', () => {
       detectLoops: false,
       loopCheckAfter: 25,
       playerOnPlay: 'B',
+      startingChooser: null,
     });
   });
 

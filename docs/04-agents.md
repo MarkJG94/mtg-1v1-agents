@@ -62,6 +62,8 @@ Objects are reported as `characteristics()` sees them rather than as they were p
 
 6. **Play-first choice** after winning the die roll: play, unless the deck's stats say draw wins more against this opponent (tracked per cycle).
 
+   **As built (4.5)**, in `packages/agents/src/opening.ts`. The engine asks the chooser a `playOrDraw` decision before anything is dealt (CR 103.1) when the game names one (`chooser` on `createGameState`); otherwise who plays first is given, as before. `playOrDraw(record)` plays unless a `PlayDrawRecord` — games and wins on the play and on the draw — shows the draw ahead by more than chance: both sides need twenty games, and the difference must clear a one-sided two-proportion test at 5%. An agent is given the record as `AgentKnowledge` when it is made (`greedyAgent(weights, knowledge)`); keeping it per cycle is phase 5's. The mulligan is item 5 in full: two to five lands scaled by hand size, something castable by turn two in the lands' colours, and a **projected turn-3 board** — a land a turn, and each turn the most mana's worth of spells those lands can pay for in their colours, draws left out — worth at least `keepBoard` (2.5) on the evaluator's scale, scaled to the size of the hand kept, down to a floor of five cards. **Bottoming** tries every way of keeping the cards left — at most thirty-five from seven — and keeps the one whose projected board is best, less a charge for each land outside two to four. `search` and `deep` use greedy's opening decisions.
+
 ### Determinism and speed
 
 - All randomness goes through the injected RNG; determinisations are seeded from it.

@@ -5,7 +5,7 @@ import { createEventEmitter, type EventEmitter } from './events/emitter.js';
 import { concede, playerLosesGame, playerWinsGame } from './game-end.js';
 import { hashState } from './loop.js';
 import { stateFromSeed } from './rng.js';
-import { MulliganError, setUpGame } from './setup.js';
+import { applyPlayOrDraw, MulliganError, setUpGame } from './setup.js';
 import {
   type CreateGameStateOptions,
   createGameState,
@@ -85,6 +85,80 @@ describe('setting up (CR 103)', () => {
   it('refuses to set up a game that has already started', () => {
     const { state, emitter } = withLibraries();
     expect(() => setUpGame({ ...state, turn: 3 }, emitter)).toThrow(MulliganError);
+  });
+});
+
+describe('choosing who plays first (CR 103.1)', () => {
+  const chosen = (chooser: PlayerId, choice: 'play' | 'draw') => {
+    const { state, emitter } = withLibraries(40, { chooser });
+    const asked = setUpGame(state, emitter);
+    return { asked, emitter, set: answer(asked, emitter, { kind: 'playOrDraw', choice }) };
+  };
+
+  it('asks the chooser before a card is shuffled or dealt', () => {
+    const { state, emitter } = withLibraries(40, { chooser: 'B' });
+    const asked = setUpGame(state, emitter);
+    expect(asked.pendingDecision).toEqual({
+      kind: 'playOrDraw',
+      player: 'B',
+      options: ['play', 'draw'],
+    });
+    expect(handOf(asked, 'A')).toHaveLength(0);
+    expect(handOf(asked, 'B')).toHaveLength(0);
+    expect(asked.rng).toEqual(state.rng);
+  });
+
+  it('puts the chooser on the play when they choose to play', () => {
+    const { set } = chosen('B', 'play');
+    expect(set.config.playerOnPlay).toBe('B');
+    // The player on the play declares a mulligan first (CR 103.4).
+    expect(set.pendingDecision).toMatchObject({ kind: 'mulligan', player: 'B' });
+    expect(handOf(set, 'A')).toHaveLength(7);
+  });
+
+  it('puts the opponent on the play when the chooser chooses to draw', () => {
+    const { set } = chosen('B', 'draw');
+    expect(set.config.playerOnPlay).toBe('A');
+    // Active from the start, as if the game had been made that way — it is what every
+    // view shows during the mulligans. (The board was made with A on the play, so the
+    // case that shows it is A choosing to draw.)
+    expect(chosen('A', 'draw').set.activePlayer).toBe('B');
+    expect(set.pendingDecision).toMatchObject({ kind: 'mulligan', player: 'A' });
+  });
+
+  /** The player on the play skips their first draw (CR 103.7a); it has to be the chosen one. */
+  it('begins turn 1 with the chosen player, who skips the first draw', () => {
+    let { set, emitter } = chosen('A', 'draw');
+    set = keep(keep(set, emitter), emitter);
+    expect(set.turn).toBe(1);
+    expect(set.activePlayer).toBe('B');
+    expect(handOf(set, 'B')).toHaveLength(7);
+  });
+
+  it('logs who made the choice', () => {
+    const { state } = withLibraries(40, { chooser: 'B' });
+    const emitter = createEventEmitter();
+    const set = answer(setUpGame(state, emitter), emitter, { kind: 'playOrDraw', choice: 'draw' });
+    const start = emitter.events.find((event) => event.type === 'gameStart');
+    expect(start).toMatchObject({ onPlay: 'A', chosenBy: 'B' });
+    expect(set.config.startingChooser).toBe('B');
+  });
+
+  it('asks nobody when who plays first was settled beforehand', () => {
+    const { state } = withLibraries();
+    const emitter = createEventEmitter();
+    const set = setUpGame(state, emitter);
+    expect(set.pendingDecision?.kind).toBe('mulligan');
+    expect(emitter.events.find((event) => event.type === 'gameStart')).toMatchObject({
+      chosenBy: null,
+    });
+  });
+
+  it('refuses the choice from anyone but the chooser', () => {
+    const { state, emitter } = withLibraries(40, { chooser: 'B' });
+    expect(() => applyPlayOrDraw(setUpGame(state, emitter), emitter, 'A', 'play')).toThrow(
+      MulliganError,
+    );
   });
 });
 

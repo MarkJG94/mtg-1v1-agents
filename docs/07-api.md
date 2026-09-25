@@ -42,7 +42,7 @@ Server messages:
 - `cycleFinished` — win rates, loser, the change with reason.
 - `deckChanged` — agent, generation, cause (`change` | `ban`), diff.
 - `banApplied` — oracle id, status, note, when it took effect.
-- `gameStart` — game id, decks, on-play, plus the current full state snapshot if joining mid-game.
+- `gameStart` — game id, decks, on-play and who chose it (`chosenBy`, or `null` when it was settled beforehand), plus the current full state snapshot if joining mid-game.
 - `gameEvents` — batches of `GameEvent` for the live game (coalesced every ~50 ms; the viewer paces them itself).
 - `gameEnd`.
 - `unsupportedCard` — a card was requested and skipped (feeds the coverage page live).

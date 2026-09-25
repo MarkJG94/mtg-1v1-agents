@@ -78,6 +78,8 @@ export type GameEventBody =
   | {
       readonly type: 'gameStart';
       readonly onPlay: PlayerId;
+      /** Who chose the player on the play (CR 103.1), or `null` if it was settled beforehand. */
+      readonly chosenBy: PlayerId | null;
       readonly startingLife: number;
       readonly decks: Readonly<Record<PlayerId, StartingDeck>>;
     }

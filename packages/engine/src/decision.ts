@@ -46,6 +46,19 @@ export interface MulliganDecision {
   readonly options: readonly ('keep' | 'mulligan')[];
 }
 
+/**
+ * Choosing who takes the first turn (CR 103.1), asked of the player who won the right to
+ * choose — at random in the first game of a match, the loser of the previous game after
+ * that. Asked before any card is dealt, because the choice decides who declares a
+ * mulligan first (CR 103.4) and who skips their first draw (CR 103.7a).
+ */
+export interface PlayOrDrawDecision {
+  readonly kind: 'playOrDraw';
+  readonly player: PlayerId;
+  /** `play`: the chooser takes the first turn. `draw`: the opponent does. */
+  readonly options: readonly ('play' | 'draw')[];
+}
+
 /** Paying for a kept mulligan by putting cards under the library (CR 103.4b). */
 export interface BottomCardsDecision {
   readonly kind: 'bottomCards';
@@ -147,6 +160,7 @@ export interface ChooseReplacementDecision {
 
 export type Decision =
   | MulliganDecision
+  | PlayOrDrawDecision
   | BottomCardsDecision
   | ChooseOptionDecision
   | ChooseReplacementDecision
@@ -160,6 +174,7 @@ export type Decision =
 export type DecisionResponse =
   | { readonly kind: 'priority'; readonly action: PriorityAction }
   | { readonly kind: 'mulligan'; readonly action: 'keep' | 'mulligan' }
+  | { readonly kind: 'playOrDraw'; readonly choice: 'play' | 'draw' }
   | { readonly kind: 'bottomCards'; readonly cards: readonly ObjectId[] }
   | { readonly kind: 'discard'; readonly cards: readonly ObjectId[] }
   | {

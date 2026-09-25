@@ -17,6 +17,8 @@ export const randomAgent: PlayAgent = {
     switch (decision.kind) {
       case 'priority':
         return { kind: 'priority', action: rng.pick(decision.options) };
+      case 'playOrDraw':
+        return { kind: 'playOrDraw', choice: rng.pick(decision.options) };
       case 'mulligan':
         return { kind: 'mulligan', action: rng.pick(decision.options) };
       case 'bottomCards':

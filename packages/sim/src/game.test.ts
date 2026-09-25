@@ -111,6 +111,23 @@ describe('what an agent is handed (ADR 0009)', () => {
   });
 });
 
+describe('who plays first (CR 103.1)', () => {
+  /** The chooser is asked through the same door as every other decision. */
+  it('asks the chooser, and plays the game the way they chose', () => {
+    const board = (seed: string) =>
+      fuzzBoard(seed, { creatures: 3, librarySize: 30, chooser: 'B' });
+    const drawing = greedyAgent(undefined, {
+      playDraw: { play: { games: 40, wins: 10 }, draw: { games: 40, wins: 30 } },
+    });
+
+    const played = playGame(board('choose'), { A: randomAgent, B: greedyAgent() }, 'choose');
+    expect(played.state.config.playerOnPlay).toBe('B');
+
+    const drew = playGame(board('choose'), { A: randomAgent, B: drawing }, 'choose');
+    expect(drew.state.config.playerOnPlay).toBe('A');
+  });
+});
+
 describe('a game that will not end', () => {
   it('is stopped, and says which seed it was', () => {
     expect(() => playGame(board('stall'), { A: randomAgent, B: randomAgent }, 'stall', 5)).toThrow(

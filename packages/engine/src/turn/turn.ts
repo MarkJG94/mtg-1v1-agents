@@ -42,7 +42,7 @@ import { activateLoyaltyAbility } from '../planeswalker.js';
 import { withPriority } from '../priority.js';
 import { expireEndOfTurnReplacements } from '../replacement.js';
 import { applyLegendRule, checkStateBasedActions } from '../sba.js';
-import { applyBottomCards, applyMulligan } from '../setup.js';
+import { applyBottomCards, applyMulligan, applyPlayOrDraw } from '../setup.js';
 import { isStackEmpty, putTriggerOnStack } from '../stack.js';
 import type { GameState } from '../state/game-state.js';
 import { isGameOver } from '../state/game-state.js';
@@ -521,6 +521,8 @@ export const applyDecision = (
     next = askForBlockerOrder(orderBlockers(cleared, decision.attacker, response.order));
   } else if (decision.kind === 'chooseReplacement' && response.kind === 'chooseReplacement') {
     next = resumeBatch(cleared, emitter, response.effect);
+  } else if (decision.kind === 'playOrDraw' && response.kind === 'playOrDraw') {
+    next = afterSetup(applyPlayOrDraw(cleared, emitter, decision.player, response.choice), emitter);
   } else if (decision.kind === 'mulligan' && response.kind === 'mulligan') {
     next = afterSetup(applyMulligan(cleared, emitter, decision.player, response.action), emitter);
   } else if (decision.kind === 'bottomCards' && response.kind === 'bottomCards') {
@@ -721,6 +723,8 @@ const defaultAnswer = (decision: Decision, options: AutoPlayOptions): DecisionRe
       if (first === undefined) throw new Error('a chooseReplacement decision offered nothing');
       return { kind: 'chooseReplacement', effect: first };
     }
+    case 'playOrDraw':
+      return { kind: 'playOrDraw', choice: 'play' };
     case 'mulligan':
       return { kind: 'mulligan', action: options.mulligan?.(decision) ?? 'keep' };
     case 'bottomCards':

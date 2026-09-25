@@ -34,6 +34,7 @@ export type {
   MulliganDecision,
   OrderBlockersDecision,
   OrderTriggersDecision,
+  PlayOrDrawDecision,
   PriorityAction,
   PriorityDecision,
 } from '../decision.js';

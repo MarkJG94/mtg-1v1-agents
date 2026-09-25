@@ -47,6 +47,11 @@ export interface Weights {
    * and in hand. Must stay below `landBeyondTarget`, or playing it looks like a loss.
    */
   readonly spareLand: number;
+  /**
+   * The projected turn-3 board a seven-card hand must reach to be kept (docs/04 item 5),
+   * on the evaluator's scale; a smaller hand is held to its share of it.
+   */
+  readonly keepBoard: number;
   /** Penalty for an empty library: the next draw loses the game (CR 704.5b). */
   readonly emptyLibrary: number;
 

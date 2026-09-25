@@ -14,7 +14,7 @@ import type {
 import { combatPolicy } from './combat/policy.js';
 import { chooseBlocks, solveAttacks } from './combat/solver.js';
 import { evaluate } from './evaluate.js';
-import { greedyAgent } from './greedy.js';
+import { type AgentKnowledge, greedyAgent } from './greedy.js';
 import type { PlayAgent } from './play-agent.js';
 import { defaultWeights, type Weights } from './weights.js';
 
@@ -126,10 +126,11 @@ export const searchAgent = (
   weights: Weights = defaultWeights,
   settings: SearchSettings = searchLevels[level],
   observe?: (report: SearchReport) => void,
+  knowledge: AgentKnowledge = {},
 ): PlayAgent => {
-  const greedy = greedyAgent(weights);
+  const greedy = greedyAgent(weights, knowledge);
   const solving = settings.combatCandidates > 0;
-  const policy = solving ? combatPolicy(weights) : greedy;
+  const policy = solving ? combatPolicy(weights, knowledge) : greedy;
   return {
     level,
     decide: (view, decision, rng, simulator): DecisionResponse => {

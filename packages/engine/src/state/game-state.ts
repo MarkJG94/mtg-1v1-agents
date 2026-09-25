@@ -180,6 +180,12 @@ export interface GameConfig {
   readonly loopCheckAfter: number;
   /** Who took the first turn. Needed for the CR 103.7a first-draw skip. */
   readonly playerOnPlay: PlayerId;
+  /**
+   * The player who chooses who plays first (CR 103.1), or `null` when that was settled
+   * before the game was made and `playerOnPlay` is simply given. In the first game of a
+   * match the chooser is picked at random; in later games it is the loser of the last.
+   */
+  readonly startingChooser: PlayerId | null;
 }
 
 const emptyPlayerState = (life: number): PlayerState => ({
@@ -202,8 +208,13 @@ export interface CreateGameStateOptions {
   readonly rng: RngState;
   /** The cards this game is played with. Anything not in here has no script (docs/03). */
   readonly definitions?: Iterable<CardDefinition>;
-  /** The player who takes the first turn. */
+  /**
+   * The player who takes the first turn — or, when `chooser` is given, who would if the
+   * chooser does not say otherwise; the choice replaces it before any card is dealt.
+   */
   readonly onPlay: PlayerId;
+  /** Ask this player to choose who plays first as the game is set up (CR 103.1). */
+  readonly chooser?: PlayerId;
   readonly startingLife?: number;
   readonly turnCap?: number;
   readonly maxHandSize?: number;
@@ -250,6 +261,7 @@ export const createGameState = (options: CreateGameStateOptions): GameState => {
       detectLoops: options.detectLoops ?? true,
       loopCheckAfter: options.loopCheckAfter ?? DEFAULT_LOOP_CHECK_AFTER,
       playerOnPlay: options.onPlay,
+      startingChooser: options.chooser ?? null,
     },
     extraTurns: [],
     pendingDecision: null,
