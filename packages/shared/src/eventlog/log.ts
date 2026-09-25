@@ -25,7 +25,10 @@ export interface EventLogPlayer {
 export interface GameEventLog {
   readonly version: number;
   readonly gameId: GameId;
-  /** The game's RNG seed as a decimal string, as in run settings. */
+  /**
+   * The seed the game was played from: the label its generator was made from, derived
+   * from the run's seed (`${run}:match-3:game-2`), not the run's decimal seed itself.
+   */
   readonly seed: string;
   readonly players: Readonly<Record<PlayerId, EventLogPlayer>>;
   /** Object id → identity, so a replay needs no card lookups. */

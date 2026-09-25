@@ -10,3 +10,4 @@ export * from './game/steps.js';
 export * from './game/zones.js';
 export * from './ids.js';
 export * from './settings.js';
+export * from './stats.js';

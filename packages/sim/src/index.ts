@@ -10,8 +10,10 @@
  */
 export * from './cycle.js';
 export * from './deck.js';
+export * from './event-log.js';
 export * from './game.js';
 export * from './ladder.js';
 export * from './match.js';
 export * from './sideboard-cards.js';
+export * from './stats.js';
 export * from './tuning.js';

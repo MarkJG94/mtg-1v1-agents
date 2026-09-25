@@ -9,7 +9,7 @@ import {
   fuzzRemoval,
   fuzzTrigger,
 } from '@mtg/engine/testing';
-import type { PlayerId } from '@mtg/shared';
+import { type AgentCounts, emptyAgentCounts, type GameEventLog, type PlayerId } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
 import {
   type AgentFactory,
@@ -195,5 +195,55 @@ describe('what the agents are told', () => {
     }
     const without = cycle({ seed: 'side', sideboard: null });
     for (const match of without.matches) expect(match.sideboarding).toEqual({ A: null, B: null });
+  });
+});
+
+describe('the cycle’s statistics (roadmap 5.2)', () => {
+  it('reads every game it played into each deck’s counts, and hands each log on', () => {
+    const logs: GameEventLog[] = [];
+    const result = cycle({ generations: { A: 4, B: 9 }, onGame: (log) => logs.push(log) });
+    const games = result.matches.flatMap((match) => match.games);
+    expect(logs).toHaveLength(games.length);
+    expect(result.stats.A.deck.games).toBe(games.length);
+    expect(result.stats.B.deck.games).toBe(games.length);
+    expect(result.stats.A.deck.wins).toBe(
+      games.filter((game) => game.result?.winner === 'A').length,
+    );
+    // Decisions are scored, so resolutions have an impact.
+    const impacts = Object.values(result.stats.A.cards).reduce(
+      (sum, card) => sum + card.impacts,
+      0,
+    );
+    expect(impacts).toBeGreaterThan(0);
+    expect(logs.every((log) => log.players.A.deckGeneration === 4)).toBe(true);
+    // A's cards are filed against B's generation, and B's against A's.
+    expect(Object.keys(result.stats.A.matchups)).toEqual(['9']);
+    expect(Object.keys(result.stats.B.matchups)).toEqual(['4']);
+  });
+
+  /**
+   * History that says A's creatures lose when drawn against B's generation 5 — and only
+   * against it — makes A side them out before game 3; the same history filed under another
+   * generation says nothing about this opponent.
+   */
+  it('sideboards on each card’s record against the opponent’s current deck', () => {
+    const creature = fuzzCreature.oracleId;
+    const history = (generation: number): Record<PlayerId, AgentCounts> => ({
+      A: {
+        ...emptyAgentCounts,
+        matchups: {
+          [generation]: {
+            [creature]: { drawn: { games: 200, wins: 20 }, notDrawn: { games: 200, wins: 180 } },
+          },
+        },
+      },
+      B: emptyAgentCounts,
+    });
+    const outs = (generation: number) =>
+      cycle({ seed: 'side', generations: { A: 0, B: 5 }, history: history(generation) })
+        .matches.flatMap((match) => match.sideboarding.A?.swaps ?? [])
+        .filter((swap) => swap.out === creature && swap.outScore.basis === 'record');
+    expect(outs(5).length).toBeGreaterThan(0);
+    expect(outs(6)).toEqual([]);
   });
 });

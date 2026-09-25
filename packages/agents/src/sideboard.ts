@@ -1,4 +1,11 @@
-import type { CardKind, CardTags, Colour, DeckSlot, OracleId } from '@mtg/shared';
+import {
+  type CardKind,
+  type CardTags,
+  type Colour,
+  type DeckSlot,
+  type OracleId,
+  shrunkRate,
+} from '@mtg/shared';
 
 /**
  * The sideboarding agent (docs/04 "Sideboarding agent"; roadmap 4.6).
@@ -208,7 +215,7 @@ const coloursMade = (
 const scorer = (input: SideboardInput, settings: SideboardSettings) => {
   const mean = input.matchup.games > 0 ? input.matchup.wins / input.matchup.games : 0.5;
   const shrunk = (wins: number, games: number) =>
-    (wins + settings.shrinkage * mean) / (games + settings.shrinkage);
+    shrunkRate({ games, wins }, mean, settings.shrinkage);
 
   // What the opponent is, by the share of their seen nonland cards of each kind.
   const seen = input.opponentSeen.flatMap((slot) => {

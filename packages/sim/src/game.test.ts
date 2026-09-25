@@ -130,9 +130,9 @@ describe('who plays first (CR 103.1)', () => {
 
 describe('a game that will not end', () => {
   it('is stopped, and says which seed it was', () => {
-    expect(() => playGame(board('stall'), { A: randomAgent, B: randomAgent }, 'stall', 5)).toThrow(
-      StalledGameError,
-    );
+    expect(() =>
+      playGame(board('stall'), { A: randomAgent, B: randomAgent }, 'stall', { maxDecisions: 5 }),
+    ).toThrow(StalledGameError);
   });
 });
 
@@ -143,5 +143,32 @@ describe('greedy against itself', () => {
       const { result } = playGame(board(`mirror-${i}`), { A: greedy, B: greedy }, `mirror-${i}`);
       expect(result).not.toBeNull();
     }
+  });
+});
+
+describe('what a game records (roadmap 5.2)', () => {
+  it('keeps every event the engine emitted, and records no decisions unless asked', () => {
+    const played = playGame(board('events'), { A: greedyAgent(), B: greedyAgent() }, 'events');
+    expect(played.events[0]?.seq).toBe(0);
+    expect(played.events.some((event) => event.type === 'gameStart')).toBe(true);
+    expect(played.events.some((event) => event.type === 'decision')).toBe(false);
+  });
+
+  /** docs/05's `impact` is read off these: each decision, scored for the player deciding. */
+  it('records each decision with the score of the decider’s own view, when asked', () => {
+    const scored: { viewer: PlayerId; turn: number }[] = [];
+    const played = playGame(board('scores'), { A: greedyAgent(), B: greedyAgent() }, 'scores', {
+      score: (view) => {
+        scored.push({ viewer: view.viewer, turn: view.turn });
+        return scored.length;
+      },
+    });
+    const decisions = played.events.filter((event) => event.type === 'decision');
+    expect(decisions).toHaveLength(played.decisions.length);
+    decisions.forEach((event, i) => {
+      expect(event.type === 'decision' && event.score).toBe(i + 1);
+      expect(event.type === 'decision' && event.player).toBe(scored[i]?.viewer);
+      expect(event.turn).toBe(scored[i]?.turn);
+    });
   });
 });

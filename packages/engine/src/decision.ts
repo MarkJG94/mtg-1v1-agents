@@ -1,4 +1,4 @@
-import type { EventTarget, ObjectId, PlayerId } from '@mtg/shared';
+import type { DecisionKind, EventTarget, ObjectId, PlayerId } from '@mtg/shared';
 import type { BlockDeclaration } from './combat.js';
 import type { RulesEvent } from './events/rules-event.js';
 import type { LegalAction } from './legal-actions.js';
@@ -170,6 +170,13 @@ export type Decision =
   | DeclareAttackersDecision
   | DeclareBlockersDecision
   | OrderBlockersDecision;
+
+/**
+ * Every kind of decision the engine can ask must be one the event log can record
+ * (`decisionKinds` in `@mtg/shared`). Checked when this compiles: `playOrDraw` joined the
+ * engine at 4.5 and was missing from the log's list until 5.2 found it.
+ */
+void (true satisfies [Decision['kind']] extends [DecisionKind] ? true : false);
 
 export type DecisionResponse =
   | { readonly kind: 'priority'; readonly action: PriorityAction }

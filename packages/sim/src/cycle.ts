@@ -1,7 +1,9 @@
 import {
   type AgentKnowledge,
   defaultWeights,
+  evaluate,
   greedyAgent,
+  type MatchupRecord,
   type PlayAgent,
   type PlayDrawRecord,
   randomAgent,
@@ -12,10 +14,22 @@ import {
   type Weights,
 } from '@mtg/agents';
 import { type CardDefinition, createRng } from '@mtg/engine';
-import type { AgentLevel, OracleId, PlayerId, RunSettings } from '@mtg/shared';
+import type { PlayerView } from '@mtg/engine/view';
+import {
+  type AgentCounts,
+  type AgentLevel,
+  addCounts,
+  emptyAgentCounts,
+  type GameEventLog,
+  type OracleId,
+  opponentOf,
+  type PlayerId,
+  type RunSettings,
+} from '@mtg/shared';
 import { cardsIn, type Deck } from './deck.js';
 import { type MatchResult, playMatch, type SideboardContext } from './match.js';
 import { sideboardCardsFor } from './sideboard-cards.js';
+import { type CardFacts, cardFactsFor, StatsAccumulator } from './stats.js';
 
 /**
  * One cycle of the evolution loop (docs/05 "The cycle"; roadmap 5.1): the two decks play
@@ -77,6 +91,20 @@ export interface CycleOptions {
   readonly sideboard?: ((context: SideboardContext) => SideboardPlan) | null;
   /** Told of each match as it finishes, for progress. */
   readonly observe?: (match: MatchResult, index: number) => void;
+  /** Each deck's generation, for the logs and the matchup statistics; 0 if not given. */
+  readonly generations?: Readonly<Record<PlayerId, number>>;
+  /**
+   * Each deck's statistics from earlier cycles, rolled up (`rollUp` in `@mtg/shared`).
+   * Sideboarding reads each card's record against the opponent's current deck from these
+   * and from this cycle's games so far.
+   */
+  readonly history?: Readonly<Record<PlayerId, AgentCounts>>;
+  /** The printed facts the aggregator needs; worked out from `definitions` if not given. */
+  readonly facts?: ReadonlyMap<OracleId, CardFacts>;
+  /** How each decision's position is scored for `impact`; the default evaluator if not given. */
+  readonly score?: (view: PlayerView) => number;
+  /** Handed each game's event log as it finishes, to keep; the cycle keeps none. */
+  readonly onGame?: (log: GameEventLog) => void;
 }
 
 export interface CycleResult {
@@ -88,6 +116,8 @@ export interface CycleResult {
   readonly decidedBy: 'winRate' | 'tiebreak' | 'coinFlip';
   /** The records as they stand at the end of the cycle. */
   readonly playDraw: Readonly<Record<PlayerId, PlayDrawRecord>>;
+  /** This cycle's statistics for each deck, read from every game's event log (docs/05). */
+  readonly stats: Readonly<Record<PlayerId, AgentCounts>>;
 }
 
 const noRecord: PlayDrawRecord = { play: { games: 0, wins: 0 }, draw: { games: 0, wins: 0 } };
@@ -114,8 +144,15 @@ export const runCycle = (options: CycleOptions): CycleResult => {
     A: options.playDraw?.A ?? noRecord,
     B: options.playDraw?.B ?? noRecord,
   };
+  const facts =
+    options.facts ??
+    new Map([...options.definitions].map(([oracleId, card]) => [oracleId, cardFactsFor(card)]));
+  const stats = new StatsAccumulator(facts);
+  const score = options.score ?? ((view: PlayerView) => evaluate(view, defaultWeights));
   const hook =
-    options.sideboard === undefined ? defaultSideboard(options, matches) : options.sideboard;
+    options.sideboard === undefined
+      ? defaultSideboard(options, matches, () => stats.totals)
+      : options.sideboard;
 
   const play = (count: number) => {
     for (let i = 0; i < count; i += 1) {
@@ -137,6 +174,12 @@ export const runCycle = (options: CycleOptions): CycleResult => {
         seed: `${options.seed}:match-${index}`,
         firstChooser: index % 2 === 0 ? 'A' : 'B',
         turnCap: settings.turnCap,
+        ...(options.generations === undefined ? {} : { generations: options.generations }),
+        score,
+        onGame: (log) => {
+          stats.add(log);
+          options.onGame?.(log);
+        },
       });
       for (const game of match.games) {
         for (const player of ['A', 'B'] as const) {
@@ -169,7 +212,7 @@ export const runCycle = (options: CycleOptions): CycleResult => {
     decidedBy = 'coinFlip';
   }
 
-  return { matches, tiebreakMatches, winRate, loser, decidedBy, playDraw };
+  return { matches, tiebreakMatches, winRate, loser, decidedBy, playDraw, stats: stats.totals };
 };
 
 const recorded = (record: PlayDrawRecord, onPlay: boolean, won: boolean): PlayDrawRecord => {
@@ -179,12 +222,16 @@ const recorded = (record: PlayDrawRecord, onPlay: boolean, won: boolean): PlayDr
 };
 
 /**
- * docs/04's sideboarding agent, given what a match and the cycle so far can tell it: the
- * cards the opponent has shown, and this deck's games and wins against the opponent's
- * deck this cycle. Per-card records (docs/05 `matchupWinRate`) are the aggregator's
- * (roadmap 5.2); until then every card is judged by its tags.
+ * docs/04's sideboarding agent, given what a match and the statistics can tell it: the
+ * cards the opponent has shown, this deck's games and wins against the opponent's deck
+ * this cycle, and each card's record against that deck — docs/05's `matchupWinRate`,
+ * keyed by the opponent's generation — from earlier cycles and this one so far.
  */
-const defaultSideboard = (options: CycleOptions, matches: readonly MatchResult[]) => {
+const defaultSideboard = (
+  options: CycleOptions,
+  matches: readonly MatchResult[],
+  sofar: () => Readonly<Record<PlayerId, AgentCounts>>,
+) => {
   const pool = new Set<OracleId>([
     ...cardsIn(options.decks.A).keys(),
     ...cardsIn(options.decks.B).keys(),
@@ -210,9 +257,33 @@ const defaultSideboard = (options: CycleOptions, matches: readonly MatchResult[]
       cards,
       opponentSeen: context.opponentSeen,
       matchup: { games, wins },
-      records: new Map(),
+      records: matchupRecords(options, sofar()[context.player], context.player),
       banned: options.banned ?? new Set(),
       settings: { maxSwaps: options.settings.maxSideboardSwaps },
     });
   };
+};
+
+/**
+ * Each card's record against the opponent's current deck, from earlier cycles' rolled-up
+ * counts and this cycle's so far, in the shape the sideboarding agent reads.
+ */
+const matchupRecords = (
+  options: CycleOptions,
+  cycle: AgentCounts,
+  player: PlayerId,
+): Map<OracleId, MatchupRecord> => {
+  const all = addCounts(options.history?.[player] ?? emptyAgentCounts, cycle);
+  const against = all.matchups[options.generations?.[opponentOf(player)] ?? 0] ?? {};
+  return new Map(
+    Object.entries(against).map(([oracleId, counts]) => [
+      oracleId as OracleId,
+      {
+        gamesDrawn: counts.drawn.games,
+        winsDrawn: counts.drawn.wins,
+        gamesNotDrawn: counts.notDrawn.games,
+        winsNotDrawn: counts.notDrawn.wins,
+      },
+    ]),
+  );
 };

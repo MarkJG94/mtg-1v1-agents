@@ -6,6 +6,8 @@
  * concern and stay in `@mtg/engine`.
  */
 export const decisionKinds = [
+  // Who takes the first turn, before anything is dealt (CR 103.1).
+  'playOrDraw',
   'mulligan',
   'bottomCards',
   'priority',

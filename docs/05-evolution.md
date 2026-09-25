@@ -73,6 +73,17 @@ Per cycle, per agent, per card (oracle id), the aggregator computes from the eve
 
 Statistics are stored per cycle and also rolled up across cycles with exponential decay (half-life 3 cycles) so the deck agent has both fresh and historical evidence. Small-sample noise is handled with a Bayesian shrinkage toward the deck mean (Beta prior with `n0 = 20`).
 
+**As built (5.2).** Every game now leaves an **event log** (`eventLogOf` in `packages/sim/src/event-log.ts`, the docs/06 format): what the engine emitted, a header naming each object's card — an object keeps its id wherever it goes in this engine, so the final table names every card — and each player's deck generation and the sixty it played with. When asked, `playGame` also records every decision as a `decision` event scored by the evaluator on the decider's own view, which is what `impact` is read from. **The aggregator** (`packages/sim/src/stats.ts`) reads a log alone, with each card's printed facts passed in, replaying just enough to know what was in each hand and on each battlefield when, and returns counts. **Counts, not rates, are what is stored** (`packages/shared/src/stats.ts`): they add, so a cycle's statistics are the sum of its games', and `rollUp` weights each cycle by 2^(−age/3) to decay them; rates are read off counts with `cardStats`/`deckStats`, the contribution Δ between shrunk drawn and not-drawn rates (`shrunkRate`, n0 = 20). Where this table leaves a choice:
+
+- *drawn* is in hand at any point after the hand was kept — the kept hand, draws, and anything returned to hand; a hand mulliganed away counts toward `mulliganBlame` instead, and cards put on the bottom are not drawn;
+- *cast* includes playing a land; *dead in hand* is a copy still in hand when the game ended;
+- *turn of first cast* is in the player's own turns, so the draw is not charged a turn;
+- *impact* is the caster's score at its first decision after the spell resolved, less its score at its last decision before casting it;
+- *screw* and *flood* are lands on the battlefield at the end of the player's fourth and eighth turns, over the games that reached them; *colour screw* is ending a turn holding a spell the lands could pay for but not in its colours;
+- *matchup* records are the drawn and not-drawn tallies filed under the opponent's deck generation.
+
+`runCycle` scores its decisions, reads every game into each deck's counts as it finishes (a cycle's logs would run to hundreds of megabytes, so none are kept unless `onGame` keeps them), returns them as `stats`, and hands the sideboarding agent each card's record against the opponent's current generation, from earlier cycles' rolled-up `history` and this cycle so far.
+
 ## Choosing the change (`DeckAgent`)
 
 ```ts

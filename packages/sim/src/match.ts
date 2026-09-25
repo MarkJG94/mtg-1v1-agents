@@ -1,7 +1,9 @@
 import type { PlayAgent, SideboardPlan } from '@mtg/agents';
 import type { CardDefinition, DecisionResponse, GameState } from '@mtg/engine';
+import type { PlayerView } from '@mtg/engine/view';
 import {
   type DeckSlot,
+  type GameEventLog,
   type GameResult,
   isHiddenZone,
   type OracleId,
@@ -10,6 +12,7 @@ import {
   playerIds,
 } from '@mtg/shared';
 import { cardCount, cardsIn, type Deck, deckBoard } from './deck.js';
+import { eventLogOf } from './event-log.js';
 import { playGame } from './game.js';
 
 /**
@@ -56,6 +59,12 @@ export interface MatchOptions {
   /** Who chooses who plays first in game 1. */
   readonly firstChooser: PlayerId;
   readonly turnCap: number;
+  /** Each player's deck generation, for the logs (docs/05); 0 if not given. */
+  readonly generations?: Readonly<Record<PlayerId, number>>;
+  /** Scores each decision's position for the log's `decision` events (see `playGame`). */
+  readonly score?: (view: PlayerView) => number;
+  /** Handed each game's event log as it finishes; the match keeps none of them. */
+  readonly onGame?: (log: GameEventLog) => void;
 }
 
 export interface MatchGame {
@@ -131,7 +140,18 @@ export const playMatch = (options: MatchOptions): MatchResult => {
       board,
       { A: options.players.A.agent, B: options.players.B.agent },
       seed,
+      options.score === undefined ? {} : { score: options.score },
     );
+    if (options.onGame !== undefined) {
+      const logged = (player: PlayerId) => ({
+        generation: options.generations?.[player] ?? 0,
+        main: decks[player].main,
+        side: decks[player].side,
+      });
+      options.onGame(
+        eventLogOf({ gameId: seed, seed, played, players: { A: logged('A'), B: logged('B') } }),
+      );
+    }
     for (const player of playerIds) addSeen(seen[player], played.state, player);
 
     const result = played.result;
