@@ -49,6 +49,12 @@ loop while run.status == running:
 
 Games within a cycle are independent and run in parallel across the worker's game queue when `SIM_WORKERS` allows more than one worker per run (default: one worker per run; multi-worker per run is a later optimisation).
 
+**As built (5.1)**, in `packages/sim/src`:
+
+- **`deckBoard`** (`deck.ts`) makes a game from two decks: each main deck in its owner's library, the definitions of every card in them, and the chooser named, so `setUpGame` asks who plays first before it shuffles and deals (CR 103.1–103.3). Sideboards stay out of the game (CR 100.4a). A card with no definition is refused rather than left out.
+- **`playMatch`** (`match.ts`) plays best of three. Game 1's chooser is given; after that the loser of the previous game chooses, and after a drawn game whoever chose in it chooses again (CR 103.1) — the chooser's own agent answers the `playOrDraw` decision, so a deck whose record says it wins more on the draw takes it. A drawn game counts for neither player; the match stops at two wins or three games, and level wins after three is a drawn match. Between games 2 and 3, and only if there is a game 3, each player's sideboarding hook is shown what the opponent has shown so far (their cards in public zones at the end of each game) and the games so far, and returns the deck for game 3; a plan that changes the seventy-five, or the sixty in the main, is refused. Each game's seed, chooser, player on the play, result, main decks and every decision are kept, so any game can be replayed.
+- **`runCycle`** (`cycle.ts`) plays `matchesPerCycle` matches with game 1's chooser alternating from match to match, scores a match one for a win and a half for a draw, and treats two rates closer than `tieMargin` — or exactly level, whatever the margin — as a tie: `tiebreakMatches` more are played and counted with the rest, and a coin flipped from `${seed}:coin` names the loser if it is still a tie. Each deck's play/draw record is kept game by game and every match's agents are made knowing the record so far (docs/04 item 6). Sideboarding is docs/04's `sideboard()` by default, told the opponent's shown cards and this deck's games and wins against the other this cycle; per-card matchup records wait for the statistics aggregator (5.2).
+
 ## Statistics
 
 Per cycle, per agent, per card (oracle id), the aggregator computes from the event logs:
