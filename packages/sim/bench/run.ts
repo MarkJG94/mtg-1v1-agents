@@ -13,7 +13,8 @@
  *
  * Each game is on a fuzz board (three creatures a side, a 30-card library: the ladder's),
  * seeds fixed, so two runs play the same games and any difference is the machine. Cases
- * are interleaved after a shared warm-up, for the reason the engine's are (see there).
+ * are interleaved after a shared warm-up, for the reason the engine's are (see there), and
+ * `pnpm bench:search` times the code as built rather than as `tsx` runs it (ADR 0013).
  * A searched decision's own cost is reported too — docs/04 aims for 20 ms or less — timed
  * only where the search had something to choose between.
  *
@@ -41,13 +42,13 @@ const CASES: readonly SearchCase[] = [
   {
     name: 'search-mirror',
     what: 'both players at search, as the evolution loop plays them',
-    games: 40,
+    games: 60,
     opponent: () => searchAgent('search'),
   },
   {
     name: 'search-vs-greedy',
     what: 'one searcher against greedy, the ladder top rung',
-    games: 40,
+    games: 60,
     opponent: () => greedyAgent(),
   },
 ];

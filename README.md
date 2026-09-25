@@ -38,8 +38,9 @@ definition, and the engine casts it, pays for it and resolves it — for a boots
 written by hand, and for whatever the auto-scripter can read off a card's oracle text,
 which is 11% of Scryfall against a 25% target. For agents, a play agent is given a
 view of the game rather than the game, and a priority decision now offers everything a
-player could actually do. A game plays in about 5.2 ms with the random agent, against a
-5 ms target — the roadmap's 4.2 note says where the rest of it is. All four agent
+player could actually do. A game plays in about 3.9 ms with the random agent, inside its
+5 ms target, and in about 85 ms with both players searching, against 50 ms — the
+roadmap's 4.8 note says where that stands. All four agent
 levels play whole games — `random`, `greedy` (a tunable static evaluator), and `search`
 and `deep`, which play each candidate forward by the real rules in samples of the game
 as the player knows it and fight with a dedicated combat solver — and the sanity ladder
@@ -50,7 +51,7 @@ roadmap.
 
 What runs today: `pnpm dev` starts the Fastify API and the Vite dev server together,
 `pnpm fetch:scryfall` builds the card projection from Scryfall's bulk data, `pnpm bench`
-plays fixed-seed games and reports the time they take, `pnpm ladder` plays the agent levels
+and `pnpm bench:search` play fixed-seed games and report the time they take, `pnpm ladder` plays the agent levels
 against each other, `pnpm tune` plays one set of evaluator weights against another or
 hill-climbs a set, and `pnpm check` (lint, typecheck, test, build) is green.
 

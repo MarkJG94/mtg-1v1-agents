@@ -108,11 +108,13 @@ What this catches is **illegal states**, not wrong-but-legal outcomes. A rule th
 
 ### 8. Benchmarks
 
-`packages/engine/bench` measures ms/game, games/sec and decisions/sec over fixed-seed random games, in four cases: a baseline board, a wide board where blocks and damage assignment do real work, a long game, and the baseline with loop detection switched off so its cost is visible rather than inferred. `pnpm bench` prints the table; `--json` writes it for CI. `packages/agents/bench` follows when there are agents to measure (phase 4).
+`packages/engine/bench` measures ms/game, games/sec and decisions/sec over fixed-seed random games, in four cases: a baseline board, a wide board where blocks and damage assignment do real work, a long game, and the baseline with loop detection switched off so its cost is visible rather than inferred. `pnpm bench` prints the table; `--json` writes it for CI.
 
-The numbers are the engine's, not a game's: invariant checking is off (that is the fuzzer's job and costs several times what playing the game does), and with no card definitions nothing is cast.
+The search's benchmarks are `packages/sim/bench` (`pnpm bench:search`) rather than a bench in the agents package, which cannot run a game (ADR 0009): whole games on the ladder's fuzz boards with both players at `search`, which is the case docs/02's 50 ms is for, and one searcher against greedy, reporting ms/game and what a searched decision costs.
 
-CI runs the benchmarks and compares them against the last run recorded on `main`, failing on a regression greater than 20% in any case's median. The baseline travels through the Actions cache, which a branch can read from the default branch; a run with no baseline records one instead of failing. The comparison is on the median rather than the mean because a shared runner is noisy, and for the same reason CI's absolute budget is a ceiling against something going badly wrong rather than the 5 ms target, which is a one-core figure for a developer machine.
+The engine's numbers are the engine's, not a game's: invariant checking is off (that is the fuzzer's job and costs several times what playing the game does). Both benchmarks time **the code as built**: `scripts/run-bundled.ts` bundles them the way tsup builds the packages and runs the bundle with node, because `tsx`'s `keepNames` transform read about a fifth slower and was in every number before 4.8 (ADR 0013).
+
+CI runs both benchmarks and compares each against the last run recorded on `main`, failing on a regression greater than 20% in any case's median. The baseline travels through the Actions cache, which a branch can read from the default branch; a run with no baseline records one instead of failing. The comparison is on the median rather than the mean because a shared runner is noisy, and for the same reason CI's absolute budget is a ceiling against something going badly wrong rather than the 5 ms and 50 ms targets, which are one-core figures for a developer machine.
 
 A benchmark is also a test that reads a whole system at once. This one found that loop detection was nine tenths of a game's time *and* that it was ending 36% of wide-board games as false draws, neither of which any unit test had noticed. See ADR 0005.
 

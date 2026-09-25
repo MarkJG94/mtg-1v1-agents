@@ -97,7 +97,29 @@ Neither agent recomputes blocking legality: the `declareBlockers` decision carri
 | `search` | 2 | 3 | 2 | 1 | 2 | 600 | 3 |
 | `deep` | 4 | 5 | 3 | 2 | 3 | 4,000 | 5 |
 
-Measured over the 500-game ladder, a searched priority decision at the `search` level costs 3.5 ms on average and 15.2 ms at the 99th percentile, inside the 20 ms aim above; an attack decision 1.8 ms and a block decision 0.7 ms; a game against greedy about 110 ms. `deep` costs about 11 ms a priority decision on average. Search beats greedy 290–137 with 73 draws over 500 games (p = 5.2 × 10⁻¹⁴).
+Measured over the 500-game ladder at 4.3, under `tsx`, a searched priority decision at the `search` level cost 3.5 ms on average and 15.2 ms at the 99th percentile, inside the 20 ms aim above (4.8 more than halved it; see "What a searched game costs"); an attack decision 1.8 ms and a block decision 0.7 ms; a game against greedy about 110 ms. `deep` costs about 11 ms a priority decision on average. Search beats greedy 290–137 with 73 draws over 500 games (p = 5.2 × 10⁻¹⁴).
+
+### What a searched game costs, as built (4.8)
+
+docs/02 asks for a median game at `search` inside 50 ms. `pnpm bench:search` (`packages/sim/bench`) plays whole games on the ladder's fuzz boards, on the code as built (ADR 0013), and reports two cases: both players at `search`, which is what the evolution loop will play and what the target is for, and one searcher against greedy.
+
+| case | before 4.8 | after 4.8 | target |
+|---|---:|---:|---:|
+| both at `search`, median game | 145–154 ms | **83–87 ms** | 50 ms |
+| `search` against greedy, median game | 77–81 ms | **45 ms** | — |
+| a searched decision, mean | 2.2 ms | **1.3 ms** | 20 ms |
+| a searched decision, 99th percentile | 11–12 ms | **8 ms** | — |
+
+**Every decision is the one it was.** Nothing below changes what the search chooses; a fingerprint of thirty games' decisions was the same after every change, and a test holds it:
+
+- **Lines are remembered within a decision.** Worlds are immutable, so an action played in one, or a world played to its horizon, has one answer; the one-step look at an option in the first world, which the shortlist then plays again, and the same position reached down two lines, are worked out once. A remembered line is still charged the steps it took, and is reused only when the budget would have covered playing it again, so the budget runs out where it always did. `remember: false` turns it off; `search.test.ts` plays positions from real games at four budgets with it on and off and requires the same reports, and fewer engine steps.
+- **A repeated deal is played once.** Two samples that dealt the opponent the same hidden cards — two decisions in five on fuzz boards, and every decision before the opponent has shown anything — differ only in the generator each would play on with. The simulator says so (`sameDeal`, ADR 0012's amendment), and the search puts the first world in the second's place, where every line is already remembered. The mean is still over both samples; what drops is a random effect before the horizon, which fuzz cards do not have.
+- **The block solver remembers the blocks it has already projected**, since each pass after the first tries most of them again.
+- **Views and evaluations allocate less**: a view is built zone by zone rather than by asking every card in both libraries whether it can be seen, what a card's definition says is worked out once per definition, the combat model overlays the creatures a combat changed rather than copying every object, and three hot loops lost their `flatMap`.
+
+Three more were measured and thrown away: caching each side's permanents per view (slower — the lookup cost more than it saved), keeping an action's memo key on the action (no change), and reusing an object's view entry while it was unchanged (no change: characteristics are recomputed whenever anything on the board changes, so the check that they had not rarely passed).
+
+**Why the rest is not there.** What is left is spread thin — the engine's own steps are a third of a searched game, building views and scoring them a fifth, the combat solver a sixth, the garbage collector a tenth — and no remaining piece is large enough that making it cheaper would close a factor of 1.7. The large lever is the search's own settings, and on fuzz boards they buy almost nothing: over 556 decisions the depth-2 search overturned the one-step look **once**, and one sample instead of two, a beam of one, one follow-up, no replies or responses for the opponent, or half the budget each left every decision in ten games against greedy unchanged. That is a finding about fuzz boards — one land that makes every colour, five kinds of card, no instant worth holding up — as much as about the search: the unit suite has the positions where depth decides (sequencing a land before the spell it enables, the opponent's burn in reply), and real decks will have more of them. Cutting the defaults to meet the target on boards where they happen not to matter would be tuning to the benchmark, so they stay, and whether they earn their cost is a question for real decks (phase 5), where the tuning harness (4.7) can weigh it.
 
 ### The combat solver, as built (4.4)
 

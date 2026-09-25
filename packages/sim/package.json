@@ -13,7 +13,7 @@
     "build": "tsup",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "bench": "tsx bench/run.ts"
+    "bench": "tsx ../../scripts/run-bundled.ts bench/run.ts"
   },
   "dependencies": {
     "@mtg/agents": "workspace:*",

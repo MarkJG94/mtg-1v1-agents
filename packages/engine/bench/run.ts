@@ -17,6 +17,10 @@
  *   which cost several times what playing the game does and are not engine time.
  * - **The seeds are fixed**, so two runs play exactly the same games and any difference
  *   between them is the machine, not the workload.
+ * - **It times the code as built.** `pnpm bench` bundles this file the way tsup builds the
+ *   engine and runs the bundle (`scripts/run-bundled.ts`, ADR 0013). Run directly under
+ *   `tsx` it reads about a fifth slower, because `tsx` keeps function names and that costs
+ *   a call every time a closure is made — which is not engine time.
  *
  * Usage:
  *   pnpm bench [--games N] [--json path] [--budget MS]

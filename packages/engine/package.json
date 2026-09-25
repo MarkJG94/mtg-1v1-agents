@@ -15,7 +15,7 @@
     "build": "tsup",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.bench.json",
     "test": "vitest run",
-    "bench": "tsx bench/run.ts"
+    "bench": "tsx ../../scripts/run-bundled.ts bench/run.ts"
   },
   "dependencies": {
     "@mtg/shared": "workspace:*"

@@ -111,10 +111,22 @@ Combat is a sub-state machine: `declareAttackers` (legal attackers computed with
 - `characteristics()` memoisation invalidated only by state version bumps; effect lists are usually short so linear scans are fine.
 - No allocation-heavy patterns in the hot path (avoid spread on large arrays; zones as plain arrays; object pool for events).
 
-Measured (roadmap 4.2, `pnpm bench`): a median game with the random agent takes **5.2 ms**
-over ~630 decisions, about 190 games and 120,000 decisions a second on one core. The
-wide-combat case is inside the budget at 3.1 ms; the baseline and long-game cases are 4%
-and 8% over it.
+Measured (roadmap 4.8, `pnpm bench`, on the code as built — ADR 0013): a median game
+with the random agent takes **3.9 ms** over ~630 decisions, about 250 games and 150,000
+decisions a second on one core; the wide-combat case 2.3 ms and the long game 4.2 ms. All
+three are inside the 5 ms budget.
+
+**Until 4.8 these were timed under `tsx`**, whose `keepNames` transform costs a call every
+time a closure is made and read about a fifth slower than the built code. Roadmap 4.2
+recorded 5.2 ms that way, 4% over; the same engine, built, played that baseline in
+4.0–4.3 ms. The rest of the difference is 4.8's own engine work: static replacements
+remembered per board, and no `flatMap` in the loops that run on every event.
+
+**At the `search` level** (`pnpm bench:search`, `packages/sim/bench`), a game with both
+players searching takes **83–87 ms** at the median against docs' 50 ms, and one searcher
+against greedy 45 ms. Roadmap 4.8 brought the first from 145–154 ms by making the search
+remember what it has already worked out — the numbers, and why the rest is not there yet,
+are in docs/04 "What a searched game costs".
 
 **These are not comparable with the 2.2 ms recorded at roadmap 1.14.** That measured a
 game in which nothing was ever cast, because card definitions did not reach the priority
@@ -133,7 +145,8 @@ still catches it — and the same investigation found the projection was ignorin
 the object table stopped being a `Map` rehashed on every write and became an array indexed
 by object id, which was a fifth of the engine's time (ADR 0010).
 
-Benchmarks live in `packages/engine/bench` and run in CI, which compares each run against
+Benchmarks live in `packages/engine/bench` (and the search's in `packages/sim/bench`) and
+run in CI on the code as built, which compares each run against
 the last one recorded on `main` and fails on a regression greater than 20%. Cases are
 played interleaved, a game from each in turn, after a warm-up over all of them: run one
 case to completion before the next and whichever goes first pays for a colder process,

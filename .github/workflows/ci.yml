@@ -69,25 +69,30 @@ jobs:
           key: bench-baseline-${{ github.sha }}
           restore-keys: bench-baseline-
 
-      # A shared runner is slower and noisier than the machine the 5 ms target in
-      # docs/02 is written for, so the budget here is only a ceiling against something
-      # going badly wrong. The real gate is the comparison with main below.
-      - name: Run
+      # A shared runner is slower and noisier than the machine the 5 ms and 50 ms targets
+      # in docs/02 are written for, so the budgets here are only ceilings against
+      # something going badly wrong. The real gate is the comparison with main below.
+      - name: Run the engine benchmarks
         run: pnpm bench --budget 12 --json bench-results/engine.json
 
+      - name: Run the search benchmarks
+        run: pnpm bench:search --budget 250 --json bench-results/search.json
+
       - name: Compare with main
-        run: pnpm bench:compare bench-baseline/engine.json bench-results/engine.json
+        run: |
+          pnpm bench:compare bench-baseline/engine.json bench-results/engine.json
+          pnpm bench:compare bench-baseline/search.json bench-results/search.json
 
       - uses: actions/upload-artifact@v7
         with:
           name: benchmarks
-          path: bench-results/engine.json
+          path: bench-results/
 
       - name: Keep this run as the baseline
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           mkdir -p bench-baseline
-          cp bench-results/engine.json bench-baseline/engine.json
+          cp bench-results/engine.json bench-results/search.json bench-baseline/
 
       - uses: actions/cache/save@v6
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

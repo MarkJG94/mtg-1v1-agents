@@ -69,3 +69,12 @@ ignore it.
 - The player's own library is unknown cards, although a real player knows their
   decklist. A draw inside the search's horizon is rare (the horizon is the end of the
   current step), so this costs little now; a decklist-aware sampler is the fix when it does.
+
+## Amendment (roadmap 4.8)
+
+The `Simulator` gained `sameDeal(a, b)`: whether two worlds were dealt the same cards in
+every zone the player cannot see. The search uses it to play a repeated deal once — two
+samples in five are the same deal on fuzz boards. It compares two samples, each drawn from
+the view and a generator alone, so it is covered by the same hidden-invariance property as
+the worlds themselves, and `determinise.test.ts` checks it that way: the answer is the same
+whatever the real hidden cards are.
