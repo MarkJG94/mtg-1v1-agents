@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { randomAgent } from './random.js';
-import { creature, scriptedRng, viewOf } from './test-views.js';
+import { creature, noSimulator, scriptedRng, viewOf } from './test-views.js';
 
 /**
  * The view-only `random` agent. Whether its answers are legal across whole games is for
@@ -29,6 +29,7 @@ describe('blocking', () => {
         canBlock: [{ blocker: ground.id, attackers: [bear.id] }],
       },
       scriptedRng(true),
+      noSimulator,
     );
 
     expect(response).toEqual({
@@ -52,6 +53,7 @@ describe('blocking', () => {
         canBlock: [{ blocker: ground.id, attackers: [] }],
       },
       scriptedRng(true),
+      noSimulator,
     );
 
     expect(response).toEqual({ kind: 'declareBlockers', blocks: [] });
@@ -73,6 +75,7 @@ describe('blocking', () => {
         canBlock: [{ blocker: one.id, attackers: [menace.id] }],
       },
       scriptedRng(true),
+      noSimulator,
     );
 
     expect(response).toEqual({ kind: 'declareBlockers', blocks: [] });
@@ -97,6 +100,7 @@ describe('blocking', () => {
         ],
       },
       scriptedRng(true),
+      noSimulator,
     );
 
     expect(response).toEqual({
@@ -120,11 +124,11 @@ describe('attacking', () => {
       defenders: [{ kind: 'player' as const, player: 'B' as const }],
     };
 
-    expect(randomAgent.decide(view, decision, scriptedRng(true))).toEqual({
+    expect(randomAgent.decide(view, decision, scriptedRng(true), noSimulator)).toEqual({
       kind: 'declareAttackers',
       attackers: [{ attacker: bear.id, defender: { kind: 'player', player: 'B' } }],
     });
-    expect(randomAgent.decide(view, decision, scriptedRng(false))).toEqual({
+    expect(randomAgent.decide(view, decision, scriptedRng(false), noSimulator)).toEqual({
       kind: 'declareAttackers',
       attackers: [],
     });

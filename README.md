@@ -36,18 +36,20 @@ with the London mulligan, a scenario builder and invariant fuzzer, and benchmark
 are data: a script is YAML in a closed vocabulary, `@mtg/cards` turns it into a card
 definition, and the engine casts it, pays for it and resolves it — for a bootstrap set
 written by hand, and for whatever the auto-scripter can read off a card's oracle text,
-which is 11% of Scryfall against a 25% target. Agents come next: a play agent is given a
+which is 11% of Scryfall against a 25% target. For agents, a play agent is given a
 view of the game rather than the game, and a priority decision now offers everything a
 player could actually do. A game plays in about 5.2 ms with the random agent, against a
-5 ms target — the roadmap's 4.2 note says where the rest of it is. The first two agent
-levels play whole games: `random`, and `greedy`, which scores positions with a tunable
-static evaluator and beats `random` in 171 of 200 games. The first milestone is
-the end-to-end thin slice described in the roadmap.
+5 ms target — the roadmap's 4.2 note says where the rest of it is. All four agent
+levels play whole games — `random`, `greedy` (a tunable static evaluator), and `search`
+and `deep`, which play each candidate forward by the real rules in samples of the game
+as the player knows it — and the sanity ladder holds: search beats greedy beats random
+over 500 games a rung. The first milestone is the end-to-end thin slice described in the
+roadmap.
 
 What runs today: `pnpm dev` starts the Fastify API and the Vite dev server together,
 `pnpm fetch:scryfall` builds the card projection from Scryfall's bulk data, `pnpm bench`
-plays fixed-seed games and reports the time they take, and `pnpm check` (lint, typecheck,
-test, build) is green.
+plays fixed-seed games and reports the time they take, `pnpm ladder` plays the agent levels
+against each other, and `pnpm check` (lint, typecheck, test, build) is green.
 
 `main` is protected: every change lands through a pull request with all three CI jobs —
 lint/typecheck/test/build, benchmarks, and the Docker build — green.

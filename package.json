@@ -17,6 +17,7 @@
     "test:watch": "vitest",
     "bench": "tsx packages/engine/bench/run.ts",
     "bench:compare": "tsx scripts/compare-benchmarks.ts",
+    "ladder": "tsx scripts/ladder.ts",
     "cards:schema": "tsx scripts/write-card-schema.ts",
     "cards:new": "tsx scripts/new-card-script.ts",
     "cards:corpus": "tsx scripts/fetch-corpus.ts",

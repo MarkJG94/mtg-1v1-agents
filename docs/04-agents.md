@@ -14,7 +14,7 @@ Interface:
 ```ts
 interface PlayAgent {
   readonly level: AgentLevel;
-  decide(view: PlayerView, decision: Decision, rng: Rng): DecisionResponse;
+  decide(view: PlayerView, decision: Decision, rng: Rng, simulator: Simulator): DecisionResponse;
 }
 ```
 
@@ -52,7 +52,7 @@ Objects are reported as `characteristics()` sees them rather than as they were p
    - colours needed but not made are charged to the viewer only, since only the viewer's hand can be read;
    - threats look one turn ahead and ignore blockers — the combat solver (4.4) is where blocks are worked out.
 
-2. **Search** for `priority` decisions: enumerate legal actions, for each simulate (engine `step` on a state **built from the view** — the agent has no other, per ADR 0009 — with the opponent modelled as passing and with hidden information sampled — the opponent's hand is drawn at random from the cards not visible, i.e. a determinisation) to the end of the current phase or to the next decision, then evaluate. Depth-2 by default (my action → opponent's best cheap response), widened with a small beam for main-phase sequencing (play land → cast → cast). Time/step budget per decision is a setting; default aims for ≤ 20 ms.
+2. **Search** for `priority` decisions: enumerate legal actions, for each simulate (engine `step` on a **determinisation** — the game as the agent knows it, with hidden information sampled: the opponent's hand drawn from cards they have shown, both libraries unknown; built by the engine from the state with everything hidden replaced, and handed to the agent as a `Simulator`, per **ADR 0012**) to the end of the current step, then evaluate. Depth-2 by default (my action → opponent's best cheap response), widened with a small beam for main-phase sequencing (play land → cast → cast). Time/step budget per decision is a setting; default aims for ≤ 20 ms.
 
 3. **Combat** uses a dedicated attack/block solver rather than generic search: enumerate attack subsets (pruned to those that survive or trade profitably or present lethal), let the opponent model pick the best blocks with the same solver, evaluate the resulting board. Block declaration mirrors this from the defender's side, considering chump blocks only when facing lethal.
 
@@ -77,6 +77,25 @@ Objects are reported as `characteristics()` sees them rather than as they were p
 Neither agent recomputes blocking legality: the `declareBlockers` decision carries `canBlock`, which attackers each available blocker may legally block (docs/02). The one rule about a declaration as a whole — an attacker with menace needs two blockers, CR 702.110b — is applied from the view by `withoutLoneMenaceBlocks`.
 
 `@mtg/sim`'s `playGame(board, agents, seed)` is where agents meet real games: the only place a view is made, with each seat drawing from its own generator forked from the seed by seat.
+
+### The `search` and `deep` levels, as built (4.3)
+
+**The simulator** (ADR 0012). With every decision the driver passes a `Simulator` alongside the view. `sample(rng)` returns a *world*: the real game with every card the player cannot see replaced — the opponent's hand drawn, with replacement, from cards the opponent has shown in public zones (unknown cards if none), both libraries unknown cards, definitions cut down to what the player can see, a fresh generator, and the loop detector's hashes dropped. `apply`, `decision`, `view` and `status` run a world by the real rules. A world depends only on what the player can see — `determinise.test.ts` swaps every hidden card, the generator and the loop hashes and requires an identical world, the same test the view is held to. `World` is opaque to the agent, and the agents package still imports nothing but `@mtg/engine/view`.
+
+**The search** (`packages/agents/src/search.ts`) runs on priority decisions that offer more than passing; everything else is greedy's until the combat solver (4.4).
+
+- It samples `samples` worlds and scores a candidate by its mean over them.
+- A line is played to the **horizon**: the stack empty and the game in a different step from the one the decision was made in, so a spell resolves, its triggers fire and state-based actions kill what they kill before anything is scored.
+- **Depth-2 with a beam.** Every option gets a one-step look (act, then everyone passes to the horizon); the best `beam`, and passing, are searched further. Along a line the searcher may take `followUps` more actions of its own when it gets priority again — "play a land, then cast what it enables" — but never responds to its own spell. Where the opponent could act, `replies` of their decisions are searched: passing and their `responses` most damaging options, and the worst for the searcher is assumed.
+- **The budget is in engine steps, not time**, so a game stays a pure function of its seed. Candidates are only compared at a depth all of them reached — the one-step look in every world, then the full search if the budget covered every candidate — because comparing a finished candidate with one the budget cut short favours whichever was searched first, which is passing. Ties at depth are broken by the one-step look.
+- An optional observer receives a `SearchReport` (each candidate's one-step and full scores, and the steps spent), for tests and for a UI that wants to say why.
+
+| level | samples | beam | follow-ups | replies | responses | budget (steps) |
+|---|---:|---:|---:|---:|---:|---:|
+| `search` | 2 | 3 | 2 | 1 | 2 | 600 |
+| `deep` | 4 | 5 | 3 | 2 | 3 | 4,000 |
+
+Measured over the 500-game ladder, a searched decision at the `search` level costs 3.6 ms on average and 15.2 ms at the 99th percentile, inside the 20 ms aim above (the slowest of 7,406 took 55 ms); a game against greedy takes about 80 ms. `deep` costs about 11 ms a decision on average. Search beats greedy 273–194 with 33 draws over 500 games (p = 1.5 × 10⁻⁴).
 
 ### Why not an LLM here
 

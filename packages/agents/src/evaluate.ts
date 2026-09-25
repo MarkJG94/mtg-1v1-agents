@@ -45,7 +45,7 @@ export const evaluateTerms = (view: PlayerView, weights: Weights): Evaluation =>
     result: resultTerm(view, weights),
     life: lifeValue(view.you, weights) - lifeValue(view.opponent, weights),
     board: boardValue(view, view.you, weights) - boardValue(view, view.opponent, weights),
-    cards: cardsValue(view.you, weights) - cardsValue(view.opponent, weights),
+    cards: cardsValue(view, view.you, weights) - cardsValue(view, view.opponent, weights),
     mana: manaValue(view, view.you, weights) - manaValue(view, view.opponent, weights),
     tempo: tempoValue(view, weights),
     threats: threatsValue(view, weights),
@@ -134,9 +134,29 @@ const boardValue = (view: PlayerView, side: SideView, weights: Weights): number 
 /**
  * Cards in hand, for either side — the size is public (CR 400.2) even where the contents
  * are not — and a heavy penalty for an empty library, because the next draw loses.
+ *
+ * The viewer's own hand can be read, and one thing in it is worth less than a card: a
+ * land it has no use for. Once the lands in play and the lands already counted in hand
+ * reach the target, a further land in hand is a spare, worth `spareLand` rather than
+ * `cardInHand`. Without that, an evaluator scored a land in hand at 1.5 and the same land
+ * in play at 0.1 past the target, and so never played its ninth land.
  */
-const cardsValue = (side: SideView, weights: Weights): number =>
-  weights.cardInHand * side.handSize - (side.librarySize === 0 ? weights.emptyLibrary : 0);
+const cardsValue = (view: PlayerView, side: SideView, weights: Weights): number => {
+  const library = side.librarySize === 0 ? weights.emptyLibrary : 0;
+  if (side.player !== view.viewer) return weights.cardInHand * side.handSize - library;
+
+  let wanted = Math.max(0, weights.landTarget - permanentsOf(view, side).filter(isLand).length);
+  let value = 0;
+  for (const card of objectsSeenIn(view, view.you.hand)) {
+    if (isLand(card) && wanted === 0) {
+      value += weights.spareLand;
+      continue;
+    }
+    if (isLand(card)) wanted -= 1;
+    value += weights.cardInHand;
+  }
+  return value - library;
+};
 
 // --- Mana development ---
 

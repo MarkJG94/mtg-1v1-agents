@@ -7,5 +7,7 @@
  * runtime bundle. `no-runtime-deps.test.ts` checks that guarantee against `index.ts`.
  */
 export * from './fuzz.js';
+export * from './fuzz-cards.js';
 export * from './random-agent.js';
 export * from './scenario.js';
+export * from './unseen.js';

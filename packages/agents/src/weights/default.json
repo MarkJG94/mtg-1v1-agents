@@ -12,6 +12,7 @@
   "otherPermanent": 0.5,
   "planeswalkerLoyalty": 1,
   "cardInHand": 1.5,
+  "spareLand": 0.05,
   "emptyLibrary": 50,
   "land": 2,
   "landTarget": 8,

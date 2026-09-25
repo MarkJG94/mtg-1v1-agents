@@ -40,6 +40,21 @@ export class ObjectStore implements ReadonlyMap<ObjectId, GameObject> {
 
   static readonly empty = new ObjectStore([], 0);
 
+  /**
+   * A store holding exactly these objects, built with one allocation. For making a table
+   * from scratch — determinisation (ADR 0012) keeps a subset of a game's objects — rather
+   * than adding to one.
+   */
+  static from(objects: Iterable<readonly [ObjectId, GameObject]>): ObjectStore {
+    const slots: (GameObject | undefined)[] = [];
+    let size = 0;
+    for (const [id, object] of objects) {
+      if (slots[id] === undefined) size += 1;
+      slots[id] = object;
+    }
+    return new ObjectStore(slots, size);
+  }
+
   get(id: ObjectId): GameObject | undefined {
     return this.slots[id];
   }

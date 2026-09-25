@@ -162,3 +162,18 @@ describe('size', () => {
     expect(store.size).toBe(2);
   });
 });
+
+describe('building one from scratch', () => {
+  it('holds exactly what it was given, counted once each, in id order', () => {
+    const store = ObjectStore.from([
+      [asObjectId(3), card(3)],
+      [asObjectId(1), card(1)],
+      [asObjectId(3), card(3, { name: 'again' })],
+    ]);
+
+    expect(store.size).toBe(2);
+    expect([...store.keys()]).toEqual([asObjectId(1), asObjectId(3)]);
+    expect(store.get(asObjectId(3))?.name).toBe('again');
+    expect(store.has(asObjectId(2))).toBe(false);
+  });
+});

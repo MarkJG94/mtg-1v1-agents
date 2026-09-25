@@ -7,12 +7,14 @@
  * it would only play better. So the agents package imports this instead, and
  * `import-boundary.test.ts` holds it to that.
  *
- * Three things are here because an agent genuinely needs all three, and nothing else is:
+ * Four things are here because an agent genuinely needs all four, and nothing else is:
  *
  * - the **view**: what this player knows;
  * - the **decisions**: what is being asked and what an answer looks like;
  * - the **RNG**: an interface, so an agent's randomness is seeded like everything else
- *   and a game stays a pure function of its seed.
+ *   and a game stays a pure function of its seed;
+ * - the **simulator**: an interface too, for a searching agent to play determinisations
+ *   of the game forward (ADR 0012) — the driver supplies the implementation.
  *
  * None of them can reach a `GameState` at run time. `decision.ts` refers to combat and
  * rules-event types, but only as `import type`, which is erased — and a test walks this
@@ -47,3 +49,4 @@ export type {
   VisibleObject,
 } from './player-view.js';
 export { objectsSeenIn, seen } from './player-view.js';
+export type { Simulator, World, WorldStatus } from './simulator.js';

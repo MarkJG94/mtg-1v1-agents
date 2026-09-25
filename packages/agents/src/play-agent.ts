@@ -1,4 +1,4 @@
-import type { Decision, DecisionResponse, PlayerView, Rng } from '@mtg/engine/view';
+import type { Decision, DecisionResponse, PlayerView, Rng, Simulator } from '@mtg/engine/view';
 import type { AgentLevel } from '@mtg/shared';
 
 /**
@@ -18,6 +18,11 @@ import type { AgentLevel } from '@mtg/shared';
  * The RNG is injected for the same reason everything else in the system is: a run is a
  * pure function of its seed, and an agent that reached for `Math.random` would make a
  * failing game unreproducible.
+ *
+ * The **simulator** is how a searching agent plays the game forward without being handed
+ * it (ADR 0012): it makes determinisations of the game as this player knows it, with
+ * everything they cannot see sampled, and runs them by the real rules. The driver makes
+ * one for every decision; an agent that does not search ignores it.
  */
 export interface PlayAgent {
   /** Which strategy this is, for the run settings and for the sanity ladder (docs/09). */
@@ -26,7 +31,7 @@ export interface PlayAgent {
    * Answer one decision. Must return a response of the decision's own kind and must not
    * mutate the view — it is this agent's copy, but the objects inside are shared.
    */
-  decide(view: PlayerView, decision: Decision, rng: Rng): DecisionResponse;
+  decide(view: PlayerView, decision: Decision, rng: Rng, simulator: Simulator): DecisionResponse;
 }
 
 /**

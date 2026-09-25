@@ -8,6 +8,7 @@ import {
   isGameOver,
   type Rng,
   setUpGame,
+  simulatorFor,
   viewFor,
 } from '@mtg/engine';
 import type { GameResult, PlayerId } from '@mtg/shared';
@@ -18,7 +19,9 @@ import type { GameResult, PlayerId } from '@mtg/shared';
  * This is the one place a view is made (ADR 0009): each time the engine stops with a
  * question, the player it is asking gets `viewFor(state, player)` and nothing else, and
  * whatever they answer goes straight back into `applyDecision`. An agent never holds the
- * state, so it cannot look at the opponent's hand however it is written.
+ * state, so it cannot look at the opponent's hand however it is written. A searching
+ * agent is handed a simulator as well, whose worlds are determinisations — the game with
+ * everything that player cannot see sampled afresh (ADR 0012).
  *
  * Each seat draws from its own generator, forked from the game's seed by seat, so one
  * agent's randomness cannot shift the other's and a game is a pure function of its seed
@@ -65,6 +68,7 @@ export const playGame = (
       viewFor(state, decision.player),
       decision,
       seats[decision.player],
+      simulatorFor(state, decision.player),
     );
     decisions.push(response);
     state = applyDecision(state, emitter, response);

@@ -42,6 +42,11 @@ export interface Weights {
 
   // --- Cards ---
   readonly cardInHand: number;
+  /**
+   * A land in the viewer's own hand once there are already enough (`landTarget`) in play
+   * and in hand. Must stay below `landBeyondTarget`, or playing it looks like a loss.
+   */
+  readonly spareLand: number;
   /** Penalty for an empty library: the next draw loses the game (CR 704.5b). */
   readonly emptyLibrary: number;
 

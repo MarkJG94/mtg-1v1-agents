@@ -71,7 +71,7 @@ export const viewFor = (state: GameState, viewer: PlayerId): PlayerView => {
  * (CR 401.2). That last part is why this asks the zone's *kind* rather than only who owns
  * it: a player may look through their own hand, never their own library.
  */
-const canSee = (viewer: PlayerId, object: GameObject): boolean => {
+export const canSee = (viewer: PlayerId, object: GameObject): boolean => {
   const zone: ZoneId = object.zone;
   if (!isHiddenZone(zone)) return true;
   if (kindOfZone(zone) === 'library') return false;

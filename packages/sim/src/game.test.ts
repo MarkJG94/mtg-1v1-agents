@@ -4,6 +4,7 @@ import { fuzzBoard } from '@mtg/engine/testing';
 import type { PlayerId } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
 import { playGame, StalledGameError } from './game.js';
+import { playRung, tailAtLeast } from './ladder.js';
 
 /**
  * Agents meeting real games. Everything here runs the engine for real, so an agent that
@@ -13,44 +14,34 @@ import { playGame, StalledGameError } from './game.js';
 
 const board = (seed: string) => fuzzBoard(seed, { creatures: 3, librarySize: 30 });
 
-/** One-sided exact binomial tail: P(X >= k) for X ~ Binomial(n, 1/2). */
-const tailAtLeast = (k: number, n: number): number => {
-  let total = 0;
-  let term = 0.5 ** n; // C(n, 0) / 2^n
-  for (let i = 0; i <= n; i += 1) {
-    if (i >= k) total += term;
-    term = (term * (n - i)) / (i + 1);
-  }
-  return total;
-};
-
 describe('the sanity ladder, first rung (docs/09)', () => {
   /**
    * Greedy against random, alternating seats so that neither is always on the play. A
    * draw — the game running out its turn limit — counts for neither, and what is tested
-   * is that greedy wins more of the decided games than a fair coin plausibly would.
+   * is that greedy wins more of the decided games than a fair coin plausibly would. The
+   * margin is wide enough that 60 games show it; `pnpm ladder` plays docs/09's 500.
    */
   it('greedy beats random far more often than chance allows', () => {
-    const greedy = greedyAgent();
-    let wins = 0;
-    let decided = 0;
-    for (let i = 0; i < 60; i += 1) {
-      const seat: PlayerId = i % 2 === 0 ? 'A' : 'B';
-      const agents = seat === 'A' ? { A: greedy, B: randomAgent } : { A: randomAgent, B: greedy };
-      const { result } = playGame(board(`ladder-${i}`), agents, `ladder-${i}`);
-      if (result === null || result.winner === null) continue;
-      decided += 1;
-      if (result.winner === seat) wins += 1;
-    }
-
-    expect(decided).toBeGreaterThan(40);
-    expect(tailAtLeast(wins, decided)).toBeLessThan(0.001);
+    const rung = playRung({
+      stronger: greedyAgent(),
+      weaker: randomAgent,
+      games: 60,
+      seed: 'ladder',
+    });
+    expect(rung.wins + rung.losses).toBeGreaterThan(40);
+    expect(rung.pValue).toBeLessThan(0.001);
   }, 60_000);
 
   it('the binomial tail it is judged by is the right one', () => {
     expect(tailAtLeast(0, 10)).toBeCloseTo(1);
     expect(tailAtLeast(10, 10)).toBeCloseTo(1 / 1024);
     expect(tailAtLeast(6, 10)).toBeCloseTo(386 / 1024);
+  });
+
+  it('counts each game once, for the side that won it', () => {
+    const rung = playRung({ stronger: randomAgent, weaker: randomAgent, games: 6, seed: 'count' });
+    expect(rung.wins + rung.losses + rung.draws).toBe(6);
+    expect(rung.pValue).toBe(tailAtLeast(rung.wins, rung.wins + rung.losses));
   });
 });
 
@@ -80,12 +71,12 @@ describe('a game is a pure function of its seed and its agents', () => {
     const seen = new Map<PlayerId, Rng>();
     const recording = (agent: PlayAgent): PlayAgent => ({
       level: agent.level,
-      decide: (view, decision, rng) => {
+      decide: (view, decision, rng, simulator) => {
         if (!seen.has(decision.player)) {
           seen.set(decision.player, rng);
           firstState.set(decision.player, rng.save());
         }
-        return agent.decide(view, decision, rng);
+        return agent.decide(view, decision, rng, simulator);
       },
     });
 
@@ -102,14 +93,16 @@ describe('what an agent is handed (ADR 0009)', () => {
     let asked = 0;
     const checking: PlayAgent = {
       level: 'random',
-      decide: (view, decision, rng) => {
+      decide: (view, decision, rng, simulator) => {
         asked += 1;
         expect(view.viewer).toBe(decision.player);
+        // The simulator samples what *this* player cannot see, and nobody else's view.
+        expect(simulator.viewer).toBe(decision.player);
         expect(view.you.player).toBe(decision.player);
         expect('zones' in view).toBe(false);
         expect('pendingDecision' in view).toBe(false);
         expect('hand' in view.opponent).toBe(false);
-        return randomAgent.decide(view, decision, rng);
+        return randomAgent.decide(view, decision, rng, simulator);
       },
     };
 

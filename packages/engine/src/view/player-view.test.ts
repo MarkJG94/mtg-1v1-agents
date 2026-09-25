@@ -2,6 +2,7 @@ import { type ObjectId, playerZone } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
 import type { GameState } from '../state/game-state.js';
 import { game } from '../testing/scenario.js';
+import { withTheUnseenReplaced } from '../testing/unseen.js';
 import { objectsSeenIn, seen } from './player-view.js';
 import { viewFor } from './project.js';
 
@@ -120,38 +121,8 @@ describe('what a player is shown', () => {
  * makes the two views differ, whether or not anybody knew to check for it.
  */
 describe('the view is a function of only what is visible', () => {
-  const hiddenZones = [
-    playerZone('B', 'hand'),
-    playerZone('A', 'library'),
-    playerZone('B', 'library'),
-  ] as const;
-
   /** The same game with every hidden card renamed and renumbered, and nothing else moved. */
-  const reshuffleTheUnseen = (state: GameState): GameState => {
-    let objects = state.objects;
-    const zones = { ...state.zones };
-    let next = state.nextObjectId;
-
-    for (const zone of hiddenZones) {
-      const fresh: ObjectId[] = [];
-      for (const id of state.zones[zone]) {
-        const object = objects.get(id);
-        if (object === undefined) continue;
-        objects = objects.without(id);
-        next += 1;
-        const renumbered = next as unknown as ObjectId;
-        objects = objects.withObject(renumbered, {
-          ...object,
-          id: renumbered,
-          name: `unseen-${renumbered}`,
-        });
-        fresh.push(renumbered);
-      }
-      zones[zone] = fresh;
-    }
-
-    return { ...state, objects, zones, nextObjectId: next, version: state.version + 1 };
-  };
+  const reshuffleTheUnseen = (state: GameState): GameState => withTheUnseenReplaced(state, 'A');
 
   it('is identical when only the hidden cards differ', () => {
     const state = board().get();

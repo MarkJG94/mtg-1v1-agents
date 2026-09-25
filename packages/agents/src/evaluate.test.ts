@@ -87,6 +87,26 @@ describe('cards and mana', () => {
     );
   });
 
+  /**
+   * Past the land target a land in hand is a spare, not a card. Scored as a card it was
+   * worth more in hand than on the battlefield, and so was never played.
+   */
+  it('values a spare land in hand below the same land in play', () => {
+    const inPlay = Array.from({ length: w.landTarget }, () => land());
+    const spare = land({ zone: 'hand' });
+    const held = viewOf({ mine: inPlay, hand: [spare] });
+    const played = viewOf({ mine: [...inPlay, { ...spare, zone: 'battlefield' }] });
+    expect(evaluate(played, w)).toBeGreaterThan(evaluate(held, w));
+  });
+
+  it('still counts a land it needs as a whole card', () => {
+    const needed = viewOf({ mine: [land()], hand: [land({ zone: 'hand' })] });
+    const nothing = viewOf({ mine: [land()] });
+    expect(evaluateTerms(needed, w).terms.cards - evaluateTerms(nothing, w).terms.cards).toBe(
+      w.cardInHand,
+    );
+  });
+
   /** The next draw from an empty library loses the game (CR 704.5b). */
   it('fears an empty library', () => {
     expect(evaluate(viewOf({ myLibrary: 0 }), w)).toBeLessThan(

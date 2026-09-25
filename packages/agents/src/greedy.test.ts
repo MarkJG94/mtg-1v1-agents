@@ -8,7 +8,7 @@ import type {
 import type { ObjectId } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
 import { greedyAgent, prior } from './greedy.js';
-import { card, cast, creature, land, scriptedRng, viewOf } from './test-views.js';
+import { card, cast, creature, land, noSimulator, scriptedRng, viewOf } from './test-views.js';
 import { defaultWeights as w } from './weights.js';
 
 /**
@@ -20,7 +20,7 @@ import { defaultWeights as w } from './weights.js';
 const greedy = greedyAgent();
 
 const decide = (view: PlayerView, decision: Decision): DecisionResponse =>
-  greedy.decide(view, decision, scriptedRng());
+  greedy.decide(view, decision, scriptedRng(), noSimulator);
 
 const choose = (view: PlayerView, options: readonly PriorityAction[]): PriorityAction => {
   const response = decide(view, {
@@ -40,6 +40,17 @@ describe('at priority, the best-looking action or nothing', () => {
     expect(choose(view, [{ kind: 'playLand', object: forest.id }])).toEqual({
       kind: 'playLand',
       object: forest.id,
+    });
+  });
+
+  /** Past the land target a land in hand is a spare, and a spare is worth more in play. */
+  it('plays a land even when it already has as many as it wants', () => {
+    const inPlay = Array.from({ length: w.landTarget }, () => land());
+    const spare = land({ zone: 'hand' });
+    const view = viewOf({ mine: inPlay, hand: [spare] });
+    expect(choose(view, [{ kind: 'playLand', object: spare.id }])).toEqual({
+      kind: 'playLand',
+      object: spare.id,
     });
   });
 
@@ -356,8 +367,8 @@ describe('the rest of the questions', () => {
       player: 'A',
       options: [{ kind: 'pass' }, { kind: 'playLand', object: forest.id }],
     };
-    expect(greedy.decide(view, decision, scriptedRng(true))).toEqual(
-      greedy.decide(view, decision, scriptedRng(false)),
+    expect(greedy.decide(view, decision, scriptedRng(true), noSimulator)).toEqual(
+      greedy.decide(view, decision, scriptedRng(false), noSimulator),
     );
   });
 });

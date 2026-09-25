@@ -1,4 +1,11 @@
-import type { Keywords, PlayerView, PriorityAction, Rng, VisibleObject } from '@mtg/engine/view';
+import type {
+  Keywords,
+  PlayerView,
+  PriorityAction,
+  Rng,
+  Simulator,
+  VisibleObject,
+} from '@mtg/engine/view';
 import { asObjectId, asOracleId, type ObjectId, type PlayerId } from '@mtg/shared';
 
 /**
@@ -192,3 +199,26 @@ export const cast = (object: ObjectId, targets: Cast['targets'] = []): PriorityA
   cost: { generic: 0, variable: 0, symbols: [] },
   targets,
 });
+
+/**
+ * A simulator for agents that never search. Any use of it is a test that thought it was
+ * testing greedy or random and was not, so it throws rather than answering.
+ */
+export const noSimulator: Simulator = {
+  viewer: 'A',
+  sample: () => {
+    throw new Error('this agent was not expected to search');
+  },
+  decision: () => {
+    throw new Error('this agent was not expected to search');
+  },
+  apply: () => {
+    throw new Error('this agent was not expected to search');
+  },
+  view: () => {
+    throw new Error('this agent was not expected to search');
+  },
+  status: () => {
+    throw new Error('this agent was not expected to search');
+  },
+};

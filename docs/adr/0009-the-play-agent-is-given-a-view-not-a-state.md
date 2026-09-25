@@ -1,6 +1,6 @@
 # ADR 0009 — The play agent is given a view, not a state
 
-- Status: accepted
+- Status: accepted; amended by ADR 0012 (how the search builds its determinisation)
 - Date: 2026-09-18
 
 ## Context
@@ -54,6 +54,10 @@ Three things together:
   cost of the decision, and it is the right one: a search that ran on the true state would
   be a search that knew the opponent's hand, which is the same cheat wearing a different
   hat. The sampling has to be seeded from the injected RNG like everything else.
+  *(ADR 0012: the determinisation is built by the engine from the state with everything
+  hidden replaced, rather than from the view, which lacks targets, effects and timestamps
+  the rules need. The property that makes it safe is the same one: it is a function of
+  what the player can see.)*
 - Whoever drives the game — the simulation loop in phase 5 — calls `viewFor(state, player)`
   and hands the result over. That is the only place the projection happens, so the rule
   about what a player knows lives in one function with tests rather than in every agent.

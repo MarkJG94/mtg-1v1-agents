@@ -111,3 +111,25 @@ jobs:
         run: pnpm test packages/engine/src/testing/fuzz.test.ts
         env:
           FUZZ_GAMES: "20000"
+
+  ladder:
+    name: Sanity ladder
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # docs/09: search beats greedy beats random, 500 games a rung, p < 0.001. The unit
+      # suite holds the bottom rung at 60 games; the top one needs all 500 to show.
+      - name: Play the ladder
+        run: pnpm ladder --games 500
