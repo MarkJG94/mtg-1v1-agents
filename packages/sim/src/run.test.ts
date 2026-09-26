@@ -1,0 +1,638 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import {
+  autoScripter,
+  type CardProjection,
+  loadHandScripts,
+  MemoryScriptStore,
+  ScriptResolver,
+} from '@mtg/cards';
+import {
+  asOracleId,
+  banViolations,
+  type DeckGeneration,
+  type GameEvent,
+  parseRunSettings,
+  type RunSettings,
+} from '@mtg/shared';
+import { describe, expect, it } from 'vitest';
+import { cardCount, cardsIn } from './deck.js';
+import type { LiveGameEnd, LiveGameStart } from './match.js';
+import {
+  createRun,
+  decklist,
+  driveRun,
+  exportRun,
+  forkRun,
+  importRun,
+  latestGenerations,
+  MemoryRunStore,
+  type RunCards,
+  RunError,
+  type RunSnapshot,
+  type RunStore,
+} from './run.js';
+
+/**
+ * A run (docs/05, docs/06 "Resume protocol"; roadmap 5.6), on the in-memory store: cycles
+ * one after another, the loser changing, checkpoints, and the property the checkpoints
+ * exist for — a run that crashes and resumes ends exactly where one that never crashed
+ * does. The SQLite store runs the same checks in the server's tests.
+ */
+
+const here = (path: string): string => fileURLToPath(new URL(path, import.meta.url));
+const fixture = (name: string) =>
+  Object.values(
+    JSON.parse(readFileSync(here(`../../cards/fixtures/${name}`), 'utf8')) as Record<
+      string,
+      CardProjection
+    >,
+  );
+const cards: RunCards = {
+  pool: [...fixture('scryfall.json'), ...fixture('corpus.json')],
+  resolver: new ScriptResolver({
+    hand: loadHandScripts(here('../../cards/scripts')),
+    auto: autoScripter,
+    store: new MemoryScriptStore(),
+    skipSmokeTest: true,
+  }),
+};
+
+const settings: RunSettings = parseRunSettings({
+  seed: '7',
+  matchesPerCycle: 2,
+  tiebreakMatches: 1,
+  shortlistSize: 6,
+  trialTopK: 1,
+  trialMatches: 1,
+  turnCap: 30,
+  agentLevel: 'greedy',
+});
+const now = () => '2026-09-26T12:00:00.000Z';
+
+const fresh = async (store: RunStore = new MemoryRunStore(), id = 'run-1') => {
+  await createRun({ store, cards, id, name: 'test', settings, now });
+  return store;
+};
+
+/** What a run is, without the parts that differ between two stores holding it. */
+const essence = (snapshot: RunSnapshot | null) => ({
+  lineage: snapshot?.lineage,
+  cycles: snapshot?.cycles,
+  bans: snapshot?.bans,
+  current: snapshot?.current,
+});
+
+const CYCLES = 2;
+const reference = (async () => {
+  const store = await fresh();
+  const result = await driveRun({ store, cards, runId: 'run-1', cycles: CYCLES });
+  return { store, result, snapshot: await store.load('run-1') };
+})();
+
+/** A store that "crashes" — throws — at a chosen write, before or after making it. */
+const crashing = (
+  inner: RunStore,
+  at: { method: 'saveMatch' | 'finishCycle'; call: number; after: boolean },
+): RunStore => {
+  let calls = 0;
+  const wrap =
+    <A extends unknown[]>(method: 'saveMatch' | 'finishCycle', f: (...args: A) => Promise<void>) =>
+    async (...args: A) => {
+      if (method !== at.method) return f(...args);
+      calls += 1;
+      if (calls === at.call && !at.after) throw new Error('crash');
+      await f(...args);
+      if (calls === at.call && at.after) throw new Error('crash');
+    };
+  return {
+    create: (...args) => inner.create(...args),
+    load: (...args) => inner.load(...args),
+    status: (...args) => inner.status(...args),
+    setStatus: (...args) => inner.setStatus(...args),
+    matches: (...args) => inner.matches(...args),
+    saveBans: (...args) => inner.saveBans(...args),
+    startCycle: (...args) => inner.startCycle(...args),
+    saveGenerations: (...args) => inner.saveGenerations(...args),
+    saveMatch: wrap('saveMatch', (...args: Parameters<RunStore['saveMatch']>) =>
+      inner.saveMatch(...args),
+    ),
+    finishCycle: wrap('finishCycle', (...args: Parameters<RunStore['finishCycle']>) =>
+      inner.finishCycle(...args),
+    ),
+  };
+};
+
+describe('a run', async () => {
+  const { snapshot, result } = await reference;
+
+  it('starts both agents on the same seed deck, as generation 0', async () => {
+    const created = await (await fresh(new MemoryRunStore(), 'seed-only')).load('seed-only');
+    expect(created?.run.status).toBe('created');
+    const [a, b] = created?.lineage ?? [];
+    expect(a?.deck).toEqual(b?.deck);
+    expect([a?.agent, a?.generation, a?.cause, b?.agent, b?.generation]).toEqual([
+      'A',
+      0,
+      'seed',
+      'B',
+      0,
+    ]);
+    expect(cardCount(a?.deck.main ?? [])).toBe(60);
+  });
+
+  it('plays its cycles, and changes the loser’s deck once each', () => {
+    expect(result).toEqual({ played: CYCLES, status: 'running' });
+    expect(snapshot?.cycles.map((cycle) => cycle.number)).toEqual([1, 2]);
+    expect(snapshot?.current).toBeNull();
+    const changes = snapshot?.lineage.filter((entry) => entry.cause === 'change') ?? [];
+    expect(changes).toHaveLength(CYCLES);
+    for (const [i, cycle] of (snapshot?.cycles ?? []).entries()) {
+      expect(changes[i]?.agent).toBe(cycle.loser);
+      expect(changes[i]?.cycle).toBe(cycle.number);
+      expect(changes[i]?.change?.reason.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('counts generations up per agent, and starts each cycle from the newest', () => {
+    for (const agent of ['A', 'B'] as const) {
+      const mine = snapshot?.lineage.filter((entry) => entry.agent === agent) ?? [];
+      expect(mine.map((entry) => entry.generation)).toEqual(mine.map((_, i) => i));
+    }
+    const [first, second] = snapshot?.cycles ?? [];
+    expect(first?.generations).toEqual({ A: 0, B: 0 });
+    const loser = first?.loser ?? 'A';
+    expect(second?.generations[loser]).toBe(1);
+  });
+
+  it('stores every match with its games’ logs, and hands them out only when asked', async () => {
+    const { store } = await reference;
+    const all = await store.matches('run-1', true);
+    const total = snapshot?.cycles.reduce((sum, cycle) => sum + cycle.matches, 0);
+    expect(all).toHaveLength(total ?? -1);
+    for (const stored of all) expect(stored.logs).toHaveLength(stored.match.games.length);
+    for (const stored of await store.matches('run-1', false)) expect(stored.logs).toEqual([]);
+  });
+
+  it('keeps the statistics each trial recorded', () => {
+    const trialled = Object.keys(snapshot?.cycles[0]?.trials ?? {});
+    expect(trialled.length).toBeGreaterThan(0);
+  });
+});
+
+describe('a crash, and the resume after it (docs/06 "Resume protocol")', async () => {
+  const { snapshot } = await reference;
+  const resumeAfter = async (at: Parameters<typeof crashing>[1]) => {
+    const inner = await fresh();
+    await expect(
+      driveRun({ store: crashing(inner, at), cards, runId: 'run-1', cycles: CYCLES }),
+    ).rejects.toThrow('crash');
+    const between = await inner.load('run-1');
+    // Resumed for the cycles the run still owes, the one in progress among them.
+    const owed = CYCLES - (between?.cycles.length ?? 0);
+    const resumed = await driveRun({ store: inner, cards, runId: 'run-1', cycles: owed });
+    return { between, resumed, after: await inner.load('run-1'), inner };
+  };
+
+  it('resumes after a checkpoint to exactly the run that never crashed', async () => {
+    // The third match is the first of cycle 2; the crash follows its write.
+    const { between, resumed, after } = await resumeAfter({
+      method: 'saveMatch',
+      call: 3,
+      after: true,
+    });
+    expect(between?.cycles).toHaveLength(1);
+    expect(between?.current?.number).toBe(2);
+    expect(between?.current?.matches).toHaveLength(1);
+    expect(resumed.played).toBe(1);
+    expect(essence(after)).toEqual(essence(snapshot));
+  });
+
+  it('replays the match a crash interrupted, to the same end', async () => {
+    const { between, after } = await resumeAfter({ method: 'saveMatch', call: 2, after: false });
+    expect(between?.current?.matches).toHaveLength(1);
+    expect(essence(after)).toEqual(essence(snapshot));
+  });
+
+  it('replays a deck change a crash interrupted, to the same change', async () => {
+    const { between, after } = await resumeAfter({ method: 'finishCycle', call: 1, after: false });
+    expect(between?.cycles).toEqual([]);
+    expect(between?.current?.matches).toHaveLength(settings.matchesPerCycle);
+    expect(essence(after)).toEqual(essence(snapshot));
+  });
+
+  it('halts after the match in progress when paused, and carries on when running again', async () => {
+    const inner = await fresh();
+    let saved = 0;
+    const pausing: RunStore = {
+      ...crashing(inner, { method: 'finishCycle', call: 99, after: true }),
+      saveMatch: async (...args) => {
+        await inner.saveMatch(...args);
+        saved += 1;
+        if (saved === 3) await inner.setStatus('run-1', 'paused');
+      },
+    };
+    const first = await driveRun({ store: pausing, cards, runId: 'run-1', cycles: CYCLES });
+    expect(first).toEqual({ played: 1, status: 'paused' });
+    expect(await driveRun({ store: inner, cards, runId: 'run-1', cycles: 1 })).toEqual({
+      played: 0,
+      status: 'paused',
+    });
+    await inner.setStatus('run-1', 'running');
+    await driveRun({ store: inner, cards, runId: 'run-1', cycles: 1 });
+    expect(essence(await inner.load('run-1'))).toEqual(essence(snapshot));
+  });
+});
+
+describe('a ban asked for between cycles', async () => {
+  const { snapshot } = await reference;
+  const store = await fresh();
+  await driveRun({ store, cards, runId: 'run-1', cycles: 1 });
+  const before = latestGenerations((await store.load('run-1'))?.lineage ?? []);
+  const target = [...cardsIn(before.A.deck).keys()].find(
+    (oracleId) => !before.A.deck.main.every((slot) => slot.oracleId !== oracleId),
+  );
+  const at = now();
+  await store.saveBans('run-1', [
+    ...((await store.load('run-1'))?.bans ?? []),
+    {
+      oracleId: target ?? asOracleId('none'),
+      action: 'ban',
+      note: '',
+      by: 'operator',
+      at,
+      appliedAfterGameId: null,
+    },
+  ]);
+  await driveRun({ store, cards, runId: 'run-1', cycles: 1 });
+  const after = await store.load('run-1');
+
+  it('takes effect as the next cycle starts, legalising the decks before it plays', () => {
+    expect(after?.bans.at(-1)?.appliedAfterGameId).toBe(`${settings.seed}:cycle-2:start`);
+    const bans = after?.lineage.filter((entry) => entry.cause === 'ban') ?? [];
+    expect(bans.length).toBeGreaterThan(0);
+    for (const entry of bans) expect(entry.cycle).toBe(2);
+    const list = new Map([[target ?? asOracleId('none'), 'banned' as const]]);
+    for (const agent of ['A', 'B'] as const) {
+      expect(banViolations(latestGenerations(after?.lineage ?? [])[agent].deck, list)).toEqual([]);
+    }
+    // The cycle began from the legalised decks.
+    const started = after?.cycles[1]?.generations;
+    const newest = (agent: 'A' | 'B') =>
+      Math.max(
+        ...(after?.lineage ?? [])
+          .filter((entry) => entry.agent === agent && entry.cause !== 'change')
+          .map((entry) => entry.generation),
+      );
+    expect(started?.A).toBeGreaterThanOrEqual(newest('A'));
+    expect(snapshot).toBeDefined();
+  });
+});
+
+describe('a ban asked for while the run plays (roadmap 5.7)', async () => {
+  const { snapshot } = await reference;
+  const target = [...cardsIn(latestGenerations(snapshot?.lineage ?? []).A.deck).keys()][0];
+  if (target === undefined) throw new Error('no card');
+  const request = { oracleId: target, action: 'ban' as const, by: 'operator', at: now() };
+
+  /** Plays one cycle, handing `request` over on the `call`th time the inbox is asked. */
+  const playWith = async (call: number) => {
+    const store = await fresh();
+    let calls = 0;
+    await driveRun({
+      store,
+      cards,
+      runId: 'run-1',
+      cycles: 1,
+      banRequests: () => {
+        calls += 1;
+        return calls === call ? [request] : [];
+      },
+    });
+    return { store, after: await store.load('run-1'), calls };
+  };
+
+  it('takes effect after the game in progress, not before and not at the cycle’s end', async () => {
+    // The first ask is the cycle's start; the second, the end of its first game.
+    const { store, after } = await playWith(2);
+    const [first] = await store.matches('run-1', false);
+    const firstGame = first?.match.games[0]?.seed;
+    expect(firstGame).toBeDefined();
+    expect(after?.bans).toEqual([{ ...request, note: '', appliedAfterGameId: firstGame }]);
+    // The deck was legalised then, in the middle of the first match.
+    const forced = after?.lineage.filter((entry) => entry.cause === 'ban') ?? [];
+    expect(forced.length).toBeGreaterThan(0);
+    expect(first?.match.legalisations.map((each) => each.afterGameId)).toEqual([firstGame]);
+  });
+
+  it('takes effect before the first match when asked for as the cycle starts', async () => {
+    const { after } = await playWith(1);
+    expect(after?.bans.map((event) => event.appliedAfterGameId)).toEqual([
+      `${settings.seed}:cycle-1:start`,
+    ]);
+  });
+
+  it('asks after every game and once at the start, and records each request once', async () => {
+    const { store, after, calls } = await playWith(3);
+    const games = (await store.matches('run-1', false)).reduce(
+      (sum, stored) => sum + stored.match.games.length,
+      0,
+    );
+    expect(calls).toBe(games + 1);
+    expect(after?.bans).toHaveLength(1);
+  });
+});
+
+describe('a cycle whose loser the deck agent cannot change', async () => {
+  // The pool scripts nothing but what the decks already hold: no replacement can be played.
+  const store = await fresh();
+  const held = new Set(
+    cardsIn(latestGenerations((await store.load('run-1'))?.lineage ?? []).A.deck).keys(),
+  );
+  const narrow: RunCards = {
+    pool: cards.pool,
+    resolver: {
+      resolve: (card, request) =>
+        held.has(asOracleId(card.oracleId))
+          ? cards.resolver.resolve(card, request)
+          : { status: 'unscripted', definition: null, source: 'none', reasons: [] },
+    },
+  };
+  const played = await driveRun({ store, cards: narrow, runId: 'run-1', cycles: 2 });
+  const after = await store.load('run-1');
+
+  it('is recorded with the agent’s reason and no new deck, and the run plays on', () => {
+    expect(played).toEqual({ played: 2, status: 'running' });
+    expect(after?.cycles).toHaveLength(2);
+    for (const cycle of after?.cycles ?? []) {
+      expect(cycle.unchanged).toMatch(/nothing the engine can play/);
+      expect(cycle.trials).toEqual({});
+    }
+    expect(after?.lineage.map((entry) => entry.cause)).toEqual(['seed', 'seed']);
+  });
+
+  it('is null on a cycle that did change the loser’s deck', async () => {
+    const { snapshot } = await reference;
+    expect(snapshot?.cycles.map((cycle) => cycle.unchanged)).toEqual([null, null]);
+  });
+});
+
+describe('a live viewer (roadmap 6.2)', async () => {
+  const { snapshot } = await reference;
+  const watch = async (watching: () => boolean) => {
+    const store = await fresh();
+    const seen = {
+      started: [] as LiveGameStart[],
+      events: [] as GameEvent[],
+      ended: [] as LiveGameEnd[],
+    };
+    await driveRun({
+      store,
+      cards,
+      runId: 'run-1',
+      cycles: 1,
+      live: {
+        watching,
+        started: (game) => seen.started.push(game),
+        event: (event) => seen.events.push(event),
+        ended: (game) => seen.ended.push(game),
+      },
+    });
+    return { seen, store };
+  };
+
+  it('is told of every game, where it is, and every event its log holds', async () => {
+    const { seen, store } = await watch(() => true);
+    const matches = await store.matches('run-1', true);
+    const logs = matches.flatMap((stored) => stored.logs);
+    expect(seen.started.map((game) => game.seed)).toEqual(logs.map((log) => log.seed));
+    expect(seen.started[0]).toMatchObject({ cycle: 1, match: 0, game: 1 });
+    expect(seen.started.at(-1)?.match).toBe(matches.length - 1);
+    expect(seen.events).toEqual(logs.flatMap((log) => log.events));
+    const games = matches.flatMap((stored) => stored.match.games);
+    expect(seen.ended.map((game) => [game.seed, game.onPlay, game.result])).toEqual(
+      games.map((game) => [game.seed, game.onPlay, game.result]),
+    );
+    // Watching changes nothing about the run.
+    expect((await store.load('run-1'))?.cycles[0]).toEqual(snapshot?.cycles[0]);
+  });
+
+  it('is told nothing of a game nobody is watching as it starts', async () => {
+    let asked = 0;
+    const { seen } = await watch(() => {
+      asked += 1;
+      return asked % 2 === 0;
+    });
+    expect(seen.started.length).toBeGreaterThan(0);
+    expect(seen.started.length).toBe(Math.floor(asked / 2));
+    expect(seen.ended.map((game) => game.seed)).toEqual(seen.started.map((game) => game.seed));
+  });
+});
+
+describe('fork, export and import', async () => {
+  const { store, snapshot } = await reference;
+
+  it('forks a run as it stood after a cycle, with a fresh seed and the ban list', async () => {
+    const fork = await forkRun({
+      store,
+      from: 'run-1',
+      cycle: 1,
+      id: 'fork',
+      name: 'fork',
+      seed: '99',
+      now,
+    });
+    expect(fork.run.forkedFrom).toEqual({ run: 'run-1', cycle: 1 });
+    expect([fork.run.seed, fork.run.settings.seed, fork.run.status]).toEqual([
+      '99',
+      '99',
+      'created',
+    ]);
+    expect(fork.cycles).toEqual(snapshot?.cycles.slice(0, 1));
+    expect(fork.lineage).toEqual(snapshot?.lineage.filter((entry) => entry.cycle <= 1));
+    expect(fork.bans).toEqual(snapshot?.bans);
+    expect(fork.current).toBeNull();
+    // It plays on from there as a run of its own.
+    const played = await driveRun({ store, cards, runId: 'fork', cycles: 1 });
+    expect(played.played).toBe(1);
+    expect((await store.load('fork'))?.cycles.map((cycle) => cycle.number)).toEqual([1, 2]);
+    // And the run it came from is untouched.
+    expect(essence(await store.load('run-1'))).toEqual(essence(snapshot));
+  });
+
+  it('refuses to fork at a cycle the run has not finished', async () => {
+    await expect(
+      forkRun({ store, from: 'run-1', cycle: 3, id: 'x', name: 'x', seed: '1', now }),
+    ).rejects.toThrow(RunError);
+  });
+
+  it('exports a bundle that imports as the same run under a new id', async () => {
+    const bundle = await exportRun({ store, runId: 'run-1', logs: true, now });
+    const target = new MemoryRunStore();
+    const imported = await importRun({
+      store: target,
+      bundle: structuredClone(bundle),
+      id: 'copy',
+    });
+    expect(imported.run.id).toBe('copy');
+    expect(imported.run.status).toBe('paused');
+    expect(essence(await target.load('copy'))).toEqual(essence(snapshot));
+    expect(await target.matches('copy', true)).toEqual(await store.matches('run-1', true));
+    // Without logs, the matches come without them.
+    const lean = await exportRun({ store, runId: 'run-1', logs: false, now });
+    for (const stored of lean.matches) expect(stored.logs).toEqual([]);
+  });
+
+  it('refuses a bundle it cannot read', async () => {
+    const bundle = await exportRun({ store, runId: 'run-1', logs: false, now });
+    await expect(
+      importRun({ store: new MemoryRunStore(), bundle: { ...bundle, version: 2 as 1 }, id: 'x' }),
+    ).rejects.toThrow(RunError);
+  });
+
+  it('writes a plain-text decklist for every generation', async () => {
+    const bundle = await exportRun({
+      store,
+      runId: 'run-1',
+      logs: false,
+      now,
+      name: (id) => `<${id}>`,
+    });
+    expect(Object.keys(bundle.decklists).sort()).toEqual(
+      (snapshot?.lineage ?? [])
+        .map((entry: DeckGeneration) => `${entry.agent}-${entry.generation}`)
+        .sort(),
+    );
+    const text = bundle.decklists['A-0'] ?? '';
+    expect(text).toContain('\nSideboard\n');
+    expect(text.split('\n')[0]).toMatch(/^\d+ <.+>$/);
+  });
+
+  it('writes the main deck, then the sideboard, a line a card', () => {
+    const text = decklist(
+      {
+        main: [
+          { oracleId: asOracleId('b'), count: 4 },
+          { oracleId: asOracleId('a'), count: 56 },
+        ],
+        side: [{ oracleId: asOracleId('c'), count: 15 }],
+      },
+      (id) => id.toUpperCase(),
+    );
+    expect(text).toBe('56 A\n4 B\n\nSideboard\n15 C');
+  });
+});
+
+describe('creating a run', () => {
+  it('takes a pasted 75, and refuses one of the wrong size or against the list', async () => {
+    const { snapshot } = await reference;
+    const deck = snapshot?.lineage[0]?.deck;
+    if (deck === undefined) throw new Error('no deck');
+    const store = new MemoryRunStore();
+    const made = await createRun({
+      store,
+      cards,
+      id: 'fixed',
+      name: 'f',
+      settings,
+      now,
+      seedDeck: deck,
+    });
+    expect(made.lineage[0]?.deck).toEqual(deck);
+
+    const short = { main: deck.main.slice(1), side: deck.side };
+    await expect(
+      createRun({ store, cards, id: 'short', name: 's', settings, now, seedDeck: short }),
+    ).rejects.toThrow(/sixty cards/);
+
+    const [first] = deck.main;
+    await expect(
+      createRun({
+        store,
+        cards,
+        id: 'banned',
+        name: 'b',
+        settings,
+        now,
+        seedDeck: deck,
+        bans: [
+          {
+            oracleId: first?.oracleId ?? asOracleId('x'),
+            action: 'ban',
+            note: '',
+            by: 'op',
+            at: now(),
+            appliedAfterGameId: null,
+          },
+        ],
+      }),
+    ).rejects.toThrow(RunError);
+  });
+
+  it('refuses a pasted 75 holding a card the engine cannot play, or one it does not know', async () => {
+    const { snapshot } = await reference;
+    const deck = snapshot?.lineage[0]?.deck;
+    const [first, ...rest] = deck?.main ?? [];
+    if (deck === undefined || first === undefined) throw new Error('no deck');
+    const unplayable = cards.pool.find(
+      (card) => cards.resolver.resolve(card, { context: 'test' }).definition === null,
+    );
+    if (unplayable === undefined) throw new Error('every fixture card is playable');
+    const store = new MemoryRunStore();
+    const swapped = (oracleId: string) => ({
+      main: [{ oracleId: asOracleId(oracleId), count: first.count }, ...rest],
+      side: deck.side,
+    });
+    await expect(
+      createRun({
+        store,
+        cards,
+        id: 'unplayable',
+        name: 'u',
+        settings,
+        now,
+        seedDeck: swapped(unplayable.oracleId),
+      }),
+    ).rejects.toThrow(`${unplayable.name} cannot be played`);
+    await expect(
+      createRun({
+        store,
+        cards,
+        id: 'unknown',
+        name: 'u',
+        settings,
+        now,
+        seedDeck: swapped('00000000-0000-0000-0000-000000000000'),
+      }),
+    ).rejects.toThrow(/not a card in the pool/);
+    expect(await store.load('unplayable')).toBeNull();
+  });
+
+  it('draws the seed deck around an initial ban list, which is in effect from the start', async () => {
+    const { snapshot } = await reference;
+    const first = snapshot?.lineage[0]?.deck.main.find((slot) => slot.count < 10)?.oracleId;
+    const store = new MemoryRunStore();
+    const made = await createRun({
+      store,
+      cards,
+      id: 'listed',
+      name: 'l',
+      settings,
+      now,
+      bans: [
+        {
+          oracleId: first ?? asOracleId('x'),
+          action: 'ban',
+          note: '',
+          by: 'op',
+          at: now(),
+          appliedAfterGameId: null,
+        },
+      ],
+    });
+    expect(
+      cardsIn(made.lineage[0]?.deck ?? { main: [], side: [] }).has(first ?? asOracleId('x')),
+    ).toBe(false);
+    expect(made.bans[0]?.appliedAfterGameId).toBe('listed:created');
+  });
+});

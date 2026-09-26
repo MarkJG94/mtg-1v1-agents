@@ -1,0 +1,30 @@
+# Prodigal Pyromancer
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. {T}: This creature deals 1 damage to any target.
+
+oracleId: 29b3cb3e-aeb1-43eb-8095-9f7881aa34bd
+name: "Prodigal Pyromancer"
+manaCost: "{2}{R}"
+types: [creature]
+subtypes: [human, wizard]
+colours: [R]
+power: 1
+toughness: 1
+text: "{T}: This creature deals 1 damage to any target."
+
+abilities:
+  - kind: activated
+    id: ping
+    covers: [0]
+    cost: { tap: true }
+    targets: [{ id: t, filter: any }]
+    effects: [{ op: damage, to: $t, amount: 1 }]
+
+tests:
+  - name: pings the opponent and taps to do it
+    activate: ping
+    targets: [opponent]
+    expect:
+      life: { opponent: 19 }
+      tapped: { this: true }

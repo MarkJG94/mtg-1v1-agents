@@ -1,0 +1,25 @@
+# Boggart Brute
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Menace
+
+oracleId: 880793a2-84b0-4ae1-9bb8-6e942e3dc723
+name: "Boggart Brute"
+manaCost: "{2}{R}"
+types: [creature]
+subtypes: [goblin, warrior]
+colours: [R]
+power: 3
+toughness: 2
+keywords: [menace]
+text: "Menace (This creature can't be blocked except by two or more creatures.)"
+
+abilities: []
+
+tests:
+  - name: resolves as a 3/2 with its keywords
+    expect:
+      zone: { this: battlefield }
+      power: { this: 3 }
+      toughness: { this: 2 }
+      keywords: { this: [menace] }

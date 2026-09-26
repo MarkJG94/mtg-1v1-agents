@@ -1,0 +1,87 @@
+import type { Colour, ObjectId, OracleId, PlayerId, ZoneId } from '@mtg/shared';
+import type { LoyaltyAbility } from '../planeswalker.js';
+import type { StackProperties } from '../stack.js';
+import type { Keywords } from '../targeting.js';
+import type { TriggeredAbility } from '../triggers.js';
+
+/**
+ * An object in a zone (CR 109): a card, a token, or a copy.
+ *
+ * Characteristics — name, types, colours, power, toughness, abilities — are
+ * deliberately **not** stored here. They are computed by `characteristics(state, id)`
+ * from the printed definition plus the layer system (roadmap 1.9), because a stored
+ * copy would go stale the moment an anthem or a Blood Moon changed. What lives here is
+ * only what the rules track per object and cannot be derived.
+ */
+export interface GameObject {
+  readonly id: ObjectId;
+  /** The card this object was printed from; looked up in the per-game definition table. */
+  readonly definitionId: OracleId;
+  /** Owner never changes; controller can (CR 108.3, 613.1b). */
+  readonly owner: PlayerId;
+  readonly controller: PlayerId;
+  readonly zone: ZoneId;
+  /** Timestamp for layer ordering (CR 613.7). Monotonic across the game. */
+  readonly timestamp: number;
+  readonly tapped: boolean;
+  /** Counter kind → count. Absent means zero. */
+  readonly counters: Readonly<Record<string, number>>;
+  /** Damage marked this turn; cleared in cleanup (CR 514.2). */
+  readonly damage: number;
+  /** Aura/Equipment attachment (CR 301.5, 303.4). */
+  readonly attachedTo: ObjectId | null;
+  readonly attachments: readonly ObjectId[];
+  /** Choices made for this object, e.g. a chosen colour or creature type. */
+  readonly chosen: Readonly<Record<string, string>>;
+  readonly token: boolean;
+  /**
+   * Printed keywords. Never read directly — `characteristics(state, id)` applies the
+   * layer system on top of these, and effects can add or remove them.
+   */
+  readonly keywords: Keywords;
+  /**
+   * Printed power and toughness, or `null` for something that is not a creature. Read
+   * through `characteristics(state, id)`, which applies effects and counters.
+   */
+  readonly power: number | null;
+  readonly toughness: number | null;
+  /** Starting loyalty, and the marker that this is a planeswalker at all (CR 306). */
+  readonly loyalty: number | null;
+  /** The card's name, which is what the legend rule compares (CR 704.5j). */
+  readonly name: string | null;
+  readonly legendary: boolean;
+  /** Printed colours, which layer 5 effects can change (CR 105.2). */
+  readonly colours: readonly Colour[];
+  /** What this attaches to things as, if anything (CR 303.4, 301.5). */
+  readonly attachment: 'aura' | 'equipment' | null;
+  /**
+   * Marked damage this turn came from a source with deathtouch, which makes any amount
+   * of it lethal (CR 702.2b). Cleared with the damage in cleanup.
+   */
+  readonly deathtouched: boolean;
+  /** Triggered abilities this object has (CR 603). Seeded from card scripts in 2.1. */
+  readonly triggers: readonly TriggeredAbility[];
+  /** Loyalty abilities, for a planeswalker (CR 606). Seeded from card scripts in 2.1. */
+  readonly loyaltyAbilities: readonly LoyaltyAbility[];
+  /**
+   * Set only while the object is on the stack: where it resolves to, and whether it has
+   * split second. Cleared as it leaves.
+   */
+  readonly stack?: StackProperties | undefined;
+  /**
+   * Whether the object has been controlled by its controller since their turn began
+   * (CR 302.6). Set when it enters the battlefield, cleared at untap.
+   */
+  readonly summoningSick: boolean;
+}
+
+export const countersOf = (object: GameObject, kind: string): number => object.counters[kind] ?? 0;
+
+/** Setting a counter to zero removes the key, so object equality stays meaningful. */
+export const withCounters = (object: GameObject, kind: string, count: number): GameObject => {
+  if (!Number.isInteger(count)) throw new RangeError(`counter count must be an integer`);
+  const counters = { ...object.counters };
+  if (count === 0) delete counters[kind];
+  else counters[kind] = count;
+  return { ...object, counters };
+};

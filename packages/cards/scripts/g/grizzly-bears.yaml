@@ -1,0 +1,23 @@
+# Grizzly Bears
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   (no rules text)
+
+oracleId: 14c8f55d-d177-4c25-a931-ebeb9e6062a0
+name: "Grizzly Bears"
+manaCost: "{1}{G}"
+types: [creature]
+subtypes: [bear]
+colours: [G]
+power: 2
+toughness: 2
+text: ""
+
+abilities: []
+
+tests:
+  - name: resolves as a 2/2
+    expect:
+      zone: { this: battlefield }
+      power: { this: 2 }
+      toughness: { this: 2 }

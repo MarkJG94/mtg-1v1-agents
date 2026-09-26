@@ -1,0 +1,39 @@
+# Rot Shambler
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Whenever another creature you control dies, put a +1/+1 counter on this creature.
+
+oracleId: 88c187fd-b3d3-4218-8e63-380a9ca9f1b4
+name: "Rot Shambler"
+manaCost: "{1}{G}"
+types: [creature]
+subtypes: [fungus]
+colours: [G]
+power: 1
+toughness: 1
+text: "Whenever another creature you control dies, put a +1/+1 counter on this creature."
+
+abilities:
+  - kind: triggered
+    id: grows
+    covers: [0]
+    when: { kind: anotherDies, controlledBy: you }
+    effects: [{ op: addCounters, object: "~", counter: "+1/+1", amount: 1 }]
+
+tests:
+  - name: grows when a creature you control dies
+    setup:
+      lands: 2
+      you:
+        creatures: [{ name: friend, power: 1, toughness: 1 }]
+    kill: friend
+    expect:
+      counters: { this: { "+1/+1": 1 } }
+  - name: does not grow when the opponent loses one
+    setup:
+      lands: 2
+      opponent:
+        creatures: [{ name: theirs, power: 1, toughness: 1 }]
+    kill: theirs
+    expect:
+      counters: { this: { "+1/+1": 0 } }

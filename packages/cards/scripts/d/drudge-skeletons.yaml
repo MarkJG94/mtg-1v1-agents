@@ -1,0 +1,30 @@
+# Drudge Skeletons
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. {B}: Regenerate this creature.
+
+oracleId: c180ed02-07f4-4538-9bea-8c249234a8e2
+name: "Drudge Skeletons"
+manaCost: "{1}{B}"
+types: [creature]
+subtypes: [skeleton]
+colours: [B]
+power: 1
+toughness: 1
+text: "{B}: Regenerate this creature. (The next time this creature would be destroyed this turn, instead tap it, remove it from combat, and heal all damage on it.)"
+
+abilities:
+  - kind: activated
+    id: regenerate
+    covers: [0]
+    cost: { mana: "{B}" }
+    effects: [{ op: regenerate, object: "~" }]
+
+tests:
+  - name: regenerating it survives being destroyed
+    setup: { lands: 2 }
+    activate: regenerate
+    kill: this
+    expect:
+      zone: { this: battlefield }
+      tapped: { this: true }

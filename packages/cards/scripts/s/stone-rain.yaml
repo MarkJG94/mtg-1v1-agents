@@ -1,0 +1,24 @@
+# Stone Rain
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Destroy target land.
+
+oracleId: 6e880df6-fc00-43d2-a9c8-f575f40b78c6
+name: "Stone Rain"
+manaCost: "{2}{R}"
+types: [sorcery]
+colours: [R]
+text: "Destroy target land."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets: [{ id: t, filter: { type: land } }]
+    effects: [{ op: destroy, object: $t }]
+
+tests:
+  - name: destroys a land
+    setup: { lands: 4 }
+    targets: [land0]
+    expect:
+      permanents: { you: 3 }

@@ -1,0 +1,540 @@
+import {
+  combatPolicy,
+  greedyAgent,
+  type PlayAgent,
+  type SearchReport,
+  type SearchSettings,
+  searchAgent,
+  searchLevels,
+} from '@mtg/agents';
+import {
+  applyDecision,
+  createEventEmitter,
+  createRng,
+  type Decision,
+  type DecisionResponse,
+  type GameState,
+  type Simulator,
+  setUpGame,
+  simulatorFor,
+  viewFor,
+  type World,
+} from '@mtg/engine';
+import { fuzzBoard, fuzzBurn, fuzzCreature, fuzzDeck, fuzzLand, game } from '@mtg/engine/testing';
+import { describe, expect, it } from 'vitest';
+import { playGame } from './game.js';
+
+/**
+ * The `search` level (roadmap 4.3), against the real engine. The agents package cannot
+ * run a game, so its search is tested here, where every world it plays forward is played
+ * by the actual rules and every answer it gives is checked by `applyDecision`.
+ *
+ * Whether it plays *better* than greedy is the sanity ladder's question, and it is not
+ * asked here: the margin is real (roughly three games in five of those decided) but a
+ * hundred games cannot tell it from luck — two seed sets of a hundred gave 48–28 and
+ * 32–35 — so it is asked at docs/09's 500 games by `pnpm ladder`, nightly.
+ */
+
+/** Ask `agent` the pending decision of `state`, the way `playGame` would. */
+const ask = (agent: PlayAgent, state: GameState, simulator?: Simulator): DecisionResponse => {
+  const decision = state.pendingDecision;
+  if (decision === null) throw new Error('nothing to decide');
+  return agent.decide(
+    viewFor(state, decision.player),
+    decision,
+    createRng('ask'),
+    simulator ?? simulatorFor(state, decision.player),
+  );
+};
+
+/** A simulator that counts what the search does with it. */
+const counting = (inner: Simulator) => {
+  const sampled = new Set<World>();
+  const counts = { samples: 0, applies: 0, replies: 0, followUps: 0 };
+  const simulator: Simulator = {
+    viewer: inner.viewer,
+    sample: (rng) => {
+      counts.samples += 1;
+      const world = inner.sample(rng);
+      sampled.add(world);
+      return world;
+    },
+    decision: (world) => inner.decision(world),
+    apply: (world, response) => {
+      counts.applies += 1;
+      const decision = inner.decision(world);
+      if (response.kind === 'priority' && response.action.kind !== 'pass' && decision !== null) {
+        if (decision.player !== inner.viewer) counts.replies += 1;
+        else if (!sampled.has(world)) counts.followUps += 1;
+      }
+      return inner.apply(world, response);
+    },
+    view: (world, player) => inner.view(world, player),
+    status: (world) => inner.status(world),
+    sameDeal: (a, b) => inner.sameDeal(a, b),
+  };
+  return { simulator, counts };
+};
+
+const land = { definitionId: fuzzLand.oracleId };
+const bolt = { name: 'bolt', definitionId: fuzzBurn.oracleId };
+const bear = { definitionId: fuzzCreature.oracleId };
+
+/** A's first main phase, with the board and hand given. */
+const mainPhase = (build: (scenario: ReturnType<typeof game>) => ReturnType<typeof game>) =>
+  build(game({ seed: 'search', definitions: fuzzDeck, onPlay: 'A' }))
+    .start()
+    .to('precombatMain')
+    .get();
+
+const named = (state: GameState, name: string) =>
+  [...state.objects.values()].find((object) => object.name === name)?.id;
+
+/** A burn spell in hand, and two creatures to aim it at: one it kills, one bigger. */
+const burnBoard = () =>
+  mainPhase((s) =>
+    s
+      .player('A')
+      .battlefield(land)
+      .hand(bolt)
+      .library(10)
+      .player('B')
+      .battlefield(
+        { name: 'giant', power: 4, toughness: 4 },
+        { name: 'bear', power: 2, toughness: 2 },
+      )
+      .library(10),
+  );
+
+describe('what the search sees that greedy has to guess', () => {
+  /**
+   * Greedy prices a burn spell by the creature it is aimed at (ADR 0011), so it aims at
+   * the biggest — here a 4/4 that two damage does not kill. The search resolves the spell
+   * in its worlds and sees which creature actually dies.
+   */
+  it('aims burn at the creature it will kill, not the biggest one', () => {
+    const state = burnBoard();
+    const bearId = named(state, 'bear');
+    const giantId = named(state, 'giant');
+
+    const chosen = (agent: PlayAgent) => {
+      const response = ask(agent, state);
+      if (response.kind !== 'priority' || response.action.kind !== 'cast') return null;
+      const [target] = response.action.targets;
+      return target?.kind === 'object' ? target.object : null;
+    };
+
+    expect(chosen(greedyAgent())).toBe(giantId);
+    expect(chosen(searchAgent())).toBe(bearId);
+  });
+
+  /**
+   * With too little budget for the full search it falls back on the one-step looks,
+   * which see the kill just as well — rather than comparing a finished candidate with one
+   * the budget cut short, which would favour whichever was searched first.
+   */
+  it('still aims burn at the creature it will kill when the budget runs short', () => {
+    for (const budget of [15, 25, 40]) {
+      const state = burnBoard();
+      const response = ask(
+        searchAgent('search', undefined, { ...searchLevels.search, budget }),
+        state,
+      );
+      expect(response).toMatchObject({
+        kind: 'priority',
+        action: { kind: 'cast', targets: [{ kind: 'object', object: named(state, 'bear') }] },
+      });
+    }
+  });
+
+  /**
+   * With an opponent holding burn and the mana for it, passing and playing the land tie
+   * at depth: the reply that hurts most is a different one in each line and costs the
+   * same. The one-step look breaks the tie, and says the land is worth playing — the
+   * position a fuzz game found, where search passed and greedy did not.
+   */
+  it('plays a land rather than passing, even into an opponent holding burn', () => {
+    const state = mainPhase((s) =>
+      s
+        .player('A')
+        .battlefield(land)
+        .hand({ name: 'spare', ...land })
+        .library(10)
+        .player('B')
+        .battlefield(land)
+        // Burn shown five times over against one land, and two cards in hand, so every
+        // world this seed samples (the answer is deterministic) holds a burn spell.
+        .graveyard(bolt, bolt, bolt, bolt, bolt)
+        .hand({ name: 'unseen-1' }, { name: 'unseen-2' })
+        .library(10),
+    );
+    let report: SearchReport | undefined;
+    const response = ask(
+      searchAgent('search', undefined, searchLevels.search, (seen) => {
+        report = seen;
+      }),
+      state,
+    );
+    expect(response).toMatchObject({ kind: 'priority', action: { kind: 'playLand' } });
+    // And it was the tie-break that decided it, so this test is about the tie-break.
+    const [pass, play] = report?.candidates ?? [];
+    expect(play?.deep).toBe(pass?.deep);
+    expect(play?.shallow).toBeGreaterThan(pass?.shallow ?? Number.POSITIVE_INFINITY);
+  });
+});
+
+describe('the shape of the search', () => {
+  const opponentShowedBurn = () =>
+    mainPhase((s) =>
+      s
+        .player('A')
+        .battlefield(land, land)
+        .hand(bear, { name: 'extra', ...land })
+        .library(10)
+        .player('B')
+        .battlefield(land)
+        .graveyard(bolt)
+        .hand({ name: 'unseen' })
+        .library(10),
+    );
+
+  const searchWith = (
+    settings: Partial<SearchSettings>,
+    observe?: (report: SearchReport) => void,
+  ) => searchAgent('search', undefined, { ...searchLevels.search, ...settings }, observe);
+
+  /** "My action, then the opponent's best cheap response" (docs/04). */
+  it('considers the opponent’s responses, drawn from what they have shown', () => {
+    const state = opponentShowedBurn();
+    const withReplies = counting(simulatorFor(state, 'A'));
+    ask(searchWith({ replies: 1 }), state, withReplies.simulator);
+    expect(withReplies.counts.replies).toBeGreaterThan(0);
+
+    const without = counting(simulatorFor(state, 'A'));
+    ask(searchWith({ replies: 0 }), state, without.simulator);
+    expect(without.counts.replies).toBe(0);
+  });
+
+  /** "Play a land, then cast what it enables" is one line, not two separate guesses. */
+  it('sequences its own actions after the first', () => {
+    const state = opponentShowedBurn();
+    const sequencing = counting(simulatorFor(state, 'A'));
+    ask(searchWith({ followUps: 2 }), state, sequencing.simulator);
+    expect(sequencing.counts.followUps).toBeGreaterThan(0);
+
+    const single = counting(simulatorFor(state, 'A'));
+    ask(searchWith({ followUps: 0 }), state, single.simulator);
+    expect(single.counts.followUps).toBe(0);
+  });
+
+  /**
+   * Depth-2 assumes the opponent answers with whatever is worst for the searcher. Casting
+   * a creature into an opponent holding burn scores lower once their reply is searched
+   * than when everyone is assumed to pass — the reply they pick is the one that kills it.
+   */
+  it('assumes the opponent answers with what is worst for it', () => {
+    const state = opponentShowedBurn();
+    const reports: SearchReport[] = [];
+    ask(
+      searchWith({ followUps: 0, replies: 1 }, (report) => reports.push(report)),
+      state,
+    );
+    const cast = reports[0]?.candidates.find((entry) => entry.action.kind === 'cast');
+    expect(cast?.deep).not.toBeNull();
+    expect(cast?.deep ?? 0).toBeLessThan(cast?.shallow ?? 0);
+  });
+
+  it('samples as many worlds as it is told to', () => {
+    const state = opponentShowedBurn();
+    const three = counting(simulatorFor(state, 'A'));
+    ask(searchWith({ samples: 3 }), state, three.simulator);
+    expect(three.counts.samples).toBe(3);
+  });
+
+  /** The budget is in engine steps, so a decision costs the same on every machine. */
+  it('never spends more engine steps than its budget', () => {
+    for (const budget of [1, 10, 50, searchLevels.search.budget]) {
+      const state = opponentShowedBurn();
+      const { simulator, counts } = counting(simulatorFor(state, 'A'));
+      const response = ask(searchWith({ budget }), state, simulator);
+      expect(counts.applies).toBeLessThanOrEqual(budget);
+      expect(response.kind).toBe('priority');
+    }
+  });
+
+  it('does not search a decision whose only option is to pass', () => {
+    const state = mainPhase((s) => s.player('A').library(10).player('B').library(10));
+    const { simulator, counts } = counting(simulatorFor(state, 'A'));
+    expect(ask(searchAgent(), state, simulator)).toEqual({
+      kind: 'priority',
+      action: { kind: 'pass' },
+    });
+    expect(counts.samples).toBe(0);
+  });
+
+  it('gives the same answer from the same generator, and leaves the game alone', () => {
+    const state = opponentShowedBurn();
+    const before = { objects: state.objects, zones: state.zones, rng: state.rng };
+    expect(ask(searchAgent(), state)).toEqual(ask(searchAgent(), state));
+    expect(state.objects).toBe(before.objects);
+    expect(state.zones).toBe(before.zones);
+    expect(state.rng).toBe(before.rng);
+  });
+});
+
+/**
+ * Remembering lines (roadmap 4.8): within one decision the search works out a line once
+ * and reuses it, and plays a repeated deal once. It is meant to make the search faster
+ * and nothing else — so every decision, every score and every step charged against the
+ * budget must be what the search that remembers nothing would have said.
+ */
+describe('remembering lines changes the work, never the answer', () => {
+  /** Positions from real games where the searcher had something to choose between. */
+  const positions = (() => {
+    const found: GameState[] = [];
+    const agent = searchAgent('search');
+    for (const seed of ['remember-1', 'remember-2']) {
+      const emitter = createEventEmitter();
+      let state = setUpGame(fuzzBoard(seed, { creatures: 3, librarySize: 30 }), emitter);
+      while (state.result === null && state.pendingDecision !== null && found.length < 40) {
+        const decision: Decision = state.pendingDecision;
+        const choosing =
+          decision.kind === 'priority'
+            ? decision.options.some((option) => option.kind !== 'pass')
+            : decision.kind === 'declareAttackers' || decision.kind === 'declareBlockers';
+        if (choosing) found.push(state);
+        state = applyDecision(state, emitter, ask(agent, state));
+      }
+    }
+    return found;
+  })();
+
+  const run = (state: GameState, settings: Partial<SearchSettings>) => {
+    const reports: SearchReport[] = [];
+    const { simulator, counts } = counting(
+      simulatorFor(state, state.pendingDecision?.player ?? 'A'),
+    );
+    const agent = searchAgent(
+      'search',
+      undefined,
+      { ...searchLevels.search, ...settings },
+      (report) => reports.push(report),
+    );
+    return { response: ask(agent, state, simulator), reports, applies: counts.applies };
+  };
+
+  /**
+   * Small budgets run out part-way, which is where a remembered line must not be reused
+   * unless playing it again would have fitted too.
+   */
+  it('reaches the same decisions, scores and spending at every budget', () => {
+    expect(positions.length).toBeGreaterThan(20);
+    let saved = 0;
+    for (const budget of [20, 60, 150, searchLevels.search.budget]) {
+      for (const state of positions) {
+        const on = run(state, { budget, remember: true });
+        const off = run(state, { budget, remember: false });
+        expect(on.response).toEqual(off.response);
+        expect(on.reports).toEqual(off.reports);
+        expect(on.applies).toBeLessThanOrEqual(off.applies);
+        saved += off.applies - on.applies;
+      }
+    }
+    expect(saved).toBeGreaterThan(0);
+  });
+
+  /**
+   * With nothing shown by the opponent, every sample deals them the same unknown hand, so
+   * a second sample is the first again and costs no engine step at all.
+   */
+  it('plays a repeated deal once', () => {
+    const state = mainPhase((s) =>
+      s
+        .player('A')
+        .battlefield(land)
+        .hand(bear, { name: 'extra', ...land })
+        .library(10)
+        .player('B')
+        .battlefield(land)
+        .hand({ name: 'unseen' })
+        .library(10),
+    );
+    const one = run(state, { samples: 1 });
+    const two = run(state, { samples: 2 });
+    expect(two.applies).toBe(one.applies);
+    expect(run(state, { samples: 2, remember: false }).applies).toBeGreaterThan(two.applies);
+  });
+});
+
+describe('combat is the solver’s, checked against the engine (roadmap 4.4)', () => {
+  /** Play greedy against greedy until `wanted` says the pending decision is the one. */
+  const stateWhere = (seed: string, wanted: (state: GameState) => boolean): GameState => {
+    const greedy = greedyAgent();
+    let found: GameState | null = null;
+    const watching: PlayAgent = {
+      level: 'greedy',
+      decide: (view, decision, rng, simulator) => {
+        if (found === null && decision.player === 'A') {
+          const probe = simulator.sample(createRng('probe')) as unknown as GameState;
+          if (wanted(probe)) found = probe;
+        }
+        return greedy.decide(view, decision, rng, simulator);
+      },
+    };
+    for (let i = 0; i < 20 && found === null; i += 1) {
+      playGame(
+        fuzzBoard(`${seed}-${i}`, { creatures: 3 }),
+        { A: watching, B: greedy },
+        `${seed}-${i}`,
+      );
+    }
+    if (found === null) throw new Error(`no game reached the decision "${seed}" wanted`);
+    return found;
+  };
+
+  const attackWithChoices = () =>
+    stateWhere('attacks', (state) => {
+      const decision = state.pendingDecision;
+      return decision?.kind === 'declareAttackers' && decision.legal.length >= 2;
+    });
+
+  const blockWithChoices = () =>
+    stateWhere('blocks', (state) => {
+      const decision = state.pendingDecision;
+      return (
+        decision?.kind === 'declareBlockers' &&
+        decision.canBlock.some((e) => e.attackers.length > 0)
+      );
+    });
+
+  it('plays each of the solver’s attacks through the real combat in every world', () => {
+    const state = attackWithChoices();
+    const { simulator, counts } = counting(simulatorFor(state, 'A'));
+    let declared = 0;
+    const watching: Simulator = {
+      ...simulator,
+      apply: (world, response) => {
+        if (response.kind === 'declareAttackers') declared += 1;
+        return simulator.apply(world, response);
+      },
+    };
+    const response = ask(searchAgent(), state, watching);
+    expect(response.kind).toBe('declareAttackers');
+    expect(counts.samples).toBe(searchLevels.search.samples);
+    // At least two candidates — the solver's best and not attacking — in every world.
+    expect(declared).toBeGreaterThanOrEqual(2 * searchLevels.search.samples);
+    expect(declared % searchLevels.search.samples).toBe(0);
+  });
+
+  it('plays each candidate block through the real combat in every world', () => {
+    const state = blockWithChoices();
+    let declared = 0;
+    const inner = simulatorFor(state, 'A');
+    const watching: Simulator = {
+      ...inner,
+      apply: (world, response) => {
+        if (response.kind === 'declareBlockers') declared += 1;
+        return inner.apply(world, response);
+      },
+    };
+    const response = ask(searchAgent(), state, watching);
+    expect(response.kind).toBe('declareBlockers');
+    expect(declared).toBeGreaterThanOrEqual(2 * searchLevels.search.samples);
+  });
+
+  /**
+   * A combat decision is only settled once damage has been dealt, several steps later — a
+   * horizon at the next step would score every attack before anything had hit anything.
+   */
+  it('scores a combat only after its damage has been dealt', () => {
+    const state = attackWithChoices();
+    const inner = simulatorFor(state, 'A');
+    const scoredAt = new Set<string>();
+    const watching: Simulator = {
+      ...inner,
+      view: (world, player) => {
+        const view = inner.view(world, player);
+        if (player === 'A') scoredAt.add(view.step);
+        return view;
+      },
+    };
+    ask(searchAgent(), state, watching);
+    // Not attacking skips straight to the end of combat, so that alone would show a late
+    // step; what matters is that no line is scored before its damage has been dealt.
+    expect(scoredAt.size).toBeGreaterThan(0);
+    for (const early of ['declareAttackers', 'declareBlockers', 'firstStrikeDamage']) {
+      expect(scoredAt.has(early)).toBe(false);
+    }
+  });
+
+  /**
+   * Inside its worlds the opponent blocks with the solver too, so an attack is judged
+   * against the blocks a good defender would make: here, two 3/3s ganging up on a 4/4,
+   * which greedy's one-for-one rules never do.
+   */
+  it('has the opponent block with the solver inside its worlds', () => {
+    const state = game({ seed: 'gang', definitions: fuzzDeck, onPlay: 'A' })
+      .player('A')
+      .battlefield({ name: 'big', power: 4, toughness: 4 })
+      .library(10)
+      .player('B')
+      .battlefield({ name: 'one', power: 3, toughness: 3 }, { name: 'two', power: 3, toughness: 3 })
+      .library(10)
+      .start()
+      .to('declareAttackers')
+      .get();
+    const inner = simulatorFor(state, 'A');
+    const blocksSeen: number[] = [];
+    const watching: Simulator = {
+      ...inner,
+      apply: (world, response) => {
+        if (response.kind === 'declareBlockers') blocksSeen.push(response.blocks.length);
+        return inner.apply(world, response);
+      },
+    };
+    ask(searchAgent(), state, watching);
+    expect(blocksSeen.length).toBeGreaterThan(0);
+    expect(blocksSeen.every((count) => count === 2)).toBe(true);
+  });
+
+  /** With no budget to check anything, the answer is the solver's own. */
+  it('falls back on the solver’s choice when the budget cannot check it', () => {
+    const state = attackWithChoices();
+    const broke = searchAgent('search', undefined, { ...searchLevels.search, budget: 0 });
+    expect(ask(broke, state)).toEqual(ask(combatPolicy(), state));
+  });
+
+  /** The ablation the ladder measures the solver by: switch it off, and combat is greedy's. */
+  it('leaves combat to greedy when the solver is switched off', () => {
+    const off = searchAgent('search', undefined, { ...searchLevels.search, combatCandidates: 0 });
+    for (const state of [attackWithChoices(), blockWithChoices()]) {
+      expect(ask(off, state)).toEqual(ask(greedyAgent(), state));
+    }
+  });
+
+  it('answers every decision but priority and combat exactly as greedy does', () => {
+    const greedy = greedyAgent();
+    const search = searchAgent();
+    let compared = 0;
+    const comparing: PlayAgent = {
+      level: 'search',
+      decide: (view, decision: Decision, rng, simulator) => {
+        const answer = search.decide(view, decision, rng, simulator);
+        const combat = decision.kind === 'declareAttackers' || decision.kind === 'declareBlockers';
+        if (decision.kind !== 'priority' && !combat) {
+          compared += 1;
+          expect(answer).toEqual(greedy.decide(view, decision, rng, simulator));
+        }
+        return answer;
+      },
+    };
+    for (let i = 0; i < 6; i += 1) {
+      playGame(
+        fuzzBoard(`others-${i}`, { creatures: 3 }),
+        { A: comparing, B: greedy },
+        `others-${i}`,
+      );
+    }
+    expect(compared).toBeGreaterThan(5);
+  });
+});

@@ -1,0 +1,25 @@
+# Slippery Bogle
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Hexproof
+
+oracleId: f64878c1-1fba-44f7-a24f-d24bef2e03ae
+name: "Slippery Bogle"
+manaCost: "{G/U}"
+types: [creature]
+subtypes: [beast]
+colours: [G, U]
+power: 1
+toughness: 1
+keywords: [hexproof]
+text: "Hexproof (This creature can't be the target of spells or abilities your opponents control.)"
+
+abilities: []
+
+tests:
+  - name: resolves as a 1/1 with its keywords
+    expect:
+      zone: { this: battlefield }
+      power: { this: 1 }
+      toughness: { this: 1 }
+      keywords: { this: [hexproof] }
