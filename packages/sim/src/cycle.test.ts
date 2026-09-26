@@ -252,3 +252,78 @@ describe('the cycle’s statistics (roadmap 5.2)', () => {
     expect(await outs(6)).toEqual([]);
   });
 });
+
+describe('resuming a cycle (roadmap 5.6)', () => {
+  /** A cycle stopped by a "crash" after `after` matches, and what it saved before it fell. */
+  const crashed = async (after: number, over: Partial<CycleOptions> = {}) => {
+    const saved: { matches: MatchResult[]; logs: GameEventLog[] } = { matches: [], logs: [] };
+    await expect(
+      cycle({
+        ...over,
+        onMatch: async (match, index, logs) => {
+          saved.matches.push(match);
+          saved.logs.push(...logs);
+          if (index + 1 === after) throw new Error('crash');
+        },
+      }),
+    ).rejects.toThrow('crash');
+    return saved;
+  };
+
+  it('hands each checkpoint the match and every one of its games’ logs', async () => {
+    const seen: { index: number; games: number; logs: number }[] = [];
+    await cycle({
+      onMatch: async (match, index, logs) => {
+        seen.push({ index, games: match.games.length, logs: logs.length });
+      },
+    });
+    expect(seen.map((entry) => entry.index)).toEqual([0, 1, 2, 3]);
+    for (const entry of seen) expect(entry.logs).toBe(entry.games);
+  });
+
+  it('plays on from where it stopped to the same end as a cycle never stopped', async () => {
+    const whole = await cycle();
+    const saved = await crashed(2);
+    expect(saved.matches).toHaveLength(2);
+    const resumed = await cycle({ completed: saved });
+    expect(resumed.matches).toEqual(whole.matches);
+    expect(resumed.stats).toEqual(whole.stats);
+    expect(resumed.playDraw).toEqual(whole.playDraw);
+    expect([resumed.loser, resumed.decidedBy, resumed.winRate]).toEqual([
+      whole.loser,
+      whole.decidedBy,
+      whole.winRate,
+    ]);
+  });
+
+  it('decides a tie the same way when it stopped inside the tiebreak', async () => {
+    // A margin of one makes every cycle a tie, so the tiebreak batch is always played.
+    const tie = { settings: { ...settings, tieMargin: 1 } };
+    const whole = await cycle(tie);
+    expect(whole.tiebreakMatches).toBe(settings.tiebreakMatches);
+    const saved = await crashed(settings.matchesPerCycle + 1, tie);
+    const resumed = await cycle({ ...tie, completed: saved });
+    expect(resumed.matches).toEqual(whole.matches);
+    expect([resumed.tiebreakMatches, resumed.decidedBy, resumed.loser]).toEqual([
+      whole.tiebreakMatches,
+      whole.decidedBy,
+      whole.loser,
+    ]);
+  });
+
+  it('plays nothing more when every match was already played', async () => {
+    const whole = await cycle();
+    let played = 0;
+    const logs: GameEventLog[] = [];
+    for (const match of whole.matches) played += match.games.length;
+    await cycle({ onGame: (log) => logs.push(log) });
+    const again = await cycle({
+      completed: { matches: whole.matches, logs },
+      onMatch: async () => {
+        throw new Error('no match should be played');
+      },
+    });
+    expect(again.stats).toEqual(whole.stats);
+    expect(logs).toHaveLength(played);
+  });
+});

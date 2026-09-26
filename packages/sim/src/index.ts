@@ -16,6 +16,7 @@ export * from './game.js';
 export * from './ladder.js';
 export * from './match.js';
 export * from './pool.js';
+export * from './run.js';
 export * from './seed-deck.js';
 export * from './sideboard-cards.js';
 export * from './stats.js';

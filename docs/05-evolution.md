@@ -161,8 +161,18 @@ Every ban also emits a `RunEvent` on the WebSocket so the UI shows a banner in l
 - The excess copies go **sideboard first**: a restricted card held three in the main and one in the side loses the side copy and two of the main; each zone's hole is its own change, with diagnosis `ban` and a reason like "Restricted to one copy: cut 3 Ogre for 3 Hill Giant".
 - **"The same colour identity"** is read as the removed card's own colours first, within a mana value of it; then anywhere in the deck's colours at that mana value; then at any. A land is replaced by a land that makes every colour it made if the pool has one — twelve Mountains for twelve Forests would strand the green spells — then by any land in the deck's colours. A hole nothing of its kind fills takes a land, since basics are never short.
 - Each hole is searched knowing what the earlier ones took, so two holes do not both take four of the same card. **No trial** is played: a legalisation happens between two games of a match and has to be quick.
-- Recording the legalised deck as a generation with `cause: 'ban'`, and not counting it as the cycle's change, is the run's (5.6); so is putting the trail in `ban_events`.
+- The legalised deck is recorded as a generation with `cause: 'ban'`, not as the cycle's change, and the trail goes into `ban_events` (5.6, below).
 
 ## Run lifecycle
 
 `created → running → paused → running … → stopped`. `fork(runId, cycle)` creates a new run with the decks and stats as of that cycle and a fresh seed; the ban list is copied. `export(runId)` produces a JSON bundle (settings, ban history, every deck generation with reasons, per-cycle stats, and optionally every event log) and a plain-text decklist per generation.
+
+**As built (5.6)**, in `packages/sim/src/run.ts`, over a `RunStore` port that `MemoryRunStore` implements for tests and `SqliteRunStore` (`apps/server/src/db`) for the server:
+
+- **`createRun`** rolls the seed deck from the run's seed (or takes a pasted 75, refused unless it is 60/15 and legal under the run's initial bans) and gives it to both agents as generation 0. The run starts `created`.
+- **`driveRun`** plays cycles: each cycle's seed is `<run seed>:cycle-<n>`, the cycle is `runCycle` with the ban enforcer after every game, then the loser's change, then the cycle's record. It sets a `created` run `running` and will not drive a paused or stopped one; it checkpoints after every match, and after each one reads the run's status — **paused or stopped halts it after the match in progress**, which is written first. Driven again, it carries on from where it stopped (docs/06 "Resume protocol", ADR 0015).
+- **Generations count up per agent** from 0; a change is one generation with `cause: 'change'`, and every forced change a ban makes is one with `cause: 'ban'` — two holes a restriction leaves are two generations. A cycle's record names the generations it began with; a legalisation during it makes the next matches play a newer one, and the record says so only through the lineage.
+- **A ban between cycles** (asked for while no game is being played) takes effect as the next cycle starts, after "game" `<cycle seed>:start`, and the decks are legalised before its first match. The same check catches a deck that breaks the list for any other reason — a fork or an import taken with a ban pending.
+- **`forkRun`** copies a run as it stood at the end of a finished cycle: the lineage made up to and in that cycle, its cycle records (and with them every statistic the deck agent reads), and the whole ban trail, under a new id and seed. It starts `created` and plays on as a run of its own.
+- **`exportRun`** / **`importRun`**: the bundle is the run's snapshot, every match with — if asked — its games' logs, and a decklist per generation (`A-0`, `B-3`, …; a card's name if the caller gives names, its oracle id otherwise). An import is a new run id, paused.
+

@@ -27,6 +27,7 @@
     "cards:goldens": "tsx scripts/write-goldens.ts",
     "cards:coverage": "tsx scripts/cards-coverage.ts",
     "fetch:scryfall": "tsx scripts/fetch-scryfall.ts",
+    "db:generate": "pnpm --filter @mtg/server db:generate",
     "check": "pnpm lint && pnpm typecheck && pnpm cards:schema --check && pnpm cards:goldens --check && pnpm test && pnpm build"
   },
   "devDependencies": {

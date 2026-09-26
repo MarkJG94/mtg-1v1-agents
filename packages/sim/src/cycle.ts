@@ -114,6 +114,26 @@ export interface CycleOptions {
   readonly onGame?: (log: GameEventLog) => void;
   /** Asked after every game whether a ban changes the decks (`banEnforcer`; docs/05). */
   readonly afterGame?: AfterGame;
+  /**
+   * Resuming (roadmap 5.6): the matches of this cycle already played, in order, and every
+   * one of their games' event logs, from which the cycle's statistics so far are rebuilt.
+   * `decks` must then be the decks as those matches left them. The cycle plays on from
+   * the next match number; since match seeds are `${seed}:match-${n}`, what it plays is
+   * what an uninterrupted cycle would have played.
+   */
+  readonly completed?: {
+    readonly matches: readonly MatchResult[];
+    readonly logs: readonly GameEventLog[];
+  };
+  /**
+   * The checkpoint (docs/06 "Resume protocol"): awaited after each match with its logs,
+   * before the next begins. A cycle that stops here can be resumed from here.
+   */
+  readonly onMatch?: (
+    match: MatchResult,
+    index: number,
+    logs: readonly GameEventLog[],
+  ) => Promise<void>;
 }
 
 export interface CycleResult {
@@ -157,11 +177,23 @@ export const isTie = (rates: Readonly<Record<PlayerId, number>>, margin: number)
 
 export const runCycle = async (options: CycleOptions): Promise<CycleResult> => {
   const { settings } = options;
-  const matches: MatchResult[] = [];
+  const matches: MatchResult[] = [...(options.completed?.matches ?? [])];
   const playDraw: Record<PlayerId, PlayDrawRecord> = {
     A: options.playDraw?.A ?? noRecord,
     B: options.playDraw?.B ?? noRecord,
   };
+  const recordGames = (match: MatchResult) => {
+    for (const game of match.games) {
+      for (const player of ['A', 'B'] as const) {
+        playDraw[player] = recorded(
+          playDraw[player],
+          game.onPlay === player,
+          game.result?.winner === player,
+        );
+      }
+    }
+  };
+  for (const match of matches) recordGames(match);
   // The decks, the cards they hold and those cards' facts, as a ban may change them.
   const decks: Record<PlayerId, Deck> = { A: options.decks.A, B: options.decks.B };
   const definitions = new Map(options.definitions);
@@ -170,6 +202,7 @@ export const runCycle = async (options: CycleOptions): Promise<CycleResult> => {
       [...options.definitions].map(([oracleId, card]) => [oracleId, cardFactsFor(card)]),
   );
   const stats = new StatsAccumulator(facts);
+  for (const log of options.completed?.logs ?? []) stats.add(log);
   const score = options.score ?? ((view: PlayerView) => evaluate(view, defaultWeights));
   const hook =
     options.sideboard === undefined
@@ -189,9 +222,11 @@ export const runCycle = async (options: CycleOptions): Promise<CycleResult> => {
           return update;
         };
 
-  const play = async (count: number) => {
-    for (let i = 0; i < count; i += 1) {
+  /** Plays until the cycle has `total` matches, checkpointing after each. */
+  const play = async (total: number) => {
+    while (matches.length < total) {
       const index = matches.length;
+      const logs: GameEventLog[] = [];
       const match = await playMatch({
         players: {
           A: {
@@ -213,22 +248,16 @@ export const runCycle = async (options: CycleOptions): Promise<CycleResult> => {
         score,
         onGame: (log) => {
           stats.add(log);
+          logs.push(log);
           options.onGame?.(log);
         },
         ...(afterGame === undefined ? {} : { afterGame }),
       });
       decks.A = match.decks.A;
       decks.B = match.decks.B;
-      for (const game of match.games) {
-        for (const player of ['A', 'B'] as const) {
-          playDraw[player] = recorded(
-            playDraw[player],
-            game.onPlay === player,
-            game.result?.winner === player,
-          );
-        }
-      }
+      recordGames(match);
       matches.push(match);
+      await options.onMatch?.(match, index, logs);
       options.observe?.(match, index);
     }
   };
@@ -238,8 +267,10 @@ export const runCycle = async (options: CycleOptions): Promise<CycleResult> => {
   await play(settings.matchesPerCycle);
   let decidedBy: CycleResult['decidedBy'] = 'winRate';
   let tiebreakMatches = 0;
-  if (tied(matchWinRates(matches))) {
-    await play(settings.tiebreakMatches);
+  // Judged on the cycle's own matches alone, so a cycle resumed during its tiebreak
+  // decides it as it did before it stopped.
+  if (tied(matchWinRates(matches.slice(0, settings.matchesPerCycle)))) {
+    await play(settings.matchesPerCycle + settings.tiebreakMatches);
     tiebreakMatches = settings.tiebreakMatches;
     decidedBy = 'tiebreak';
   }

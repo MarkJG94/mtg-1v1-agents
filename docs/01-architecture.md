@@ -81,7 +81,7 @@ State is immutable-by-convention with structural sharing via a small persistent-
 
 ## Persistence and resume
 
-Everything durable lives in one SQLite file (`data/mtg.db`, WAL mode). Runs are resumable: the worker checkpoints after every completed match (results + event logs), and after every cycle (decks, stats, change). On restart the server reloads every run with status `running` and resumes from the last completed match of the current cycle; a game interrupted mid-play is simply replayed from scratch with the same seed.
+Everything durable lives in one SQLite file (`data/mtg.db`, WAL mode). Runs are resumable: the worker checkpoints after every completed match (results + event logs), and after every cycle (decks, stats, change). On restart the server reloads every run with status `running` and resumes from the last completed match of the current cycle; a game interrupted mid-play is simply replayed from scratch with the same seed. The resumed cycle is rebuilt from its stored matches and their logs, so it ends where the one that never stopped would have (ADR 0015); the run driver and the store are in place (5.6), and reloading `running` runs at boot is the worker pool's (5.7).
 
 ## Deployment
 
