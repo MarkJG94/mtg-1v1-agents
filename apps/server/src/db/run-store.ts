@@ -194,25 +194,7 @@ export class SqliteRunStore implements RunStore {
     const row = this.db.select().from(runs).where(eq(runs.id, runId)).get();
     if (row === undefined) return null;
     const run = runInfoOf(row);
-    const lineage = this.db
-      .select()
-      .from(deckGenerations)
-      .where(eq(deckGenerations.runId, runId))
-      .orderBy(asc(deckGenerations.seq))
-      .all()
-      .map(
-        (entry): DeckGeneration => ({
-          agent: entry.agent,
-          generation: entry.generation,
-          cycle: entry.cycle,
-          cause: entry.cause,
-          deck: {
-            main: JSON.parse(entry.main) as DeckSlot[],
-            side: JSON.parse(entry.side) as DeckSlot[],
-          },
-          change: entry.change === null ? null : (JSON.parse(entry.change) as DeckChange),
-        }),
-      );
+    const lineage = this.lineage(runId);
     const cycleRows = this.db
       .select()
       .from(cycles)
@@ -240,6 +222,57 @@ export class SqliteRunStore implements RunStore {
 
   async matches(runId: string, withLogs: boolean): Promise<StoredMatch[]> {
     return this.matchesOf(runId, withLogs);
+  }
+
+  // --- Reads the API makes that a run does not ---
+
+  /** Every deck generation of the run, in the order they were made. */
+  lineage(runId: string): DeckGeneration[] {
+    return this.db
+      .select()
+      .from(deckGenerations)
+      .where(eq(deckGenerations.runId, runId))
+      .orderBy(asc(deckGenerations.seq))
+      .all()
+      .map(
+        (entry): DeckGeneration => ({
+          agent: entry.agent,
+          generation: entry.generation,
+          cycle: entry.cycle,
+          cause: entry.cause,
+          deck: {
+            main: JSON.parse(entry.main) as DeckSlot[],
+            side: JSON.parse(entry.side) as DeckSlot[],
+          },
+          change: entry.change === null ? null : (JSON.parse(entry.change) as DeckChange),
+        }),
+      );
+  }
+
+  /** The ban trail alone, without loading the run. */
+  trail(runId: string): BanEvent[] {
+    return this.bansOf(runId);
+  }
+
+  /** One finished cycle's record, statistics and all. */
+  cycle(runId: string, number: number): CycleRecord | null {
+    const row = this.db
+      .select()
+      .from(cycles)
+      .where(eq(cycles.id, cycleId(runId, number)))
+      .get();
+    return row === undefined || row.status !== 'finished' ? null : this.recordOf(runId, row);
+  }
+
+  /** Every finished cycle's record, oldest first. */
+  cycleRecords(runId: string): CycleRecord[] {
+    return this.db
+      .select()
+      .from(cycles)
+      .where(and(eq(cycles.runId, runId), eq(cycles.status, 'finished')))
+      .orderBy(asc(cycles.number))
+      .all()
+      .map((row) => this.recordOf(runId, row));
   }
 
   // --- Plumbing ---

@@ -24,13 +24,14 @@ describe('the API server', () => {
     const body = response.json<HealthResponse>();
     expect(body.status).toBe('ok');
     expect(body.simWorkers).toBe(2);
-    expect([body.runsPlaying, body.runsWaiting]).toEqual([0, 0]);
+    expect([body.runsPlaying, body.runsWaiting, body.scryfallVersion]).toEqual([0, 0, null]);
     expect(body.uptimeSeconds).toBeGreaterThanOrEqual(0);
   });
 
   it('404s an unknown API route rather than serving the app shell', async () => {
     const response = await app.inject({ method: 'GET', url: '/api/nope' });
     expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({ error: { code: 'not_found' } });
   });
 });
 

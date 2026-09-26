@@ -1,3 +1,4 @@
+export * from './api.js';
 export * from './bans.js';
 export * from './deck-change.js';
 export * from './eventlog/events.js';

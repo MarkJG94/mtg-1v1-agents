@@ -1,7 +1,10 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
+import { loadCatalogue } from './db/catalogue.js';
 import { openDatabase } from './db/open.js';
+import { Queries } from './db/queries.js';
+import { services } from './services.js';
 import { Supervisor } from './workers/supervisor.js';
 
 const config = loadConfig();
@@ -18,7 +21,17 @@ const supervisor = new Supervisor({
   cardsPath: config.cardsPath,
   handScriptsDir: config.cardScriptsDir,
 });
-const app = await buildApp(config, { supervisor });
+const hasCards = existsSync(config.cardsPath);
+const catalogue = hasCards ? loadCatalogue(database, config.cardsPath) : null;
+const app = await buildApp(
+  config,
+  services({
+    supervisor,
+    queries: new Queries(database, supervisor.store),
+    cardsPath: config.cardsPath,
+  }),
+);
+if (catalogue?.loaded) app.log.info(catalogue, 'card catalogue loaded');
 supervisor.on((event) => {
   if (event.type === 'runFailed') app.log.error({ runId: event.runId }, event.message);
   if (event.type === 'runHalted') app.log.info(event, 'run halted');
@@ -42,7 +55,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 try {
   await app.listen({ port: config.port, host: config.host });
   // Every run left running by a crash or a restart plays on (docs/06 "Resume protocol").
-  if (existsSync(config.cardsPath)) {
+  if (hasCards) {
     const resumed = await supervisor.resumeRunning();
     if (resumed.length > 0) app.log.info({ runs: resumed }, 'resuming runs');
   } else {

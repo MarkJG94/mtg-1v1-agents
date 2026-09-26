@@ -34,8 +34,11 @@ const cache = new SqliteScriptStore(database.db);
 const reached = new Map<string, CachedScript>();
 const write = (message: ScriptWrite) => parent.postMessage(message);
 
+/** The card being scripted afresh, whose cached verdict is not to be believed. */
+let forced: string | null = null;
+
 const store: ScriptStore = {
-  get: (oracleId) => reached.get(oracleId) ?? cache.get(oracleId),
+  get: (oracleId) => (oracleId === forced ? null : (reached.get(oracleId) ?? cache.get(oracleId))),
   put: (entry) => {
     reached.set(entry.oracleId, entry);
     write({ put: entry });
@@ -53,10 +56,13 @@ const resolver = new ScriptResolver({
 const answer = (port: MessagePort) => {
   port.on('message', (value: ScriptRequest) => {
     let reply: ScriptAnswer;
+    forced = value.force === true ? value.card.oracleId : null;
     try {
       reply = { id: value.id, resolution: resolver.resolve(value.card, value.request) };
     } catch (error) {
       reply = { id: value.id, error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      forced = null;
     }
     port.postMessage(reply);
     if (value.signal !== undefined) {

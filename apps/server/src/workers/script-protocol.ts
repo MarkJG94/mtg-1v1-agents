@@ -22,6 +22,8 @@ export interface ScriptRequest {
   readonly card: CardProjection;
   readonly request: RequestContext;
   readonly signal?: Int32Array;
+  /** Script it afresh, as if nothing were cached (`POST /api/cards/:id/script`). */
+  readonly force?: boolean;
 }
 
 export type ScriptAnswer =

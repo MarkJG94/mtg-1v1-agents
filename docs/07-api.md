@@ -32,6 +32,20 @@ Fastify on one port; JSON over HTTP for state, WebSocket for live streams. All D
 
 Errors are `{ error: { code, message, details? } }` with proper status codes; validation failures are 400 with the zod issue list.
 
+**As built (6.1)**, in `apps/server/src/routes`, every route above but the image proxy (6.2's), with every request and response a zod schema in `packages/shared/src/api.ts`. Where the table leaves a choice:
+
+- **Creating a run**: `settings` takes any subset of the run settings; a missing `seed` is drawn at random (64 bits) and recorded, so the run is still a function of its settings. The seed deck is rolled on a simulation worker. A pasted 75 that is not sixty and fifteen, or breaks the run's initial list, is `400 invalid_seed_deck`. Anything that needs Scryfall's cards answers `503 no_card_data` when they have not been fetched.
+- **Lifecycle**: `start` takes `{ cycles? }` — play that many and pause — and answers the run's summary; pausing and stopping take effect after the match in progress (5.7). Starting a stopped run is `409`.
+- **Fork** takes `{ cycle, name?, seed? }` (a missing seed is drawn); forking at a cycle the run has not finished is `409`. **Export** is the 5.6 bundle as an attachment, with each decklist's cards named from the catalogue; **import** accepts a bundle up to 1 GB and answers the new run, paused.
+- **Cycles** page with `?offset=&limit=` (default 50, at most 500), finished cycles only; each says the change it made or, when the deck agent could make none, why (ADR 0017). A **cycle's detail** has the decks it began with, the change with its evidence, each deck's rates, play/draw records, what each deck showed, the trialled candidates and its matches.
+- **Statistics** are one cycle's (`?cycle=n`) or every cycle rolled up with docs/05's decay, a row a card with its name, worst Δ first.
+- **Bans**: `PUT`/`DELETE` answer `202` with the list and the trail. On a run a worker is playing the edit takes effect after the game in progress; otherwise it waits on the trail as pending until the run's next cycle starts. The card must be in the catalogue (`404` otherwise).
+- **Matches and games** are addressed by the ids docs/06 gives them (`<run>:<cycle>:<match>` and `…:<game>`, URL-encoded); a game's log is `404` when it kept none.
+- **Cards** search the catalogue — docs/06 `cards`, loaded from the Scryfall JSONL at boot whenever its version changes — by name, type line and rules text, the exact name first, then names that start with the query. A card's detail adds its script verdict, its record summed over every run, and how often a run asked for it and could not have it. `POST …/script` scripts it afresh on the scripting worker, ignoring the cache, and answers the verdict. **Coverage** counts the catalogue and the verdicts and lists the 25 most-requested unsupported cards.
+- **Health** reports the simulation workers allowed, the runs on a worker and waiting for one, the database's size with its WAL, and the Scryfall version the catalogue holds.
+- **Errors**: `400 invalid_request` (with the zod issues), `404 not_found` (an unknown route too), `409 conflict`, `503 no_card_data`, `500 internal`.
+
+
 ## WebSocket `/ws`
 
 Client sends `{ subscribe: 'run', runId }`, `{ subscribe: 'game', runId }` (the run's current live game), `{ subscribe: 'runs' }` (list-level status), or `{ unsubscribe: ... }`.

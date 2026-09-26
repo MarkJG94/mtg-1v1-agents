@@ -254,15 +254,26 @@ export class Supervisor {
     ]);
   }
 
-  /** Scripts a card on the scripting worker, for the API (`POST /api/cards/:id/script`). */
-  resolveCard(card: CardProjection): Promise<Resolution> {
+  /**
+   * Scripts a card on the scripting worker, for the API; `force` scripts it afresh rather
+   * than answering from the cache (`POST /api/cards/:id/script`).
+   */
+  resolveCard(
+    card: CardProjection,
+    options: { readonly force?: boolean } = {},
+  ): Promise<Resolution> {
     const id = this.nextScript++;
     return new Promise((resolve, reject) => {
       this.scriptAnswers.set(id, (answer) => {
         if ('error' in answer) reject(new Error(answer.error));
         else resolve(answer.resolution);
       });
-      this.apiScripts.postMessage({ id, card, request: { context: 'api' } });
+      this.apiScripts.postMessage({
+        id,
+        card,
+        request: { context: 'api' },
+        ...(options.force === true ? { force: true } : {}),
+      });
     });
   }
 

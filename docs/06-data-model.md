@@ -8,7 +8,8 @@ SQLite (`data/mtg.db`, WAL, `synchronous=NORMAL`), accessed through drizzle-orm 
 cards (                      -- projection of Scryfall bulk data, rebuilt on fetch
   oracle_id TEXT PK, name TEXT, mana_cost TEXT, mana_value REAL, colors TEXT, color_identity TEXT,
   type_line TEXT, oracle_text TEXT, power TEXT, toughness TEXT, loyalty TEXT, keywords TEXT,
-  layout TEXT, legal_base INTEGER, preferred_printing_id TEXT, image_uri TEXT, scryfall_updated_at TEXT
+  layout TEXT, legal_base INTEGER, preferred_printing_id TEXT, image_uri TEXT, scryfall_updated_at TEXT,
+  projection TEXT /*the whole projection, json: what a card is scripted against on request*/
 );
 card_scripts (
   oracle_id TEXT PK, source TEXT CHECK(source IN ('hand','auto')), parser_version INTEGER,
@@ -57,7 +58,7 @@ card_stats (
 
 Indexes: `games(match_id)`, `matches(cycle_id)`, `cycles(run_id, number)`, `deck_generations(run_id, agent, generation)`, `card_stats(run_id, agent, oracle_id)`, `unsupported_requests(oracle_id)`.
 
-The tables are declared once, in `apps/server/src/db/schema.ts` (drizzle); `pnpm db:generate` writes a migration under `apps/server/drizzle/` for a change there, and the server applies every migration when it opens the file. A test compares the migrated database with the schema, column by column. `cards` is declared but not yet filled: the sim reads the bulk JSONL directly (5.3), and the card browser that needs the table is phase 6's.
+The tables are declared once, in `apps/server/src/db/schema.ts` (drizzle); `pnpm db:generate` writes a migration under `apps/server/drizzle/` for a change there, and the server applies every migration when it opens the file. A test compares the migrated database with the schema, column by column. `cards` is filled at boot from the bulk JSONL whenever its version — `meta.json`'s `updatedAt` — differs from the one the rows carry in `scryfall_updated_at`, in one transaction (6.1); the API searches and names cards from it, while the simulation workers still read the JSONL directly.
 
 Deck lineage is reconstructed from `deck_generations`; nothing is ever updated in place except `runs.status/current_cycle` and `cycles` progress counters.
 

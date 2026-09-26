@@ -31,6 +31,8 @@ export const cards = sqliteTable('cards', {
   preferredPrintingId: text('preferred_printing_id'),
   imageUri: text('image_uri'),
   scryfallUpdatedAt: text('scryfall_updated_at'),
+  /** The whole projection as JSON, which the scripting worker validates a script against. */
+  projection: text('projection').notNull().default('{}'),
 });
 
 export const cardScripts = sqliteTable('card_scripts', {
