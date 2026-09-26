@@ -64,6 +64,7 @@ const matchWon = (winner: PlayerId | null): MatchResult => ({
   wins: { A: 0, B: 0 },
   winner,
   sideboarding: { A: null, B: null },
+  shown: { A: [], B: [] },
 });
 
 describe('match win rates', () => {

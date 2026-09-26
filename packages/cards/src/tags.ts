@@ -50,6 +50,44 @@ export const cardTags = (definition: CardDefinition): CardTags => {
   return { is: sorted(is), vs: sorted(vs) };
 };
 
+/**
+ * Cards a card draws for its controller, read off its script: every `draw` its spell,
+ * triggered, activated or loyalty abilities do for "you" or for a target player — whom a
+ * player points it at is almost always themselves — a fixed number counted as
+ * itself and anything that varies ("draw X cards") as one. The deck agent's
+ * card-advantage term (docs/05 "static quality model"). An ability that can be activated
+ * again counts once — this is a ranking signal, not a card-advantage calculator.
+ */
+export const cardsDrawn = (definition: CardDefinition): number => {
+  let drawn = 0;
+  const count = (op: EffectOp): void => {
+    switch (op.op) {
+      case 'sequence':
+        for (const inner of op.effects) count(inner);
+        return;
+      case 'forEach':
+        for (const inner of op.effects) count(inner);
+        return;
+      case 'if':
+        for (const inner of [...op.thenDo, ...(op.otherwise ?? [])]) count(inner);
+        return;
+      case 'draw':
+        if (op.player.kind === 'you' || op.player.kind === 'target')
+          drawn += typeof op.count === 'number' ? op.count : 1;
+        return;
+      default:
+        return;
+    }
+  };
+  for (const ability of definition.abilities) {
+    if (ability.kind === 'mana' || ability.kind === 'static' || ability.kind === 'replacement') {
+      continue;
+    }
+    for (const op of effectsOf(ability)) count(op);
+  }
+  return drawn;
+};
+
 interface Context {
   readonly targets: readonly TargetSpec[];
   /** The filter the enclosing `forEach` runs over, which `$each` refers to. */

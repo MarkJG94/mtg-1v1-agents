@@ -19,6 +19,7 @@ import {
   type AgentCounts,
   type AgentLevel,
   addCounts,
+  type DeckSlot,
   emptyAgentCounts,
   type GameEventLog,
   type OracleId,
@@ -118,6 +119,11 @@ export interface CycleResult {
   readonly playDraw: Readonly<Record<PlayerId, PlayDrawRecord>>;
   /** This cycle's statistics for each deck, read from every game's event log (docs/05). */
   readonly stats: Readonly<Record<PlayerId, AgentCounts>>;
+  /**
+   * What each deck showed the other over the cycle, summed over its games: the opponent's
+   * observed decklist the deck agent reads (docs/04 "Opponent modelling").
+   */
+  readonly shown: Readonly<Record<PlayerId, readonly DeckSlot[]>>;
 }
 
 const noRecord: PlayDrawRecord = { play: { games: 0, wins: 0 }, draw: { games: 0, wins: 0 } };
@@ -212,7 +218,28 @@ export const runCycle = (options: CycleOptions): CycleResult => {
     decidedBy = 'coinFlip';
   }
 
-  return { matches, tiebreakMatches, winRate, loser, decidedBy, playDraw, stats: stats.totals };
+  return {
+    matches,
+    tiebreakMatches,
+    winRate,
+    loser,
+    decidedBy,
+    playDraw,
+    stats: stats.totals,
+    shown: { A: summed(matches, 'A'), B: summed(matches, 'B') },
+  };
+};
+
+const summed = (matches: readonly MatchResult[], player: PlayerId): DeckSlot[] => {
+  const counts = new Map<OracleId, number>();
+  for (const match of matches) {
+    for (const slot of match.shown[player]) {
+      counts.set(slot.oracleId, (counts.get(slot.oracleId) ?? 0) + slot.count);
+    }
+  }
+  return [...counts]
+    .map(([oracleId, count]) => ({ oracleId, count }))
+    .sort((a, b) => (a.oracleId < b.oracleId ? -1 : 1));
 };
 
 const recorded = (record: PlayDrawRecord, onPlay: boolean, won: boolean): PlayDrawRecord => {

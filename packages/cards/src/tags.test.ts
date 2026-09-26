@@ -4,7 +4,7 @@ import { asOracleId } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
 import { readScript } from './files.js';
 import { loadCardScript } from './load.js';
-import { cardTags } from './tags.js';
+import { cardsDrawn, cardTags } from './tags.js';
 
 /**
  * Card tags (roadmap 4.6): what a card is and what it answers, read off its script. The
@@ -87,6 +87,41 @@ describe('what only a hand-built card shows', () => {
     colours: [],
     abilities: [],
     ...over,
+  });
+
+  it('counts a draw wherever it sits: in a sequence, a loop or either branch of an if', () => {
+    const draw = { op: 'draw', player: { kind: 'you' }, count: 1 } as const;
+    const nested = card({
+      abilities: [
+        {
+          kind: 'spell',
+          effects: [
+            { op: 'sequence', effects: [draw] },
+            { op: 'forEach', of: { kind: 'creature' }, effects: [draw] },
+            {
+              op: 'if',
+              condition: { kind: 'exists', filter: { kind: 'creature' } },
+              thenDo: [draw],
+              otherwise: [draw],
+            },
+          ],
+        },
+      ],
+    });
+    expect(cardsDrawn(nested)).toBe(4);
+    // What varies counts as one; an opponent's draw is not the caster's card advantage.
+    const variable = card({
+      abilities: [
+        {
+          kind: 'spell',
+          effects: [
+            { op: 'draw', player: { kind: 'you' }, count: { kind: 'x' } },
+            { op: 'draw', player: { kind: 'opponent' }, count: 3 },
+          ],
+        },
+      ],
+    });
+    expect(cardsDrawn(variable)).toBe(1);
   });
 
   it('answers counterspells with split second (CR 702.61a)', () => {
@@ -181,5 +216,30 @@ describe('what only a hand-built card shows', () => {
       ],
     });
     expect(cardTags(noncreature).vs).toEqual(['artifact', 'enchantment', 'planeswalker', 'land']);
+  });
+});
+
+describe('cards drawn (the deck agent’s card-advantage term, roadmap 5.4)', () => {
+  const drawn = (path: string) => cardsDrawn(script(path));
+
+  it('counts what a spell or a trigger draws for its controller', () => {
+    expect(drawn('d/divination')).toBe(2);
+    expect(drawn('e/elvish-visionary')).toBe(1);
+    expect(drawn('w/wall-of-omens')).toBe(1);
+  });
+
+  it('counts a target player drawing, which is nearly always the caster', () => {
+    expect(drawn('s/sign-in-blood')).toBe(2);
+  });
+
+  it('does not count a draw everybody gets', () => {
+    // Jace Beleren: +2 each player draws a card (not counted); −1 target player draws one.
+    expect(drawn('j/jace-beleren')).toBe(1);
+  });
+
+  it('is nothing for a card that draws nothing', () => {
+    expect(drawn('g/grizzly-bears')).toBe(0);
+    expect(drawn('l/lightning-bolt')).toBe(0);
+    expect(drawn('f/forest')).toBe(0);
   });
 });

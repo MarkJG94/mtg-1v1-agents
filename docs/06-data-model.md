@@ -26,7 +26,7 @@ ban_events (id INTEGER PK, run_id TEXT, oracle_id TEXT, action TEXT, note TEXT, 
 deck_generations (
   id TEXT PK, run_id TEXT, agent TEXT CHECK(agent IN ('A','B')), generation INTEGER, cycle INTEGER,
   cause TEXT CHECK(cause IN ('seed','change','ban','manual')), main TEXT /*json [{oracle_id,count}]*/, side TEXT,
-  change TEXT /*json DeckChange incl. reason+evidence*/, created_at TEXT
+  change TEXT /*json DeckChange incl. shape+reason+evidence, @mtg/shared deck-change.ts*/, created_at TEXT
 );
 
 cycles (

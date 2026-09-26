@@ -87,6 +87,11 @@ export interface MatchResult {
   readonly winner: PlayerId | null;
   /** What each player sided in for game 3, if there was one and it had a hook. */
   readonly sideboarding: Readonly<Record<PlayerId, SideboardPlan | null>>;
+  /**
+   * What each player showed the other, summed over the match's games: its cards that ended
+   * a game somewhere public (docs/04 "Opponent modelling").
+   */
+  readonly shown: Readonly<Record<PlayerId, readonly DeckSlot[]>>;
 }
 
 export class IllegalSideboardError extends Error {
@@ -172,7 +177,13 @@ export const playMatch = (options: MatchOptions): MatchResult => {
   }
 
   const winner = wins.A > wins.B ? 'A' : wins.B > wins.A ? 'B' : null;
-  return { games, wins, winner, sideboarding };
+  return {
+    games,
+    wins,
+    winner,
+    sideboarding,
+    shown: { A: slotsOf(seen.A), B: slotsOf(seen.B) },
+  };
 };
 
 /** A swap keeps the seventy-five, and keeps sixty of them in the main deck. */

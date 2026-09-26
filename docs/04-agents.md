@@ -177,3 +177,5 @@ Early in a run there are no matchup statistics; the tag prior carries the decisi
 ## Opponent modelling
 
 Both agents are instances of the same code with different decks and different accumulated statistics; there is no asymmetry. Each maintains, per run and per cycle, a `knowledge` record of the opponent's observed decklist (every card revealed by casting or otherwise), which the sideboarding agent and the deck agent use.
+
+**As built (5.4):** each match reports what each player showed the other — its cards that ended a game somewhere public, summed over the match's games (`MatchResult.shown`) — and a cycle sums its matches' (`CycleResult.shown`). The sideboarding agent reads a match's; the deck agent reads the cycle's as its `OpponentKnowledge`. Keeping it across cycles is the run's (5.6).

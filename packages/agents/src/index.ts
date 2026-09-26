@@ -18,6 +18,7 @@ export * from './after-action.js';
 export * from './combat/model.js';
 export * from './combat/policy.js';
 export * from './combat/solver.js';
+export * from './deck-agent.js';
 export * from './evaluate.js';
 export * from './greedy.js';
 export * from './opening.js';

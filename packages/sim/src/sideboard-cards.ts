@@ -1,6 +1,6 @@
-import type { SideboardCard } from '@mtg/agents';
-import { cardTags } from '@mtg/cards';
-import { type CardDefinition, costColours, isColouredMana } from '@mtg/engine';
+import type { DeckCard, SideboardCard } from '@mtg/agents';
+import { cardsDrawn, cardTags } from '@mtg/cards';
+import { type CardDefinition, costColours, isColouredMana, manaValue } from '@mtg/engine';
 import type { Colour, OracleId } from '@mtg/shared';
 
 /**
@@ -33,3 +33,22 @@ export const sideboardCardsFor = (
   new Map(
     [...definitions].map((definition) => [definition.oracleId, sideboardCardFor(definition)]),
   );
+
+/**
+ * What the deck agent is told about a card it could play (roadmap 5.4): what the
+ * sideboarding agent is told, and its name, mana value, whether it is a basic land, and
+ * how many cards it draws — all read off the definition, for the same reason as above.
+ */
+export const deckCardFor = (definition: CardDefinition): DeckCard => ({
+  ...sideboardCardFor(definition),
+  name: definition.name,
+  basic: definition.types.includes('land') && (definition.supertypes ?? []).includes('basic'),
+  manaValue: manaValue(definition.manaCost),
+  cardsDrawn: cardsDrawn(definition),
+});
+
+/** The same, for every card in a pool. */
+export const deckCardsFor = (
+  definitions: Iterable<CardDefinition>,
+): ReadonlyMap<OracleId, DeckCard> =>
+  new Map([...definitions].map((definition) => [definition.oracleId, deckCardFor(definition)]));

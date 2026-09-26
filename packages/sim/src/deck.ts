@@ -5,16 +5,21 @@ import {
   createRng,
   type GameState,
 } from '@mtg/engine';
-import { type DeckSlot, type OracleId, type PlayerId, playerIds, playerZone } from '@mtg/shared';
+import {
+  type Deck75,
+  type DeckSlot,
+  type OracleId,
+  type PlayerId,
+  playerIds,
+  playerZone,
+} from '@mtg/shared';
 
 /**
  * A deck as the evolution loop holds it (docs/05): sixty cards to play with and fifteen
- * to sideboard from, each a card name and a count.
+ * to sideboard from, each a card name and a count. `Deck75` in `@mtg/shared`, since the
+ * deck agent and the UI read it too.
  */
-export interface Deck {
-  readonly main: readonly DeckSlot[];
-  readonly side: readonly DeckSlot[];
-}
+export type Deck = Deck75;
 
 export const cardCount = (slots: readonly DeckSlot[]): number =>
   slots.reduce((sum, slot) => sum + slot.count, 0);
