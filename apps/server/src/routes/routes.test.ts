@@ -14,11 +14,13 @@ import {
   healthSchema,
   lineageSchema,
   matchDetailSchema,
+  resolveCardsSchema,
   runBundleSchema,
   runDetailSchema,
   runListSchema,
   runSummarySchema,
   scriptResultSchema,
+  seedDeckPreviewSchema,
   statsTableSchema,
 } from '@mtg/shared';
 import { createRun, driveRun } from '@mtg/sim';
@@ -119,6 +121,15 @@ describe('runs', () => {
     expect(created).toMatchObject({ name: 'contract', seed: settings.seed, status: 'created' });
     const { runs } = await call(runListSchema, { method: 'GET', url: '/api/runs' });
     expect(runs.map((each) => each.id)).toContain(created.id);
+  });
+
+  it('lists each run with A’s win rate cycle by cycle, and its last change', async () => {
+    const { runs } = await call(runListSchema, { method: 'GET', url: '/api/runs' });
+    const listed = runs.find((each) => each.id === created.id);
+    const page = await call(cyclePageSchema, { method: 'GET', url: `${run}/cycles` });
+    expect(listed?.winRates).toEqual(page.cycles.map((cycle) => cycle.winRate.A));
+    const changes = page.cycles.filter((cycle) => cycle.change !== null);
+    expect(listed?.lastChange).toBe(changes.at(-1)?.change?.reason ?? null);
   });
 
   it('draws a seed when the request names none', async () => {
@@ -399,6 +410,110 @@ describe('cards and coverage', async () => {
     expect(coverage.scripted.supported).toBeGreaterThan(0);
     const counts = coverage.mostRequested.map((row) => row.requests);
     expect(counts).toEqual([...counts].sort((a, b) => b - a));
+  });
+});
+
+describe('the new-run form', async () => {
+  const preview = await call(seedDeckPreviewSchema, {
+    method: 'POST',
+    url: '/api/seed-decks',
+    payload: { settings: { ...request, seed: '31' } },
+  });
+  const count = (cards: { count: number }[]) => cards.reduce((sum, card) => sum + card.count, 0);
+
+  it('previews the seventy-five a run would be made with, every card playable, by name', () => {
+    expect([count(preview.main), count(preview.side)]).toEqual([60, 15]);
+    expect(preview.seed).toBe('31');
+    for (const card of [...preview.main, ...preview.side]) {
+      expect(card.support).toBe('supported');
+      expect(card.name).toBe(pool.find((each) => each.oracleId === card.oracleId)?.name);
+    }
+  });
+
+  it('rolls exactly the deck the run is then made with', async () => {
+    const made = await call(
+      runSummarySchema,
+      {
+        method: 'POST',
+        url: '/api/runs',
+        payload: { name: 'previewed', settings: { ...request, seed: '31' } },
+      },
+      201,
+    );
+    const detail = await call(runDetailSchema, { method: 'GET', url: `/api/runs/${made.id}` });
+    const slots = (cards: { oracleId: string; count: number }[]) =>
+      cards.map((card) => [card.oracleId, card.count]);
+    expect(slots(detail.decks.A.deck.main)).toEqual(slots(preview.main));
+    expect(slots(detail.decks.A.deck.side)).toEqual(slots(preview.side));
+  });
+
+  it('respects an initial ban list, in the preview and in the run', async () => {
+    const banned = preview.main.find((card) => !/Basic/.test(card.typeLine))?.oracleId ?? '';
+    const bans = [{ oracleId: banned, status: 'banned' }];
+    const without = await call(seedDeckPreviewSchema, {
+      method: 'POST',
+      url: '/api/seed-decks',
+      payload: { settings: { ...request, seed: '31' }, bans },
+    });
+    expect(without.main.map((card) => card.oracleId)).not.toContain(banned);
+    const made = await call(
+      runSummarySchema,
+      {
+        method: 'POST',
+        url: '/api/runs',
+        payload: { name: 'banned', settings: { ...request, seed: '31' }, bans },
+      },
+      201,
+    );
+    const state = await call(banStateSchema, { method: 'GET', url: `/api/runs/${made.id}/bans` });
+    expect(state.list).toMatchObject([{ oracleId: banned, status: 'banned' }]);
+    expect(state.history[0]?.appliedAfterGameId).toBe(`${made.id}:created`);
+    const detail = await call(runDetailSchema, { method: 'GET', url: `/api/runs/${made.id}` });
+    expect(detail.decks.A.deck.main.map((slot) => slot.oracleId)).not.toContain(banned);
+    await failure(
+      {
+        method: 'POST',
+        url: '/api/runs',
+        payload: { name: 'x', settings: request, bans: [{ oracleId: 'nope', status: 'banned' }] },
+      },
+      404,
+    );
+  });
+
+  it('resolves typed names to the catalogue’s cards, with their support', async () => {
+    const card = preview.main[0];
+    const { cards } = await call(resolveCardsSchema, {
+      method: 'POST',
+      url: '/api/cards/resolve',
+      payload: { names: [card?.name.toUpperCase(), 'No Such Card'] },
+    });
+    expect(cards).toEqual([
+      {
+        query: card?.name.toUpperCase(),
+        oracleId: card?.oracleId,
+        name: card?.name,
+        support: 'supported',
+      },
+      { query: 'No Such Card', oracleId: null, name: null, support: null },
+    ]);
+  });
+
+  it('resolves a split or double-faced card by its front face', async () => {
+    database.sqlite
+      .prepare(
+        `INSERT INTO cards (oracle_id, name, mana_value, colors, color_identity, type_line,
+           oracle_text, keywords, layout, legal_base, projection)
+         VALUES ('split-card', 'Fire // Ice', 2, '[]', '[]', 'Instant // Instant', '', '[]',
+           'split', 1, '{}')`,
+      )
+      .run();
+    const { cards } = await call(resolveCardsSchema, {
+      method: 'POST',
+      url: '/api/cards/resolve',
+      payload: { names: ['fire', 'Fire // Ice'], script: false },
+    });
+    database.sqlite.prepare("DELETE FROM cards WHERE oracle_id = 'split-card'").run();
+    expect(cards.map((card) => card.name)).toEqual(['Fire // Ice', 'Fire // Ice']);
   });
 });
 

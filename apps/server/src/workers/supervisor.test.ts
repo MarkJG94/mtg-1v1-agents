@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { banListOf, banViolations, type OracleId } from '@mtg/shared';
 import {
@@ -353,5 +354,42 @@ describe('a worker that fails', async () => {
     expect(events.filter(is('runFailed'))[0]?.message).toMatch(/ENOENT/);
     // The next job still finds a worker.
     await expect(supervisor.create({ id: 'y', name: 'y', settings })).rejects.toThrow(/ENOENT/);
+  });
+});
+
+describe('a scripting worker that stops', async () => {
+  // A hand script that does not parse stops the worker as it loads them.
+  const scripts = join(box.directory, 'broken-scripts');
+  mkdirSync(scripts);
+  writeFileSync(join(scripts, 'broken.yaml'), 'oracleId: [unclosed\n');
+  const { supervisor } = box.supervise('scripting-stopped.db', { handScriptsDir: scripts });
+  const [card] = pool;
+  if (card === undefined) throw new Error('no fixture cards');
+
+  it('fails what was waiting on it, and all that asks after, at once rather than timing out', async () => {
+    const first = await within(
+      supervisor.resolveCard(card).then(
+        () => null,
+        (error: Error) => error,
+      ),
+      'the first script request failing',
+      10_000,
+    );
+    expect(first?.message).toMatch(/scripting worker has stopped/);
+    await expect(within(supervisor.resolveCard(card), 'a later request', 1_000)).rejects.toThrow(
+      /scripting worker has stopped/,
+    );
+    await expect(within(supervisor.roll(settings), 'a roll', 1_000)).rejects.toMatchObject({
+      name: 'ScriptingStoppedError',
+    });
+    await expect(
+      within(supervisor.create({ id: 'z', name: 'z', settings }), 'a run being made', 1_000),
+    ).rejects.toThrow(/scripting worker has stopped/);
+  });
+
+  it('is refused at boot when its scripts are not there, rather than dying unseen', () => {
+    expect(() =>
+      box.supervise('no-scripts.db', { handScriptsDir: join(box.directory, 'absent') }),
+    ).toThrow(/no card scripts at .*absent \(CARD_SCRIPTS_DIR\)/);
   });
 });

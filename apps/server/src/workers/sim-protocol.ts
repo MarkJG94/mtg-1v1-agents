@@ -49,7 +49,30 @@ export interface DriveJob {
   readonly control: MessagePort;
 }
 
-export type SimJob = CreateJob | DriveJob;
+/** Roll the seed deck a run with these settings would get, and make nothing. */
+export interface RollJob {
+  readonly job: number;
+  readonly kind: 'roll';
+  readonly settings: RunSettings;
+  /** The list in effect as the deck is rolled. */
+  readonly bans: readonly BanEvent[];
+}
+
+/** A rolled seed deck, as the new-run form previews it. */
+export interface RolledDeck {
+  readonly deck: Deck75;
+  readonly colours: readonly string[];
+  readonly lands: number;
+  readonly nonbasicLands: number;
+  readonly rerolled: readonly {
+    readonly oracleId: string;
+    readonly name: string;
+    readonly status: string;
+    readonly section: string;
+  }[];
+}
+
+export type SimJob = CreateJob | DriveJob | RollJob;
 
 export interface DriveOutcome {
   readonly played: number;
@@ -59,6 +82,7 @@ export interface DriveOutcome {
 export type JobResult =
   | { readonly job: number; readonly created: RunSnapshot }
   | { readonly job: number; readonly drove: DriveOutcome }
+  | { readonly job: number; readonly rolled: RolledDeck }
   | { readonly job: number; readonly failed: { readonly name: string; readonly message: string } };
 
 export type { BanRequest };

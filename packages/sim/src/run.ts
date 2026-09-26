@@ -7,6 +7,7 @@ import {
   applyLegalChange,
   type BanAction,
   type BanEvent,
+  type BanList,
   banViolations,
   type CycleRecord,
   type Deck75,
@@ -28,7 +29,7 @@ import { type AgentFactory, agentsAt, runCycle } from './cycle.js';
 import { cardCount, cardsIn } from './deck.js';
 import type { LiveGameEnd, LiveGameStart, LiveGames, MatchResult } from './match.js';
 import { ScryfallPool } from './pool.js';
-import { generateSeedDeck } from './seed-deck.js';
+import { generateSeedDeck, type SeedDeck } from './seed-deck.js';
 import { deckCardsFor, sideboardCardsFor } from './sideboard-cards.js';
 import { trials } from './trial.js';
 
@@ -138,6 +139,25 @@ export interface NewRunOptions {
   readonly bans?: readonly BanEvent[];
 }
 
+/**
+ * The seed deck a run with these settings is made with: what the new-run form previews,
+ * and exactly what `createRun` then rolls, since both draw from the run's seed.
+ */
+export const seedDeckFor = (options: {
+  readonly cards: RunCards;
+  readonly settings: RunSettings;
+  readonly banList?: BanList;
+  readonly runId?: string;
+}): SeedDeck =>
+  generateSeedDeck({
+    pool: options.cards.pool,
+    resolver: options.cards.resolver,
+    seed: `${options.settings.seed}:seed-deck`,
+    settings: options.settings,
+    ...(options.banList === undefined ? {} : { banList: options.banList }),
+    ...(options.runId === undefined ? {} : { runId: options.runId }),
+  });
+
 /** A new run: both agents on the same 75 as generation 0 (docs/05). */
 export const createRun = async (options: NewRunOptions): Promise<RunSnapshot> => {
   const { settings } = options;
@@ -145,14 +165,7 @@ export const createRun = async (options: NewRunOptions): Promise<RunSnapshot> =>
   registry.applyPending(`${options.id}:created`);
   const deck =
     options.seedDeck ??
-    generateSeedDeck({
-      pool: options.cards.pool,
-      resolver: options.cards.resolver,
-      seed: `${settings.seed}:seed-deck`,
-      settings,
-      banList: registry.list,
-      runId: options.id,
-    }).deck;
+    seedDeckFor({ cards: options.cards, settings, banList: registry.list, runId: options.id }).deck;
   if (cardCount(deck.main) !== 60 || cardCount(deck.side) !== 15) {
     throw new RunError('a seed deck is sixty cards and a fifteen-card sideboard');
   }
@@ -162,6 +175,9 @@ export const createRun = async (options: NewRunOptions): Promise<RunSnapshot> =>
       `the seed deck holds ${broken.held} of ${broken.oracleId}, which is ${broken.status}`,
     );
   }
+  // A pasted 75 is checked card by card now, not when its first game cannot be dealt; a
+  // rolled one only ever holds cards the engine can play (docs/05 "re-roll").
+  if (options.seedDeck !== undefined) unplayable(options.seedDeck, options.cards, options.id);
   const seed = (agent: PlayerId): DeckGeneration => ({
     agent,
     generation: 0,
@@ -503,6 +519,19 @@ const definitionsOf = (
     const definition = known.get(oracleId);
     return definition === undefined ? [] : [definition];
   });
+
+/** Throws on the first card of a pasted 75 the catalogue lacks or the engine cannot play. */
+const unplayable = (deck: Deck75, cards: RunCards, runId: string): void => {
+  const projections = new Map(cards.pool.map((card) => [card.oracleId, card]));
+  for (const oracleId of cardsIn(deck).keys()) {
+    const projection = projections.get(oracleId);
+    if (projection === undefined) throw new RunError(`${oracleId} is not a card in the pool`);
+    const resolved = cards.resolver.resolve(projection, { runId, context: 'seed deck (pasted)' });
+    if (resolved.definition === null) {
+      throw new RunError(`${projection.name} cannot be played: its script is ${resolved.status}`);
+    }
+  }
+};
 
 // --- Fork, export, import ---
 

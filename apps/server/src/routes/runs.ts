@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   asOracleId,
+  type BanEvent,
   banListOf,
   banRequestSchema,
   createRunRequestSchema,
@@ -10,6 +11,7 @@ import {
   parseRunSettings,
   type RunSummary,
   runBundleSchema,
+  seedDeckRequestSchema,
   startRunRequestSchema,
   statsQuerySchema,
   unbanRequestSchema,
@@ -39,6 +41,20 @@ const randomSeed = (): string => {
   return ((BigInt(high) << 32n) | BigInt(low)).toString();
 };
 
+/** A new run's initial list, as edits applied as it is made (`createRun` stamps them). */
+const initialBans = (
+  bans: readonly { oracleId: string; status: 'banned' | 'restricted'; note: string }[],
+  at: string,
+): BanEvent[] =>
+  bans.map((ban) => ({
+    oracleId: asOracleId(ban.oracleId),
+    action: ban.status === 'banned' ? 'ban' : 'restrict',
+    note: ban.note,
+    by: 'operator',
+    at,
+    appliedAfterGameId: null,
+  }));
+
 /** Export bundles carry every match and, if asked, every log: far past Fastify's 1 MB. */
 const BUNDLE_LIMIT = 1024 * 1024 * 1024;
 
@@ -57,6 +73,8 @@ export const runRoutes = async (app: FastifyInstance, services: Services): Promi
     cycles: row.cycles,
     currentCycle: row.currentCycle,
     playing: supervisor.isActive(row.id),
+    winRates: [...row.winRates],
+    lastChange: row.lastChange,
   });
   const runOr404 = (runId: string): RunRow => {
     const row = queries.run(runId);
@@ -83,6 +101,45 @@ export const runRoutes = async (app: FastifyInstance, services: Services): Promi
 
   app.get('/api/runs', async () => ({ runs: queries.runs().map(summary) }));
 
+  // The new-run form's preview: the deck a run with these settings would be made with.
+  app.post('/api/seed-decks', async (request) => {
+    const body = seedDeckRequestSchema.parse(request.body ?? {});
+    const settings = parseRunSettings({
+      ...body.settings,
+      seed: body.settings.seed ?? randomSeed(),
+    });
+    const problems = validateSeedDeckColours(settings);
+    if (problems.length > 0) {
+      throw new HttpError(400, 'invalid_request', problems.join('; '), problems);
+    }
+    for (const ban of body.bans) cardOr404(ban.oracleId);
+    services.requireCards();
+    const bans = initialBans(body.bans, now()).map((event) => ({
+      ...event,
+      appliedAfterGameId: 'preview',
+    }));
+    const rolled = await supervisor.roll(settings, bans);
+    const facts = queries.facts([...rolled.deck.main, ...rolled.deck.side].map((s) => s.oracleId));
+    // Every card in a rolled deck is one the engine can play: the rest were re-rolled.
+    const card = (slot: { oracleId: string; count: number }) => ({
+      oracleId: slot.oracleId,
+      count: slot.count,
+      name: facts.get(slot.oracleId)?.name ?? slot.oracleId,
+      typeLine: facts.get(slot.oracleId)?.typeLine ?? '',
+      manaValue: facts.get(slot.oracleId)?.manaValue ?? 0,
+      support: 'supported' as const,
+    });
+    return {
+      seed: settings.seed,
+      colours: [...rolled.colours],
+      lands: rolled.lands,
+      nonbasicLands: rolled.nonbasicLands,
+      main: rolled.deck.main.map(card),
+      side: rolled.deck.side.map(card),
+      rerolled: rolled.rerolled.map((each) => ({ ...each })),
+    };
+  });
+
   app.post('/api/runs', async (request, reply) => {
     const body = createRunRequestSchema.parse(request.body);
     const settings = parseRunSettings({
@@ -95,11 +152,13 @@ export const runRoutes = async (app: FastifyInstance, services: Services): Promi
     }
     services.requireCards();
     const id = randomUUID();
+    for (const ban of body.bans) cardOr404(ban.oracleId);
     try {
       await supervisor.create({
         id,
         name: body.name,
         settings,
+        ...(body.bans.length === 0 ? {} : { bans: initialBans(body.bans, now()) }),
         ...(body.seedDeck === undefined
           ? {}
           : {

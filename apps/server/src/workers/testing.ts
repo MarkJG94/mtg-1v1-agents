@@ -61,7 +61,11 @@ export interface Sandbox {
   /** Opens (and migrates) a database file in the sandbox, and a supervisor over it. */
   supervise(
     name: string,
-    options?: { readonly workers?: number; readonly cardsPath?: string },
+    options?: {
+      readonly workers?: number;
+      readonly cardsPath?: string;
+      readonly handScriptsDir?: string;
+    },
   ): { database: OpenDatabase; supervisor: Supervisor; events: SupervisorEvent[] };
   /** Closes everything it opened and removes the directory. */
   dispose(): Promise<void>;
@@ -81,7 +85,7 @@ export const sandbox = (): Sandbox => {
         database,
         workers: options.workers ?? 2,
         cardsPath: options.cardsPath ?? cardsPath,
-        handScriptsDir,
+        handScriptsDir: options.handScriptsDir ?? handScriptsDir,
         skipSmokeTest: true,
         now,
       });

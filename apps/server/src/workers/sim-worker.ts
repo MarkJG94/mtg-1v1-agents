@@ -5,7 +5,7 @@ import {
   workerData,
 } from 'node:worker_threads';
 import type { CardProjection } from '@mtg/cards';
-import type { GameEvent } from '@mtg/shared';
+import { banListOf, type GameEvent } from '@mtg/shared';
 import {
   type BanRequest,
   createRun,
@@ -13,6 +13,7 @@ import {
   type LiveGames,
   type RunCards,
   type RunStore,
+  seedDeckFor,
 } from '@mtg/sim';
 import { readCardPool } from '../cards.js';
 import { client } from './rpc.js';
@@ -112,6 +113,23 @@ const liveStream = (runId: string, control: Control): LiveGames => {
 };
 
 const run = async (job: SimJob): Promise<JobResult> => {
+  if (job.kind === 'roll') {
+    const seed = seedDeckFor({
+      cards: cards(),
+      settings: job.settings,
+      banList: banListOf(job.bans),
+    });
+    return {
+      job: job.job,
+      rolled: {
+        deck: seed.deck,
+        colours: seed.colours,
+        lands: seed.lands,
+        nonbasicLands: seed.nonbasicLands,
+        rerolled: seed.rerolled.map((card) => ({ ...card })),
+      },
+    };
+  }
   if (job.kind === 'create') {
     const created = await createRun({
       store,

@@ -1,4 +1,4 @@
-import { cardSearchQuerySchema } from '@mtg/shared';
+import { cardSearchQuerySchema, resolveCardsRequestSchema } from '@mtg/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { Services } from '../services.js';
@@ -40,4 +40,25 @@ export const cardRoutes = async (app: FastifyInstance, services: Services): Prom
   });
 
   app.get('/api/coverage', async () => queries.coverage());
+
+  // Names a person typed — a pasted decklist, a ban list — as the catalogue's cards, each
+  // scripted so its support is known rather than guessed (docs/08 "New run").
+  app.post('/api/cards/resolve', async (request) => {
+    const { names, script } = resolveCardsRequestSchema.parse(request.body);
+    const cards = [];
+    for (const query of names) {
+      const found = queries.findByName(query);
+      if (found === null) {
+        cards.push({ query, oracleId: null, name: null, support: null });
+        continue;
+      }
+      const projection = script ? queries.projection(found.oracleId) : null;
+      const support =
+        projection === null
+          ? (queries.card(found.oracleId)?.support ?? null)
+          : (await supervisor.resolveCard(projection)).status;
+      cards.push({ query, oracleId: found.oracleId, name: found.name, support });
+    }
+    return { cards };
+  });
 };

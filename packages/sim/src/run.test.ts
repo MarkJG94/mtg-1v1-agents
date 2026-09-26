@@ -569,6 +569,45 @@ describe('creating a run', () => {
     ).rejects.toThrow(RunError);
   });
 
+  it('refuses a pasted 75 holding a card the engine cannot play, or one it does not know', async () => {
+    const { snapshot } = await reference;
+    const deck = snapshot?.lineage[0]?.deck;
+    const [first, ...rest] = deck?.main ?? [];
+    if (deck === undefined || first === undefined) throw new Error('no deck');
+    const unplayable = cards.pool.find(
+      (card) => cards.resolver.resolve(card, { context: 'test' }).definition === null,
+    );
+    if (unplayable === undefined) throw new Error('every fixture card is playable');
+    const store = new MemoryRunStore();
+    const swapped = (oracleId: string) => ({
+      main: [{ oracleId: asOracleId(oracleId), count: first.count }, ...rest],
+      side: deck.side,
+    });
+    await expect(
+      createRun({
+        store,
+        cards,
+        id: 'unplayable',
+        name: 'u',
+        settings,
+        now,
+        seedDeck: swapped(unplayable.oracleId),
+      }),
+    ).rejects.toThrow(`${unplayable.name} cannot be played`);
+    await expect(
+      createRun({
+        store,
+        cards,
+        id: 'unknown',
+        name: 'u',
+        settings,
+        now,
+        seedDeck: swapped('00000000-0000-0000-0000-000000000000'),
+      }),
+    ).rejects.toThrow(/not a card in the pool/);
+    expect(await store.load('unplayable')).toBeNull();
+  });
+
   it('draws the seed deck around an initial ban list, which is in effect from the start', async () => {
     const { snapshot } = await reference;
     const first = snapshot?.lineage[0]?.deck.main.find((slot) => slot.count < 10)?.oracleId;

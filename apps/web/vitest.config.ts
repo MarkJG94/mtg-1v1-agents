@@ -4,7 +4,8 @@ export default defineConfig({
   test: {
     name: 'web',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
-    environment: 'node',
-    passWithNoTests: true,
+    // Components render into happy-dom; the pure modules do not mind it.
+    environment: 'happy-dom',
+    setupFiles: ['src/test/setup.ts'],
   },
 });

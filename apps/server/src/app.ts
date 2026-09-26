@@ -36,7 +36,12 @@ export const buildApp = async (
   });
 
   await app.register(websocket);
-  registerErrors(app);
+  // In the Docker image the built web app sits next to the server bundle and is served
+  // from the same port, its pages falling back to index.html. In development Vite serves it.
+  const { webDist } = config;
+  const appShell = webDist !== undefined && existsSync(webDist);
+  if (appShell) await app.register(fastifyStatic, { root: webDist });
+  registerErrors(app, { appShell });
 
   app.get('/api/health', async (): Promise<HealthResponse> => {
     const load = services?.supervisor.load;
@@ -64,20 +69,6 @@ export const buildApp = async (
     if (services !== undefined) services.hub.connect(socket);
     else socket.send(JSON.stringify({ type: 'hello', version: packageVersion }));
   });
-
-  // In the Docker image the built web app sits next to the server bundle and is
-  // served from the same port. In development Vite serves it instead.
-  if (config.webDist && existsSync(config.webDist)) {
-    await app.register(fastifyStatic, { root: config.webDist });
-    app.setNotFoundHandler((request, reply) => {
-      if (request.url.startsWith('/api/')) {
-        return reply.status(404).send({
-          error: { code: 'not_found', message: `no route ${request.method} ${request.url}` },
-        });
-      }
-      return reply.sendFile('index.html');
-    });
-  }
 
   return app;
 };

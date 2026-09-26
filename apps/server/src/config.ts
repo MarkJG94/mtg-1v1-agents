@@ -1,5 +1,6 @@
+import { existsSync } from 'node:fs';
 import { cpus } from 'node:os';
-import { resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 
 /**
@@ -14,7 +15,7 @@ const envSchema = z.object({
   /** Simulation workers. Defaults to one per core, less the API process. */
   SIM_WORKERS: z.coerce.number().int().min(1).max(256).optional(),
   SCRYFALL_IMAGE_CACHE: z.enum(['lazy', 'off']).default('lazy'),
-  /** The hand-written card scripts; the repository's, relative to where the server runs. */
+  /** The hand-written card scripts: the repository's by default. */
   CARD_SCRIPTS_DIR: z.string().default('packages/cards/scripts'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -41,14 +42,34 @@ export interface ServerConfig {
 
 export const defaultSimWorkers = (): number => Math.max(1, cpus().length - 1);
 
-export const loadConfig = (env: NodeJS.ProcessEnv = process.env): ServerConfig => {
+/**
+ * Where a relative `DATA_DIR` or `CARD_SCRIPTS_DIR` is taken from: the pnpm workspace the
+ * server runs in, found by walking up to its `pnpm-workspace.yaml`, or else `start`
+ * itself. `pnpm dev` runs the server in `apps/server`, and the data `pnpm fetch:scryfall`
+ * writes and the scripts it reads are the repository's, at its root; the Docker image sets
+ * both paths absolutely.
+ */
+export const pathBase = (start: string = process.cwd()): string => {
+  let directory = resolve(start);
+  for (;;) {
+    if (existsSync(join(directory, 'pnpm-workspace.yaml'))) return directory;
+    const parent = dirname(directory);
+    if (parent === directory) return resolve(start);
+    directory = parent;
+  }
+};
+
+export const loadConfig = (
+  env: NodeJS.ProcessEnv = process.env,
+  base: string = pathBase(),
+): ServerConfig => {
   // Docker Compose passes unset variables through as empty strings; treat those as absent
   // so that `SIM_WORKERS=` means "use the default" rather than "zero workers".
   const present = Object.fromEntries(
     Object.entries(env).filter(([, value]) => value !== undefined && value !== ''),
   );
   const parsed = envSchema.parse(present);
-  const dataDir = resolve(parsed.DATA_DIR);
+  const dataDir = resolve(base, parsed.DATA_DIR);
   return {
     port: parsed.PORT,
     host: parsed.HOST,
@@ -57,11 +78,11 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): ServerConfig =
     scryfallDir: resolve(dataDir, 'scryfall'),
     imageCacheDir: resolve(dataDir, 'images'),
     cardsPath: resolve(dataDir, 'scryfall', 'cards.jsonl'),
-    cardScriptsDir: resolve(parsed.CARD_SCRIPTS_DIR),
+    cardScriptsDir: resolve(base, parsed.CARD_SCRIPTS_DIR),
     simWorkers: parsed.SIM_WORKERS ?? defaultSimWorkers(),
     scryfallImageCache: parsed.SCRYFALL_IMAGE_CACHE,
     logLevel: parsed.LOG_LEVEL,
     nodeEnv: parsed.NODE_ENV,
-    webDist: parsed.WEB_DIST ? resolve(parsed.WEB_DIST) : undefined,
+    webDist: parsed.WEB_DIST ? resolve(base, parsed.WEB_DIST) : undefined,
   };
 };

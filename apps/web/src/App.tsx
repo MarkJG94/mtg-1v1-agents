@@ -1,40 +1,83 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchHealth } from './api.js';
+import { api } from './api.js';
+import { useConnected } from './live.js';
+import { NewRunPage } from './pages/NewRunPage.js';
+import { RunPage } from './pages/RunPage.js';
+import { RunsPage } from './pages/RunsPage.js';
+import { Link, type Route, useRoute } from './router.js';
 
 /**
- * App shell. The runs list, run dashboard, game viewer, ban console and coverage
- * page arrive in phase 6 of docs/10-roadmap.md; for now this proves the browser
- * can reach the API through the dev proxy.
+ * The app shell (docs/08): a header with the pages and the server's state, and the page
+ * the path names. Pages to come — the run dashboard, the game viewer, coverage — are
+ * roadmap 6.4 to 6.6.
  */
 export const App = () => {
-  const health = useQuery({ queryKey: ['health'], queryFn: fetchHealth, retry: false });
-
+  const route = useRoute();
   return (
-    <main className="mx-auto max-w-3xl px-6 py-16 text-slate-100">
-      <h1 className="text-3xl font-semibold tracking-tight">MTG 1v1 Agents</h1>
-      <p className="mt-3 text-slate-400">
-        Two agents play best-of-three; the loser changes one slot each cycle.
-      </p>
+    <div className="min-h-screen">
+      <header className="border-b border-slate-800 bg-slate-950/80">
+        <nav className="mx-auto flex max-w-7xl items-center gap-6 px-6 py-3">
+          <Link to="/" className="font-semibold tracking-tight">
+            MTG 1v1 Agents
+          </Link>
+          <Link to="/" className={navClass(route.page === 'runs' || route.page === 'run')}>
+            Runs
+          </Link>
+          <Link to="/runs/new" className={navClass(route.page === 'newRun')}>
+            New run
+          </Link>
+          <span className="ml-auto">
+            <ServerState />
+          </span>
+        </nav>
+      </header>
+      <main className="mx-auto max-w-7xl px-6 py-8">
+        <Page route={route} />
+      </main>
+    </div>
+  );
+};
 
-      <section className="mt-10 rounded-lg border border-slate-700 bg-slate-900/60 p-5">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-slate-400">Server</h2>
-        {health.isPending && <p className="mt-2 text-slate-400">Checking…</p>}
-        {health.isError && (
-          <p className="mt-2 text-red-400">Unreachable — is the API running on port 8080?</p>
-        )}
-        {health.data && (
-          <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
-            <dt className="text-slate-400">Status</dt>
-            <dd className="text-emerald-400">{health.data.status}</dd>
-            <dt className="text-slate-400">Version</dt>
-            <dd>{health.data.version}</dd>
-            <dt className="text-slate-400">Simulation workers</dt>
-            <dd>{health.data.simWorkers}</dd>
-            <dt className="text-slate-400">Uptime</dt>
-            <dd>{health.data.uptimeSeconds}s</dd>
-          </dl>
-        )}
-      </section>
-    </main>
+const navClass = (active: boolean) =>
+  active ? 'text-slate-100' : 'text-slate-400 hover:text-slate-200';
+
+const Page = ({ route }: { route: Route }) => {
+  switch (route.page) {
+    case 'runs':
+      return <RunsPage />;
+    case 'newRun':
+      return <NewRunPage />;
+    case 'run':
+      return <RunPage runId={route.runId} />;
+    case 'notFound':
+      return (
+        <p>
+          Nothing lives at <code>{route.path}</code>. <Link to="/">Back to the runs</Link>.
+        </p>
+      );
+  }
+};
+
+/** The server's health, and whether the live feed is connected. */
+const ServerState = () => {
+  const health = useQuery({
+    queryKey: ['health'],
+    queryFn: api.health,
+    retry: false,
+    refetchInterval: 30_000,
+  });
+  const connected = useConnected();
+  if (health.isError) {
+    return <span className="text-sm text-orange-300">Server unreachable</span>;
+  }
+  if (health.data === undefined) return null;
+  return (
+    <span className="text-xs text-slate-400" title={`v${health.data.version}`}>
+      {health.data.runsPlaying} playing · {health.data.runsWaiting} waiting ·{' '}
+      {health.data.simWorkers} workers · live feed{' '}
+      <span className={connected ? 'text-sky-300' : 'text-amber-300'}>
+        {connected ? 'on' : 'reconnecting'}
+      </span>
+    </span>
   );
 };

@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
@@ -32,6 +35,48 @@ describe('the API server', () => {
     const response = await app.inject({ method: 'GET', url: '/api/nope' });
     expect(response.statusCode).toBe(404);
     expect(response.json()).toMatchObject({ error: { code: 'not_found' } });
+  });
+});
+
+describe('serving the built web app (the Docker image, WEB_DIST)', () => {
+  let app: FastifyInstance;
+  let web: string;
+
+  beforeEach(async () => {
+    web = mkdtempSync(join(tmpdir(), 'web-dist-'));
+    mkdirSync(join(web, 'assets'));
+    writeFileSync(join(web, 'index.html'), '<!doctype html><div id="root"></div>');
+    writeFileSync(join(web, 'assets', 'app.js'), 'console.log(1)');
+    app = await buildApp(
+      loadConfig({ NODE_ENV: 'test', LOG_LEVEL: 'silent', DATA_DIR: 'data', WEB_DIST: web }),
+    );
+  });
+
+  afterEach(async () => {
+    await app.close();
+    rmSync(web, { recursive: true, force: true });
+  });
+
+  it('serves the app’s files, and its index for any page the router knows', async () => {
+    expect((await app.inject({ url: '/assets/app.js' })).body).toBe('console.log(1)');
+    for (const url of ['/', '/runs/new', '/runs/abc?tab=decks']) {
+      const page = await app.inject({ url });
+      expect(page.statusCode).toBe(200);
+      expect(page.body).toContain('<div id="root">');
+    }
+  });
+
+  it('keeps the API, the images, a missing file and a POST as 404s in docs/07’s shape', async () => {
+    for (const [method, url] of [
+      ['GET', '/api/nope'],
+      ['GET', '/img'],
+      ['GET', '/assets/missing.js'],
+      ['POST', '/runs/new'],
+    ] as const) {
+      const response = await app.inject({ method, url });
+      expect(response.statusCode, url).toBe(404);
+      expect(response.json(), url).toMatchObject({ error: { code: 'not_found' } });
+    }
   });
 });
 

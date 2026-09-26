@@ -31,9 +31,16 @@ const body = (code: string, message: string, details?: unknown): ApiError => ({
 const byName: Readonly<Record<string, { status: number; code: string }>> = {
   RunError: { status: 409, code: 'conflict' },
   IllegalDeckChangeError: { status: 409, code: 'conflict' },
+  ScriptingStoppedError: { status: 503, code: 'scripting_unavailable' },
 };
 
-export const registerErrors = (app: FastifyInstance): void => {
+export const registerErrors = (
+  app: FastifyInstance,
+  options: {
+    /** The built web app is served: an unknown page answers its `index.html`. */
+    readonly appShell?: boolean;
+  } = {},
+): void => {
   app.setErrorHandler((error: FastifyError | Error, request, reply) => {
     if (error instanceof HttpError) {
       return reply.status(error.status).send(body(error.code, error.message, error.details));
@@ -63,7 +70,23 @@ export const registerErrors = (app: FastifyInstance): void => {
     return reply.status(500).send(body('internal', 'something went wrong'));
   });
 
-  app.setNotFoundHandler((request, reply) =>
-    reply.status(404).send(body('not_found', `no route ${request.method} ${request.url}`)),
-  );
+  app.setNotFoundHandler((request, reply) => {
+    if (options.appShell && wantsAppShell(request.method, request.url)) {
+      return reply.type('text/html').sendFile('index.html');
+    }
+    return reply.status(404).send(body('not_found', `no route ${request.method} ${request.url}`));
+  });
+};
+
+/**
+ * Whether an unknown path is one of the web app's own pages (`/runs/…`), which the browser
+ * may load directly — a reload, a pasted link — and which the app's router then reads. The
+ * API, the socket, the images and anything that looks like a file stay 404s.
+ */
+export const wantsAppShell = (method: string, url: string): boolean => {
+  if (method !== 'GET' && method !== 'HEAD') return false;
+  const path = url.split('?')[0] ?? '';
+  if (/^\/(api|ws|img)(\/|$)/.test(path)) return false;
+  const last = path.split('/').at(-1) ?? '';
+  return !last.includes('.');
 };

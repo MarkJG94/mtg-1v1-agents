@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { MessageChannel, type MessagePort, type Worker } from 'node:worker_threads';
 import type { CardProjection, Resolution, UnsupportedRequest } from '@mtg/cards';
 import type {
@@ -21,6 +22,8 @@ import type {
   CreateJob,
   JobResult,
   LiveMessage,
+  RolledDeck,
+  RollJob,
   SimJob,
   SimWorkerData,
 } from './sim-protocol.js';
@@ -101,6 +104,14 @@ export class SupervisorError extends Error {
   }
 }
 
+/** The scripting worker has stopped: no card can be scripted, so no deck rolled or run played. */
+export class ScriptingStoppedError extends Error {
+  constructor(reason: string) {
+    super(`the scripting worker has stopped: ${reason}`);
+    this.name = 'ScriptingStoppedError';
+  }
+}
+
 interface Slot {
   readonly worker: Worker;
   job: Queued | null;
@@ -112,6 +123,12 @@ type Queued =
       readonly kind: 'create';
       readonly run: NewRun;
       readonly settle: (result: Promise<RunSnapshot>) => void;
+    }
+  | {
+      readonly kind: 'roll';
+      readonly settings: RunSettings;
+      readonly bans: readonly BanEvent[];
+      readonly settle: (result: Promise<RolledDeck>) => void;
     };
 
 interface Active {
@@ -139,9 +156,17 @@ export class Supervisor {
   private nextJob = 0;
   private nextScript = 0;
   private closed = false;
+  /** Why the scripting worker stopped, once it has: everything that needs it fails at once. */
+  private scriptingStopped: string | null = null;
 
   constructor(private readonly options: SupervisorOptions) {
     this.now = options.now ?? (() => new Date().toISOString());
+    // Said here, at boot, rather than by every request timing out on a worker that died.
+    if (!existsSync(options.handScriptsDir)) {
+      throw new SupervisorError(
+        `no card scripts at ${options.handScriptsDir} (CARD_SCRIPTS_DIR); the scripting worker needs them`,
+      );
+    }
     this.store = new SqliteRunStore(options.database, this.now);
     this.scripts = new SqliteScriptStore(options.database.db);
     this.scriptWorker = spawnWorker('script-worker', {
@@ -156,11 +181,9 @@ export class Supervisor {
         this.emit({ type: 'unsupportedCard', request: message.unsupported });
       }
     });
-    this.scriptWorker.on('error', (error) => {
-      // Without it no card can be scripted: nothing else can go on.
-      for (const runId of this.active.keys()) {
-        this.emit({ type: 'runFailed', runId, message: `scripting worker: ${error.message}` });
-      }
+    this.scriptWorker.on('error', (error) => this.scriptingStop(error.message));
+    this.scriptWorker.on('exit', (code) => {
+      if (!this.closed) this.scriptingStop(`it exited with code ${code}`);
     });
     this.scriptWorker.unref();
     const { port1, port2 } = new MessageChannel();
@@ -201,6 +224,23 @@ export class Supervisor {
       this.enqueue({
         kind: 'create',
         run,
+        settle: (result) => {
+          result.then(resolve, reject);
+        },
+      });
+    });
+  }
+
+  /**
+   * Rolls the seed deck a run with these settings would be made with, on a worker, and
+   * makes nothing: the new-run form's preview (docs/08). `bans` are the list in effect.
+   */
+  roll(settings: RunSettings, bans: readonly BanEvent[] = []): Promise<RolledDeck> {
+    return new Promise<RolledDeck>((resolve, reject) => {
+      this.enqueue({
+        kind: 'roll',
+        settings,
+        bans,
         settle: (result) => {
           result.then(resolve, reject);
         },
@@ -295,6 +335,9 @@ export class Supervisor {
     card: CardProjection,
     options: { readonly force?: boolean } = {},
   ): Promise<Resolution> {
+    if (this.scriptingStopped !== null) {
+      return Promise.reject(new ScriptingStoppedError(this.scriptingStopped));
+    }
     const id = this.nextScript++;
     return new Promise((resolve, reject) => {
       this.scriptAnswers.set(id, (answer) => {
@@ -347,8 +390,38 @@ export class Supervisor {
 
   private enqueue(job: Queued): void {
     if (this.closed) throw new SupervisorError('the supervisor is closed');
+    if (this.scriptingStopped !== null) {
+      const error = new ScriptingStoppedError(this.scriptingStopped);
+      switch (job.kind) {
+        case 'drive':
+          throw error;
+        case 'create':
+          job.settle(Promise.reject(error));
+          return;
+        case 'roll':
+          job.settle(Promise.reject(error));
+          return;
+      }
+    }
     this.queue.push(job);
     this.pump();
+  }
+
+  /**
+   * Without the scripting worker no card can be scripted, so nothing else can go on: the
+   * API's requests waiting on it fail, and so do the runs on workers — a simulation worker
+   * waiting on it would otherwise wait out its timeout for every card.
+   */
+  private scriptingStop(reason: string): void {
+    if (this.scriptingStopped !== null) return;
+    this.scriptingStopped = reason;
+    for (const [id, answer] of this.scriptAnswers) {
+      answer({ id, error: new ScriptingStoppedError(reason).message });
+    }
+    this.scriptAnswers.clear();
+    for (const runId of this.active.keys()) {
+      this.emit({ type: 'runFailed', runId, message: `scripting worker: ${reason}` });
+    }
   }
 
   /** Hands waiting jobs to free workers, starting workers up to the limit. */
@@ -393,6 +466,16 @@ export class Supervisor {
   private assign(slot: Slot, job: Queued): void {
     slot.job = job;
     const id = this.nextJob++;
+    if (job.kind === 'roll') {
+      const message: RollJob = {
+        job: id,
+        kind: 'roll',
+        settings: job.settings,
+        bans: job.bans,
+      };
+      slot.worker.postMessage(message);
+      return;
+    }
     if (job.kind === 'create') {
       const { run } = job;
       const message: CreateJob = {
@@ -474,16 +557,14 @@ export class Supervisor {
     const job = slot.job;
     slot.job = null;
     if (job === null) return;
+    const failure = () =>
+      'failed' in result
+        ? new RemoteError(result.failed.name, result.failed.message)
+        : new Error(`a ${job.kind} job did not do it`);
     if (job.kind === 'create') {
-      job.settle(
-        'created' in result
-          ? Promise.resolve(result.created)
-          : Promise.reject(
-              'failed' in result
-                ? new RemoteError(result.failed.name, result.failed.message)
-                : new Error('a create job did not create'),
-            ),
-      );
+      job.settle('created' in result ? Promise.resolve(result.created) : Promise.reject(failure()));
+    } else if (job.kind === 'roll') {
+      job.settle('rolled' in result ? Promise.resolve(result.rolled) : Promise.reject(failure()));
     } else {
       void this.ended(job.runId, result);
     }
@@ -527,6 +608,7 @@ export class Supervisor {
     slot.job = null;
     void slot.worker.terminate();
     if (job?.kind === 'create') job.settle(Promise.reject(error));
+    else if (job?.kind === 'roll') job.settle(Promise.reject(error));
     else if (job?.kind === 'drive') {
       const active = this.active.get(job.runId);
       this.active.delete(job.runId);

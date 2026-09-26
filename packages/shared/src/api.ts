@@ -128,11 +128,19 @@ export type HealthResponse = z.infer<typeof healthSchema>;
 /** Settings as a request gives them: all but the seed default, and the seed is chosen if absent. */
 export const runSettingsRequestSchema = runSettingsSchema.extend({ seed: seedSchema.optional() });
 
+/** A ban in effect from a run's start (docs/08 "New run": an initial ban list). */
+export const initialBanSchema = z.object({
+  oracleId,
+  status: z.enum(['banned', 'restricted']),
+  note: z.string().max(1000).default(''),
+});
+
 export const createRunRequestSchema = z.object({
   name: z.string().trim().min(1).max(200),
   settings: runSettingsRequestSchema.prefault({}),
   /** docs/05 `seedDeck: fixed`: a pasted 75 in place of the rolled one. */
   seedDeck: deck75Schema.optional(),
+  bans: z.array(initialBanSchema).max(500).default([]),
 });
 export type CreateRunRequest = z.input<typeof createRunRequestSchema>;
 
@@ -161,6 +169,10 @@ export const runSummarySchema = z.object({
   currentCycle: z.int().nullable(),
   /** On a worker now. */
   playing: z.boolean(),
+  /** A's win rate in each of the last cycles, oldest first, for a sparkline. */
+  winRates: z.array(z.number()),
+  /** The newest change's reason, if a deck has changed. */
+  lastChange: z.string().nullable(),
 });
 export type RunSummary = z.infer<typeof runSummarySchema>;
 
@@ -390,6 +402,8 @@ export const cardSummarySchema = z.object({
   support: z.enum(supportStatuses),
 });
 
+export type CardSummary = z.infer<typeof cardSummarySchema>;
+
 export const cardSearchSchema = z.object({ cards: z.array(cardSummarySchema) });
 
 export const scriptStatusSchema = z.object({
@@ -555,3 +569,53 @@ export const wsServerMessageSchema = z.discriminatedUnion('type', [
   }),
 ]);
 export type WsServerMessage = z.infer<typeof wsServerMessageSchema>;
+
+// --- The new-run form (docs/08 "New run") ---
+
+/** Roll the seed deck a run with these settings would get, without making the run. */
+export const seedDeckRequestSchema = z.object({
+  settings: runSettingsRequestSchema.prefault({}),
+  bans: z.array(initialBanSchema).max(500).default([]),
+});
+
+export const previewCardSchema = z.object({
+  oracleId,
+  name: z.string(),
+  count: z.int().min(1),
+  typeLine: z.string(),
+  manaValue: z.number(),
+  support: z.enum(supportStatuses),
+});
+
+export const seedDeckPreviewSchema = z.object({
+  /** The seed the deck was rolled from: a run made with it gets this deck. */
+  seed: z.string(),
+  colours: z.array(z.string()),
+  lands: z.int().min(0),
+  nonbasicLands: z.int().min(0),
+  main: z.array(previewCardSchema),
+  side: z.array(previewCardSchema),
+  /** Cards drawn and put back because the engine cannot play them. */
+  rerolled: z.array(
+    z.object({ oracleId, name: z.string(), status: z.string(), section: z.string() }),
+  ),
+});
+export type SeedDeckPreview = z.infer<typeof seedDeckPreviewSchema>;
+
+export const resolveCardsRequestSchema = z.object({
+  names: z.array(z.string().trim().min(1).max(200)).min(1).max(250),
+  /** Script each card found, so its support is known rather than guessed. */
+  script: z.boolean().default(true),
+});
+
+export const resolvedCardSchema = z.object({
+  /** The name as asked. */
+  query: z.string(),
+  oracleId: oracleId.nullable(),
+  /** The catalogue's name, which may differ in case or be a split card's whole name. */
+  name: z.string().nullable(),
+  support: z.enum(supportStatuses).nullable(),
+});
+export type ResolvedCard = z.infer<typeof resolvedCardSchema>;
+
+export const resolveCardsSchema = z.object({ cards: z.array(resolvedCardSchema) });

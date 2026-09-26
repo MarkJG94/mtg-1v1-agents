@@ -37,6 +37,10 @@ export interface RunRow {
   readonly forkedFrom: { readonly run: string; readonly cycle: number } | null;
   readonly cycles: number;
   readonly currentCycle: number | null;
+  /** A's win rate in each of the last cycles, oldest first. */
+  readonly winRates: readonly number[];
+  /** The newest change's reason, if a deck has changed. */
+  readonly lastChange: string | null;
 }
 
 interface RunRecord {
@@ -50,6 +54,7 @@ interface RunRecord {
   forked_from_cycle: number | null;
   finished: number;
   running: number | null;
+  last_change: string | null;
 }
 
 interface CycleRow {
@@ -83,10 +88,15 @@ interface GameRow {
 const RUNS = `
   SELECT r.*,
     (SELECT count(*) FROM cycles c WHERE c.run_id = r.id AND c.status = 'finished') AS finished,
-    (SELECT max(c.number) FROM cycles c WHERE c.run_id = r.id AND c.status = 'running') AS running
+    (SELECT max(c.number) FROM cycles c WHERE c.run_id = r.id AND c.status = 'running') AS running,
+    (SELECT g.change FROM deck_generations g WHERE g.run_id = r.id AND g.cause = 'change'
+      ORDER BY g.seq DESC LIMIT 1) AS last_change
   FROM runs r`;
 
-const toRun = (row: RunRecord): RunRow => ({
+/** How many cycles a run's sparkline shows. */
+const SPARKLINE = 40;
+
+const toRun = (row: RunRecord, winRates: readonly number[]): RunRow => ({
   id: row.id,
   name: row.name,
   status: row.status,
@@ -99,6 +109,9 @@ const toRun = (row: RunRecord): RunRow => ({
       : { run: row.forked_from_run, cycle: row.forked_from_cycle ?? 0 },
   cycles: row.finished,
   currentCycle: row.running,
+  winRates,
+  lastChange:
+    row.last_change === null ? null : (JSON.parse(row.last_change) as { reason: string }).reason,
 });
 
 const toGame = (row: GameRow) => ({
@@ -131,13 +144,27 @@ export class Queries {
 
   runs(): RunRow[] {
     return (this.sqlite.prepare(`${RUNS} ORDER BY r.created_at, r.id`).all() as RunRecord[]).map(
-      toRun,
+      (row) => toRun(row, this.winRates(row.id)),
     );
   }
 
   run(runId: string): RunRow | null {
     const row = this.sqlite.prepare(`${RUNS} WHERE r.id = ?`).get(runId) as RunRecord | undefined;
-    return row === undefined ? null : toRun(row);
+    return row === undefined ? null : toRun(row, this.winRates(runId));
+  }
+
+  /** A's win rate in each of a run's last cycles, oldest first. */
+  private winRates(runId: string): number[] {
+    return (
+      this.sqlite
+        .prepare(
+          `SELECT win_rate_a AS rate FROM cycles WHERE run_id = ? AND status = 'finished'
+           ORDER BY number DESC LIMIT ?`,
+        )
+        .all(runId, SPARKLINE) as { rate: number | null }[]
+    )
+      .map((row) => row.rate ?? 0.5)
+      .reverse();
   }
 
   /** The newest cycle — in progress, or else the last finished — and its matches. */
@@ -471,6 +498,45 @@ export class Queries {
       stats,
       unsupportedRequests: requests,
     };
+  }
+
+  /**
+   * A card by the name a person typed: its exact name, whatever the case, or — for a split,
+   * adventure or double-faced card — the name of its front face.
+   */
+  findByName(name: string): { oracleId: string; name: string } | null {
+    const exact = this.sqlite
+      .prepare(
+        'SELECT oracle_id AS oracleId, name FROM cards WHERE name = ? COLLATE NOCASE LIMIT 1',
+      )
+      .get(name) as { oracleId: string; name: string } | undefined;
+    if (exact !== undefined) return exact;
+    const face = this.sqlite
+      .prepare(
+        `SELECT oracle_id AS oracleId, name FROM cards WHERE name LIKE ? ESCAPE '\\'
+         ORDER BY name LIMIT 1`,
+      )
+      .get(`${name.replaceAll(/[\\%_]/g, (c) => `\\${c}`)} // %`) as
+      | { oracleId: string; name: string }
+      | undefined;
+    return face ?? null;
+  }
+
+  /** Name, type line and mana value of cards, by oracle id, from the catalogue. */
+  facts(
+    oracleIds: readonly string[],
+  ): Map<string, { name: string; typeLine: string; manaValue: number }> {
+    const found = new Map<string, { name: string; typeLine: string; manaValue: number }>();
+    const statement = this.sqlite.prepare(
+      'SELECT name, type_line AS typeLine, mana_value AS manaValue FROM cards WHERE oracle_id = ?',
+    );
+    for (const oracleId of new Set(oracleIds)) {
+      const row = statement.get(oracleId) as
+        | { name: string; typeLine: string; manaValue: number }
+        | undefined;
+      if (row !== undefined) found.set(oracleId, row);
+    }
+    return found;
   }
 
   /** The printing whose image stands for the card, if the catalogue has it. */

@@ -7,3 +7,28 @@
 body {
   @apply bg-slate-950 text-slate-100;
 }
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply border-sky-600 bg-sky-700 hover:bg-sky-600;
+  }
+  .btn-small {
+    @apply px-2 py-0.5 text-xs;
+  }
+  .field {
+    @apply flex flex-col gap-1 text-sm;
+  }
+  .field > span {
+    @apply text-xs text-slate-400;
+  }
+  td input,
+  td select,
+  .field input,
+  .field select,
+  .field textarea {
+    @apply rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100;
+  }
+}
