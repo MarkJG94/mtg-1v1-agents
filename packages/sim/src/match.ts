@@ -2,6 +2,7 @@ import type { PlayAgent, SideboardPlan } from '@mtg/agents';
 import type { CardDefinition, DecisionResponse, GameState } from '@mtg/engine';
 import type { PlayerView } from '@mtg/engine/view';
 import {
+  type DeckChange,
   type DeckSlot,
   type GameEventLog,
   type GameResult,
@@ -32,6 +33,12 @@ import { playGame } from './game.js';
  * and returns the deck for the last game; the swap has to keep the same seventy-five and
  * the same sixty, or the match refuses it. The deck each player registered is what the
  * next match starts from — a sideboarded deck lasts one game.
+ *
+ * **A ban** takes effect when the game in progress ends (docs/05, roadmap 5.5): after
+ * every game the match asks `afterGame`, and if that legalises a deck the match goes on
+ * with it — the games already played still count, and sideboarding for game 3 starts
+ * from the legalised deck. The match is asynchronous because legalisation is: it searches
+ * the card pool, which scripts cards on demand.
  */
 
 export interface SideboardContext {
@@ -65,6 +72,31 @@ export interface MatchOptions {
   readonly score?: (view: PlayerView) => number;
   /** Handed each game's event log as it finishes; the match keeps none of them. */
   readonly onGame?: (log: GameEventLog) => void;
+  /**
+   * Asked after every game whether the decks have to change before the next: a ban that
+   * takes effect "at the end of the game currently in progress" (docs/05), whose match
+   * goes on with the legalised decks. See `banEnforcer`.
+   */
+  readonly afterGame?: AfterGame;
+}
+
+/** Called with the game that just ended and the decks registered for the match. */
+export type AfterGame = (context: {
+  readonly gameId: string;
+  readonly decks: Readonly<Record<PlayerId, Deck>>;
+}) => Promise<DeckUpdate | null>;
+
+/** New registered decks, the definitions any new card in them needs, and why. */
+export interface DeckUpdate {
+  readonly decks: Readonly<Record<PlayerId, Deck>>;
+  readonly definitions: ReadonlyMap<OracleId, CardDefinition>;
+  readonly changes: Readonly<Record<PlayerId, readonly DeckChange[]>>;
+}
+
+/** Changes forced on the decks between two games, and after which. */
+export interface Legalisation {
+  readonly afterGameId: string;
+  readonly changes: Readonly<Record<PlayerId, readonly DeckChange[]>>;
 }
 
 export interface MatchGame {
@@ -87,6 +119,9 @@ export interface MatchResult {
   readonly winner: PlayerId | null;
   /** What each player sided in for game 3, if there was one and it had a hook. */
   readonly sideboarding: Readonly<Record<PlayerId, SideboardPlan | null>>;
+  /** The decks registered at the end: the ones it started with, unless a ban changed them. */
+  readonly decks: Readonly<Record<PlayerId, Deck>>;
+  readonly legalisations: readonly Legalisation[];
   /**
    * What each player showed the other, summed over the match's games: its cards that ended
    * a game somewhere public (docs/04 "Opponent modelling").
@@ -104,15 +139,18 @@ export class IllegalSideboardError extends Error {
 const WINS_NEEDED = 2;
 const MOST_GAMES = 3;
 
-export const playMatch = (options: MatchOptions): MatchResult => {
+export const playMatch = async (options: MatchOptions): Promise<MatchResult> => {
   const games: MatchGame[] = [];
   const wins: Record<PlayerId, number> = { A: 0, B: 0 };
   const sideboarding: Record<PlayerId, SideboardPlan | null> = { A: null, B: null };
   const seen: Record<PlayerId, Map<OracleId, number>> = { A: new Map(), B: new Map() };
-  const decks: Record<PlayerId, Deck> = {
+  const registered: Record<PlayerId, Deck> = {
     A: options.players.A.deck,
     B: options.players.B.deck,
   };
+  const decks: Record<PlayerId, Deck> = { ...registered };
+  const definitions = new Map(options.definitions);
+  const legalisations: Legalisation[] = [];
   let chooser = options.firstChooser;
 
   while (games.length < MOST_GAMES && wins.A < WINS_NEEDED && wins.B < WINS_NEEDED) {
@@ -121,13 +159,13 @@ export const playMatch = (options: MatchOptions): MatchResult => {
         const hook = options.players[player].sideboard;
         if (hook === undefined) continue;
         const plan = hook({
-          deck: options.players[player].deck,
+          deck: registered[player],
           opponentSeen: slotsOf(seen[opponentOf(player)]),
           // A copy: the match goes on adding games, and what the hook was shown must not.
           games: [...games],
           player,
         });
-        checkSwap(player, options.players[player].deck, plan);
+        checkSwap(player, registered[player], plan);
         sideboarding[player] = plan;
         decks[player] = { main: plan.main, side: plan.side };
       }
@@ -136,7 +174,7 @@ export const playMatch = (options: MatchOptions): MatchResult => {
     const seed = `${options.seed}:game-${games.length + 1}`;
     const board = deckBoard({
       decks,
-      definitions: options.definitions,
+      definitions,
       seed,
       chooser,
       turnCap: options.turnCap,
@@ -174,6 +212,19 @@ export const playMatch = (options: MatchOptions): MatchResult => {
       // CR 103.1: the loser of the previous game chooses; after a draw, whoever chose.
       chooser = opponentOf(winner);
     }
+
+    // docs/05: a ban takes effect when the game in progress ends, and the match goes on
+    // with the legalised decks — the games already played still count.
+    const update = await options.afterGame?.({ gameId: seed, decks: { ...registered } });
+    if (update !== undefined && update !== null) {
+      for (const player of playerIds) {
+        registered[player] = update.decks[player];
+        decks[player] = update.decks[player];
+      }
+      for (const [oracleId, definition] of update.definitions)
+        definitions.set(oracleId, definition);
+      legalisations.push({ afterGameId: seed, changes: update.changes });
+    }
   }
 
   const winner = wins.A > wins.B ? 'A' : wins.B > wins.A ? 'B' : null;
@@ -183,6 +234,8 @@ export const playMatch = (options: MatchOptions): MatchResult => {
     winner,
     sideboarding,
     shown: { A: slotsOf(seen.A), B: slotsOf(seen.B) },
+    decks: registered,
+    legalisations,
   };
 };
 

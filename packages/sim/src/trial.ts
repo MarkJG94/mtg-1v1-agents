@@ -39,7 +39,7 @@ export interface Trials {
 export const trials = (options: TrialOptions): Trials => {
   const recorded = new Map<OracleId, AgentCounts>();
   const run = async (deck: Deck75, candidate: OracleId): Promise<TrialResult> => {
-    const cycle = runCycle({
+    const cycle = await runCycle({
       decks: { A: deck, B: options.opponent },
       definitions: options.definitions(),
       seed: `${options.seed}:${candidate}`,

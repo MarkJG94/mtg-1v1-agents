@@ -65,10 +65,12 @@ const matchWon = (winner: PlayerId | null): MatchResult => ({
   winner,
   sideboarding: { A: null, B: null },
   shown: { A: [], B: [] },
+  decks: { A: deck, B: deck },
+  legalisations: [],
 });
 
 describe('match win rates', () => {
-  it('counts a won match as one and a drawn match as half', () => {
+  it('counts a won match as one and a drawn match as half', async () => {
     expect(matchWinRates([matchWon('A'), matchWon(null), matchWon('B'), matchWon('A')])).toEqual({
       A: 0.625,
       B: 0.375,
@@ -78,7 +80,7 @@ describe('match win rates', () => {
 });
 
 describe('what counts as a tie', () => {
-  it('is two rates closer than the margin, or exactly level', () => {
+  it('is two rates closer than the margin, or exactly level', async () => {
     expect(isTie({ A: 0.51, B: 0.49 }, 0.04)).toBe(true);
     expect(isTie({ A: 0.53, B: 0.47 }, 0.04)).toBe(false);
     expect(isTie({ A: 0.5, B: 0.5 }, 0)).toBe(true);
@@ -87,8 +89,8 @@ describe('what counts as a tie', () => {
 });
 
 describe('the cycle', () => {
-  it('plays its matches with the first choice alternating between the decks', () => {
-    const result = cycle();
+  it('plays its matches with the first choice alternating between the decks', async () => {
+    const result = await cycle();
     expect(result.matches.length).toBeGreaterThanOrEqual(settings.matchesPerCycle);
     result.matches.forEach((match, i) => {
       expect(match.games[0]?.chooser).toBe(i % 2 === 0 ? 'A' : 'B');
@@ -96,10 +98,10 @@ describe('the cycle', () => {
   });
 
   /** A strong deck pilot against a weak one: no tie, no tiebreak, the weak one loses. */
-  it('names the deck with the lower match win rate as the loser', () => {
+  it('names the deck with the lower match win rate as the loser', async () => {
     const lopsided: AgentFactory = (player, knowledge) =>
       player === 'A' ? greedyAgent(undefined, knowledge) : randomAgent;
-    const result = cycle({ agents: lopsided });
+    const result = await cycle({ agents: lopsided });
     expect(result.decidedBy).toBe('winRate');
     expect(result.tiebreakMatches).toBe(0);
     expect(result.matches).toHaveLength(settings.matchesPerCycle);
@@ -111,7 +113,7 @@ describe('the cycle', () => {
    * Level after the first batch — each deck's pilot is strong in alternate matches — so a
    * tiebreak batch is played, and in it A's pilot is the strong one.
    */
-  it('plays a tiebreak batch on a tie, and lets it decide', () => {
+  it('plays a tiebreak batch on a tie, and lets it decide', async () => {
     let made = 0;
     const alternating: AgentFactory = (player, knowledge) => {
       const match = Math.floor(made / 2);
@@ -119,7 +121,7 @@ describe('the cycle', () => {
       const strong = match < settings.matchesPerCycle ? (match % 2 === 0 ? 'A' : 'B') : 'A';
       return player === strong ? greedyAgent(undefined, knowledge) : randomAgent;
     };
-    const result = cycle({ agents: alternating });
+    const result = await cycle({ agents: alternating });
     expect(matchWinRates(result.matches.slice(0, settings.matchesPerCycle))).toEqual({
       A: 0.5,
       B: 0.5,
@@ -131,24 +133,24 @@ describe('the cycle', () => {
   });
 
   /** Two turns are too few to win in, so every match is drawn and the coin decides. */
-  it('flips the cycle’s coin when the tiebreak is still a tie', () => {
+  it('flips the cycle’s coin when the tiebreak is still a tie', async () => {
     for (const seed of ['coin-1', 'coin-2', 'coin-3', 'coin-4']) {
-      const result = cycle({ seed, settings: { ...settings, turnCap: 2 } });
+      const result = await cycle({ seed, settings: { ...settings, turnCap: 2 } });
       expect(result.decidedBy).toBe('coinFlip');
       expect(result.matches).toHaveLength(settings.matchesPerCycle + settings.tiebreakMatches);
       expect(result.loser).toBe(createRng(`${seed}:coin`).nextBoolean() ? 'A' : 'B');
     }
   });
 
-  it('is the same cycle from the same seed', () => {
-    expect(cycle({ seed: 'again' })).toEqual(cycle({ seed: 'again' }));
+  it('is the same cycle from the same seed', async () => {
+    expect(await cycle({ seed: 'again' })).toEqual(await cycle({ seed: 'again' }));
   });
 });
 
 describe('what the agents are told', () => {
   /** docs/04 item 6: the play/draw record is what the choice is made from. */
-  it('keeps each deck’s record on the play and on the draw, game by game', () => {
-    const result = cycle();
+  it('keeps each deck’s record on the play and on the draw, game by game', async () => {
+    const result = await cycle();
     const games = result.matches.flatMap((match) => match.games);
     for (const player of ['A', 'B'] as const) {
       const record = result.playDraw[player];
@@ -165,13 +167,13 @@ describe('what the agents are told', () => {
     }
   });
 
-  it('makes each match’s agents knowing the record of the matches before it', () => {
+  it('makes each match’s agents knowing the record of the matches before it', async () => {
     const told: { player: PlayerId; knowledge: AgentKnowledge }[] = [];
     const start: Record<PlayerId, PlayDrawRecord> = {
       A: { play: { games: 30, wins: 10 }, draw: { games: 30, wins: 20 } },
       B: { play: { games: 0, wins: 0 }, draw: { games: 0, wins: 0 } },
     };
-    const result = cycle({
+    const result = await cycle({
       playDraw: start,
       agents: (player, knowledge) => {
         told.push({ player, knowledge });
@@ -186,23 +188,23 @@ describe('what the agents are told', () => {
     expect(lastA?.knowledge.playDraw?.play.games).toBe(expected);
   });
 
-  it('sideboards by default when a match reaches game 3, and not when told not to', () => {
-    const withSide = cycle({ seed: 'side' });
+  it('sideboards by default when a match reaches game 3, and not when told not to', async () => {
+    const withSide = await cycle({ seed: 'side' });
     const thirdGames = withSide.matches.filter((match) => match.games.length === 3);
     expect(thirdGames.length).toBeGreaterThan(0);
     for (const match of thirdGames) {
       expect(match.sideboarding.A).not.toBeNull();
       expect(match.sideboarding.B).not.toBeNull();
     }
-    const without = cycle({ seed: 'side', sideboard: null });
+    const without = await cycle({ seed: 'side', sideboard: null });
     for (const match of without.matches) expect(match.sideboarding).toEqual({ A: null, B: null });
   });
 });
 
 describe('the cycle’s statistics (roadmap 5.2)', () => {
-  it('reads every game it played into each deck’s counts, and hands each log on', () => {
+  it('reads every game it played into each deck’s counts, and hands each log on', async () => {
     const logs: GameEventLog[] = [];
-    const result = cycle({ generations: { A: 4, B: 9 }, onGame: (log) => logs.push(log) });
+    const result = await cycle({ generations: { A: 4, B: 9 }, onGame: (log) => logs.push(log) });
     const games = result.matches.flatMap((match) => match.games);
     expect(logs).toHaveLength(games.length);
     expect(result.stats.A.deck.games).toBe(games.length);
@@ -227,7 +229,7 @@ describe('the cycle’s statistics (roadmap 5.2)', () => {
    * against it — makes A side them out before game 3; the same history filed under another
    * generation says nothing about this opponent.
    */
-  it('sideboards on each card’s record against the opponent’s current deck', () => {
+  it('sideboards on each card’s record against the opponent’s current deck', async () => {
     const creature = fuzzCreature.oracleId;
     const history = (generation: number): Record<PlayerId, AgentCounts> => ({
       A: {
@@ -240,11 +242,13 @@ describe('the cycle’s statistics (roadmap 5.2)', () => {
       },
       B: emptyAgentCounts,
     });
-    const outs = (generation: number) =>
-      cycle({ seed: 'side', generations: { A: 0, B: 5 }, history: history(generation) })
-        .matches.flatMap((match) => match.sideboarding.A?.swaps ?? [])
+    const outs = async (generation: number) =>
+      (
+        await cycle({ seed: 'side', generations: { A: 0, B: 5 }, history: history(generation) })
+      ).matches
+        .flatMap((match) => match.sideboarding.A?.swaps ?? [])
         .filter((swap) => swap.out === creature && swap.outScore.basis === 'record');
-    expect(outs(5).length).toBeGreaterThan(0);
-    expect(outs(6)).toEqual([]);
+    expect((await outs(5)).length).toBeGreaterThan(0);
+    expect(await outs(6)).toEqual([]);
   });
 });

@@ -208,7 +208,7 @@ describe('a deck change, end to end over the committed fixtures', async () => {
   };
   const decks = { A: seeds.A.deck, B: seeds.B.deck };
   const known = new Map([...seeds.A.definitions, ...seeds.B.definitions]);
-  const cycle = runCycle({
+  const cycle = await runCycle({
     decks,
     definitions: known,
     seed: 'change-cycle',
@@ -298,8 +298,8 @@ describe('a deck change, end to end over the committed fixtures', async () => {
     }
   });
 
-  it('plays: the changed deck goes through a whole match', () => {
-    const match = playMatch({
+  it('plays: the changed deck goes through a whole match', async () => {
+    const match = await playMatch({
       players: {
         A: { deck: changed, agent: agentsAt('greedy')('A', {}) },
         B: { deck: decks[opponent], agent: agentsAt('greedy')('B', {}) },

@@ -616,11 +616,11 @@ describe('over the committed Scryfall fixtures, with the real resolver', () => {
       expect(request.context).toMatch(/^seed deck \((lands|main|side)\)$/);
   });
 
-  it('plays: two seed decks go through a whole match', () => {
+  it('plays: two seed decks go through a whole match', async () => {
     const [a, b] = seeds;
     if (a === undefined || b === undefined) throw new Error('two decks');
     const definitions = new Map([...a.definitions, ...b.definitions]);
-    const match = playMatch({
+    const match = await playMatch({
       players: {
         A: { deck: a.deck, agent: greedyAgent(defaultWeights) },
         B: { deck: b.deck, agent: greedyAgent(defaultWeights) },

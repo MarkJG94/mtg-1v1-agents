@@ -2,8 +2,11 @@ import type { Rng } from '@mtg/engine/view';
 import {
   type AgentCounts,
   colours as allColours,
+  applyDeckChange,
   type BanList,
+  type BanStatus,
   banLimit,
+  banViolations,
   type CandidateEvidence,
   type CardKind,
   type CardStats,
@@ -270,6 +273,8 @@ export interface DeckPlan {
   readonly search: SearchSpec | null;
   readonly swapIn: Slot | null;
   readonly starved: Colour | null;
+  /** For legalisation: what the list says of the card cut. */
+  readonly ban: BanStatus | null;
   /** Tried if the search finds nothing the engine can play. */
   readonly otherwise: DeckPlan | null;
 }
@@ -338,6 +343,60 @@ export class StatisticalDeckAgent implements DeckAgent {
       };
     }
 
+    return this.replace(input, plan, deckEvidence, deck, true);
+  }
+
+  /**
+   * docs/05 "Legalisation": every change the ban list forces on this deck, in order — for
+   * each card it holds too many of, the excess copies out, sideboard copies first, and
+   * each hole filled by the replacement search: the same colours, within a mana value of
+   * the card cut, as many copies of one card as the hole has. No trial is played; a
+   * legalisation happens between two games of a match, and has to be quick. It does not
+   * count as the cycle's change.
+   */
+  async legalise(input: DeckAgentInput): Promise<DeckChange[]> {
+    const deck = deckStats(input.counts.deck);
+    const deckEvidence: DeckChangeEvidence['deck'] = {
+      games: deck.games,
+      winRate: deck.winRate,
+      screwRate: deck.screwRate,
+      floodRate: deck.floodRate,
+      colourScrewRate: deck.colourScrewRate,
+    };
+    const changes: DeckChange[] = [];
+    let current = input;
+    for (const violation of banViolations(input.deck, input.banList)) {
+      let excess = violation.held - violation.allowed;
+      for (const zone of ['side', 'main'] as const) {
+        const held =
+          current.deck[zone].find((slot) => slot.oracleId === violation.oracleId)?.count ?? 0;
+        const count = Math.min(held, excess);
+        if (count === 0) continue;
+        excess -= count;
+        const plan = banPlan(
+          current,
+          this.settings,
+          violation.oracleId,
+          zone,
+          count,
+          violation.status,
+        );
+        const change = await this.replace(current, plan, deckEvidence, deck, false);
+        changes.push(change);
+        current = { ...current, deck: applyDeckChange(current.deck, change) };
+      }
+    }
+    return changes;
+  }
+
+  /** The search for a plan's replacement, its trial if asked for, and the change it makes. */
+  private async replace(
+    input: DeckAgentInput,
+    plan: DeckPlan,
+    deckEvidence: DeckChangeEvidence['deck'],
+    deck: ReturnType<typeof deckStats>,
+    trial: boolean,
+  ): Promise<DeckChange> {
     let tried: DeckPlan | null = plan;
     let found: Shortlist | null = null;
     while (tried !== null && found === null) {
@@ -349,7 +408,9 @@ export class StatisticalDeckAgent implements DeckAgent {
         `nothing the engine can play replaces ${plan.removed.card.name} (${plan.diagnosis})`,
       );
     }
-    const winner = await this.trial(input, tried, found.kept);
+    const winner = trial
+      ? await this.trial(input, tried, found.kept)
+      : (found.kept[0] as Candidate);
     const zone = tried.removed.zone;
     return {
       shape: 'replace',
@@ -449,28 +510,12 @@ export const diagnose = (
   input: DeckAgentInput,
   settings: DeckAgentSettings = defaultDeckAgentSettings,
 ): DeckPlan => {
-  const { counts, cards, deck } = input;
+  const { counts, deck } = input;
   const d = counts.deck;
-  const deckWinRate = d.games > 0 ? d.wins / d.games : 0.5;
   const screw = d.screwChances > 0 ? d.screwed / d.screwChances : 0;
   const flood = d.floodChances > 0 ? d.flooded / d.floodChances : 0;
   const colourScrew = d.games > 0 ? d.colourScrewed / d.games : 0;
-
-  const slotOf = (entry: DeckSlot, zone: DeckZone): Slot => {
-    const card = cards.get(entry.oracleId);
-    if (card === undefined) throw new DeckAgentError(`nothing is known of ${entry.oracleId}`);
-    const record = counts.cards[entry.oracleId];
-    const played = record !== undefined && record.games > 0;
-    if (zone === 'side' && !played) {
-      return { ...entry, zone, card, stats: null, score: settings.idleSideScore };
-    }
-    const stats = cardStats(record ?? emptyCardCounts, deckWinRate, settings.shrinkage);
-    const score =
-      stats.delta -
-      settings.deadInHandWeight * (stats.deadInHandRate ?? 0) -
-      settings.uncastWeight * (1 - (stats.castRate ?? 1));
-    return { ...entry, zone, card, stats, score };
-  };
+  const slotOf = slotScorer(input, settings);
   const byScore = (a: Slot, b: Slot) =>
     a.score - b.score ||
     (a.zone === b.zone ? 0 : a.zone === 'main' ? -1 : 1) ||
@@ -509,6 +554,7 @@ export const diagnose = (
     search,
     swapIn: extra.swapIn ?? null,
     starved: extra.starved ?? null,
+    ban: null,
     otherwise: extra.otherwise ?? null,
   });
 
@@ -575,6 +621,98 @@ export const diagnose = (
     return plan('weakest', worst, spellSearch(worst));
   }
   return plan(worst.stats === null ? 'idleSideboard' : 'weakest', worst, spellSearch(worst));
+};
+
+/** Each slot scored as the diagnosis reads it: shrunk Δ less its charges; lower is worse. */
+const slotScorer = (input: DeckAgentInput, settings: DeckAgentSettings) => {
+  const d = input.counts.deck;
+  const deckWinRate = d.games > 0 ? d.wins / d.games : 0.5;
+  return (entry: DeckSlot, zone: DeckZone): Slot => {
+    const card = input.cards.get(entry.oracleId);
+    if (card === undefined) throw new DeckAgentError(`nothing is known of ${entry.oracleId}`);
+    const record = input.counts.cards[entry.oracleId];
+    const played = record !== undefined && record.games > 0;
+    if (zone === 'side' && !played) {
+      return { ...entry, zone, card, stats: null, score: settings.idleSideScore };
+    }
+    const stats = cardStats(record ?? emptyCardCounts, deckWinRate, settings.shrinkage);
+    const score =
+      stats.delta -
+      settings.deadInHandWeight * (stats.deadInHandRate ?? 0) -
+      settings.uncastWeight * (1 - (stats.castRate ?? 1));
+    return { ...entry, zone, card, stats, score };
+  };
+};
+
+/**
+ * The replacement for copies the ban list forces out (docs/05 "Legalisation"): a card of
+ * the same kind — land for land, spell for spell. A spell is looked for in the removed
+ * card's own colours and within a mana value of it first, then anywhere in the deck's
+ * colours at that mana value, then at any; a land, among lands that make every colour it
+ * made, then any in the deck's colours. The search already keeps banned cards out, and a restricted one out of any
+ * hole bigger than one.
+ */
+const banPlan = (
+  input: DeckAgentInput,
+  settings: DeckAgentSettings,
+  oracleId: OracleId,
+  zone: DeckZone,
+  count: number,
+  ban: BanStatus,
+): DeckPlan => {
+  const entry = input.deck[zone].find((slot) => slot.oracleId === oracleId);
+  if (entry === undefined) throw new DeckAgentError(`the ${zone} holds no ${oracleId}`);
+  const removed = slotScorer(input, settings)(entry, zone);
+  const { card } = removed;
+  const deckColours = coloursOf(
+    input.deck.main.flatMap((slot) => {
+      const known = input.cards.get(slot.oracleId);
+      return known === undefined || known.land ? [] : [known.costColours];
+    }),
+  );
+  const own = card.land ? card.produces : card.costColours;
+  const band = {
+    min: Math.max(0, card.manaValue - settings.manaValueBand),
+    max: card.manaValue + settings.manaValueBand,
+  };
+  const anyInColours: SearchSpec = { land: card.land, colours: deckColours };
+  // A land is replaced by one that makes what it made, if the pool has one, so a ban does
+  // not strand the spells that needed its colour.
+  const sameMana: SearchSpec = {
+    land: true,
+    colours: deckColours,
+    accept: (other) => own.every((colour) => other.produces.includes(colour)),
+    fallback: anyInColours,
+  };
+  const inColours: SearchSpec = card.land
+    ? sameMana
+    : { land: false, colours: deckColours, manaValue: band, fallback: anyInColours };
+  const search: SearchSpec =
+    own.length > 0 && !card.land
+      ? { land: false, colours: own, manaValue: band, fallback: inColours }
+      : inColours;
+  return {
+    diagnosis: 'ban',
+    removed,
+    count,
+    search,
+    swapIn: null,
+    starved: null,
+    ban,
+    // A hole nothing of its kind fills takes a land: basics are never short.
+    otherwise: card.land
+      ? null
+      : {
+          diagnosis: 'ban',
+          removed,
+          count,
+          search: { land: true, colours: deckColours },
+          swapIn: null,
+          starved: null,
+          ban,
+          otherwise: null,
+        },
+  };
 };
 
 /** Whether cutting `count` of this land leaves every colour the spells need made. */
@@ -783,6 +921,10 @@ const replaceReason = (
   const out = copies(plan.count, described(plan.removed));
   const inn = `${copies(plan.count, name)}${trial}`;
   switch (plan.diagnosis) {
+    case 'ban':
+      return plan.ban === 'restricted'
+        ? `Restricted to one copy: cut ${out}${zoneNote(plan)} for ${inn}`
+        : `Banned: cut ${out}${zoneNote(plan)} for ${inn}`;
     case 'screw':
       return `Mana screw in ${percent(deck.screwRate ?? 0)} of games: cut ${out} for ${inn}`;
     case 'flood':
@@ -797,6 +939,9 @@ const replaceReason = (
         : `Cut ${out} for ${inn}`;
   }
 };
+
+const zoneNote = (plan: DeckPlan): string =>
+  plan.removed.zone === 'side' ? ' from the sideboard' : '';
 
 const swapReason = (out: Slot, into: Slot): string =>
   `Moved ${described(into)} from the sideboard into the main deck for ${described(out)}`;

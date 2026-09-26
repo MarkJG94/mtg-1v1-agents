@@ -28,7 +28,13 @@ import {
   type RunSettings,
 } from '@mtg/shared';
 import { cardsIn, type Deck } from './deck.js';
-import { type MatchResult, playMatch, type SideboardContext } from './match.js';
+import {
+  type AfterGame,
+  type Legalisation,
+  type MatchResult,
+  playMatch,
+  type SideboardContext,
+} from './match.js';
 import { sideboardCardsFor } from './sideboard-cards.js';
 import { type CardFacts, cardFactsFor, StatsAccumulator } from './stats.js';
 
@@ -106,6 +112,8 @@ export interface CycleOptions {
   readonly score?: (view: PlayerView) => number;
   /** Handed each game's event log as it finishes, to keep; the cycle keeps none. */
   readonly onGame?: (log: GameEventLog) => void;
+  /** Asked after every game whether a ban changes the decks (`banEnforcer`; docs/05). */
+  readonly afterGame?: AfterGame;
 }
 
 export interface CycleResult {
@@ -124,6 +132,10 @@ export interface CycleResult {
    * observed decklist the deck agent reads (docs/04 "Opponent modelling").
    */
   readonly shown: Readonly<Record<PlayerId, readonly DeckSlot[]>>;
+  /** The decks at the end of the cycle: as they started, unless a ban changed them. */
+  readonly decks: Readonly<Record<PlayerId, Deck>>;
+  /** Every change a ban forced during the cycle, by match, in order. */
+  readonly legalisations: readonly (Legalisation & { readonly match: number })[];
 }
 
 const noRecord: PlayDrawRecord = { play: { games: 0, wins: 0 }, draw: { games: 0, wins: 0 } };
@@ -143,40 +155,57 @@ export const matchWinRates = (matches: readonly MatchResult[]): Record<PlayerId,
 export const isTie = (rates: Readonly<Record<PlayerId, number>>, margin: number): boolean =>
   rates.A === rates.B || Math.abs(rates.A - rates.B) < margin;
 
-export const runCycle = (options: CycleOptions): CycleResult => {
+export const runCycle = async (options: CycleOptions): Promise<CycleResult> => {
   const { settings } = options;
   const matches: MatchResult[] = [];
   const playDraw: Record<PlayerId, PlayDrawRecord> = {
     A: options.playDraw?.A ?? noRecord,
     B: options.playDraw?.B ?? noRecord,
   };
-  const facts =
+  // The decks, the cards they hold and those cards' facts, as a ban may change them.
+  const decks: Record<PlayerId, Deck> = { A: options.decks.A, B: options.decks.B };
+  const definitions = new Map(options.definitions);
+  const facts = new Map(
     options.facts ??
-    new Map([...options.definitions].map(([oracleId, card]) => [oracleId, cardFactsFor(card)]));
+      [...options.definitions].map(([oracleId, card]) => [oracleId, cardFactsFor(card)]),
+  );
   const stats = new StatsAccumulator(facts);
   const score = options.score ?? ((view: PlayerView) => evaluate(view, defaultWeights));
   const hook =
     options.sideboard === undefined
-      ? defaultSideboard(options, matches, () => stats.totals)
+      ? defaultSideboard(options, { decks, definitions }, matches, () => stats.totals)
       : options.sideboard;
+  const enforce = options.afterGame;
+  const afterGame: AfterGame | undefined =
+    enforce === undefined
+      ? undefined
+      : async (context) => {
+          const update = await enforce(context);
+          if (update === null) return null;
+          for (const [oracleId, definition] of update.definitions) {
+            definitions.set(oracleId, definition);
+            if (!facts.has(oracleId)) facts.set(oracleId, cardFactsFor(definition));
+          }
+          return update;
+        };
 
-  const play = (count: number) => {
+  const play = async (count: number) => {
     for (let i = 0; i < count; i += 1) {
       const index = matches.length;
-      const match = playMatch({
+      const match = await playMatch({
         players: {
           A: {
-            deck: options.decks.A,
+            deck: decks.A,
             agent: options.agents('A', { playDraw: playDraw.A }),
             ...(hook === null ? {} : { sideboard: hook }),
           },
           B: {
-            deck: options.decks.B,
+            deck: decks.B,
             agent: options.agents('B', { playDraw: playDraw.B }),
             ...(hook === null ? {} : { sideboard: hook }),
           },
         },
-        definitions: options.definitions,
+        definitions,
         seed: `${options.seed}:match-${index}`,
         firstChooser: index % 2 === 0 ? 'A' : 'B',
         turnCap: settings.turnCap,
@@ -186,7 +215,10 @@ export const runCycle = (options: CycleOptions): CycleResult => {
           stats.add(log);
           options.onGame?.(log);
         },
+        ...(afterGame === undefined ? {} : { afterGame }),
       });
+      decks.A = match.decks.A;
+      decks.B = match.decks.B;
       for (const game of match.games) {
         for (const player of ['A', 'B'] as const) {
           playDraw[player] = recorded(
@@ -203,11 +235,11 @@ export const runCycle = (options: CycleOptions): CycleResult => {
 
   const tied = (rates: Record<PlayerId, number>) => isTie(rates, settings.tieMargin);
 
-  play(settings.matchesPerCycle);
+  await play(settings.matchesPerCycle);
   let decidedBy: CycleResult['decidedBy'] = 'winRate';
   let tiebreakMatches = 0;
   if (tied(matchWinRates(matches))) {
-    play(settings.tiebreakMatches);
+    await play(settings.tiebreakMatches);
     tiebreakMatches = settings.tiebreakMatches;
     decidedBy = 'tiebreak';
   }
@@ -227,6 +259,10 @@ export const runCycle = (options: CycleOptions): CycleResult => {
     playDraw,
     stats: stats.totals,
     shown: { A: summed(matches, 'A'), B: summed(matches, 'B') },
+    decks,
+    legalisations: matches.flatMap((match, index) =>
+      match.legalisations.map((legalisation) => ({ ...legalisation, match: index })),
+    ),
   };
 };
 
@@ -256,19 +292,23 @@ const recorded = (record: PlayDrawRecord, onPlay: boolean, won: boolean): PlayDr
  */
 const defaultSideboard = (
   options: CycleOptions,
+  now: {
+    readonly decks: Readonly<Record<PlayerId, Deck>>;
+    readonly definitions: ReadonlyMap<OracleId, CardDefinition>;
+  },
   matches: readonly MatchResult[],
   sofar: () => Readonly<Record<PlayerId, AgentCounts>>,
 ) => {
-  const pool = new Set<OracleId>([
-    ...cardsIn(options.decks.A).keys(),
-    ...cardsIn(options.decks.B).keys(),
-  ]);
-  const cards = sideboardCardsFor(
-    [...pool].flatMap((oracleId) => {
-      const definition = options.definitions.get(oracleId);
-      return definition === undefined ? [] : [definition];
-    }),
-  );
+  // What each card is, for the decks as they stand: a ban can bring new cards in.
+  const cardsNow = () =>
+    sideboardCardsFor(
+      [...new Set([...cardsIn(now.decks.A).keys(), ...cardsIn(now.decks.B).keys()])].flatMap(
+        (oracleId) => {
+          const definition = now.definitions.get(oracleId);
+          return definition === undefined ? [] : [definition];
+        },
+      ),
+    );
   return (context: SideboardContext): SideboardPlan => {
     let games = 0;
     let wins = 0;
@@ -281,7 +321,7 @@ const defaultSideboard = (
     return sideboard({
       main: context.deck.main,
       side: context.deck.side,
-      cards,
+      cards: cardsNow(),
       opponentSeen: context.opponentSeen,
       matchup: { games, wins },
       records: matchupRecords(options, sofar()[context.player], context.player),

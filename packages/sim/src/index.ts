@@ -8,6 +8,7 @@
  * against each other (docs/09). Until phase 5 brings decks, the ladder plays on the
  * engine's fuzz boards.
  */
+export * from './bans.js';
 export * from './cycle.js';
 export * from './deck.js';
 export * from './event-log.js';

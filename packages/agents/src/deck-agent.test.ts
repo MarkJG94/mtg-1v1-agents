@@ -5,6 +5,7 @@ import {
   applyDeckChange,
   asOracleId,
   type BanList,
+  banViolations,
   type CardCounts,
   type CardKind,
   type Colour,
@@ -807,5 +808,131 @@ describe('the change it emits', () => {
   it('adds up counts it is given the way the aggregator does', () => {
     // A sanity check on the fixture: two cycles' counts add.
     expect(addCounts(counts(), counts()).deck.games).toBe(200);
+  });
+});
+
+// --- Legalisation (roadmap 5.5) ---
+
+describe('legalisation (docs/05 "Bans and restrictions")', () => {
+  const legalise = (over: Partial<DeckAgentInput> = {}) => agent().legalise(input(over));
+  const banned = (name: string, status: 'banned' | 'restricted' = 'banned'): BanList =>
+    new Map([
+      [id('banned-beast'), 'banned'],
+      [id(name), status],
+    ]);
+
+  it('changes nothing, and searches nothing, when the deck is legal', async () => {
+    const pool = new FakePool();
+    expect(await legalise({ pool })).toEqual([]);
+    expect(pool.searches).toEqual([]);
+  });
+
+  it('replaces every copy of a banned card with as many of one card, keeping 60/15', async () => {
+    const changes = await legalise({ banList: banned('ogre') });
+    expect(changes).toHaveLength(1);
+    const [change] = changes;
+    expect(change?.remove).toEqual({ oracleId: id('ogre'), zone: 'main', count: 4 });
+    expect(change?.add.count).toBe(4);
+    expect(change?.evidence.diagnosis).toBe('ban');
+    expect(change?.reason).toMatch(/^Banned: cut 4 ogre .*for 4 /);
+    const legal = changes.reduce((d, c) => applyDeckChange(d, c), deck);
+    expect(banViolations(legal, banned('ogre'))).toEqual([]);
+    expect(legal.main.reduce((sum, s) => sum + s.count, 0)).toBe(60);
+  });
+
+  it('looks in the removed card’s own colours and mana value first', async () => {
+    // The wolf is the better card on paper, but it is green and the ogre was red.
+    const [change] = await legalise({ banList: banned('ogre') });
+    expect(change?.add.oracleId).toBe(id('hill-giant'));
+  });
+
+  it('leaves one copy of a restricted card and replaces the rest', async () => {
+    const changes = await legalise({ banList: banned('bear', 'restricted') });
+    expect(changes).toHaveLength(1);
+    expect(changes[0]?.remove).toEqual({ oracleId: id('bear'), zone: 'main', count: 3 });
+    expect(changes[0]?.reason).toMatch(/^Restricted to one copy: cut 3 bear/);
+    // A hole of three cannot take a card restricted in the base format.
+    expect(changes[0]?.add.oracleId).not.toBe(id('relic'));
+    const legal = changes.reduce((d, c) => applyDeckChange(d, c), deck);
+    expect(legal.main).toContainEqual({ oracleId: id('bear'), count: 1 });
+  });
+
+  it('fills a hole of one with a single copy, which may be of a restricted card', async () => {
+    const twoBears: Deck75 = {
+      main: [
+        ...deck.main.filter((s) => s.oracleId !== id('bear') && s.oracleId !== id('mountain')),
+        slot('bear', 2),
+        slot('mountain', 14),
+      ],
+      side: deck.side,
+    };
+    const [change] = await legalise({ deck: twoBears, banList: banned('bear', 'restricted') });
+    expect(change?.remove.count).toBe(1);
+    expect(change?.add).toEqual({ oracleId: id('relic'), zone: 'main', count: 1 });
+  });
+
+  it('takes sideboard copies first, and legalises main and side as separate holes', async () => {
+    const split: Deck75 = {
+      main: deck.main,
+      side: [...deck.side.filter((s) => s.oracleId !== id('pyroclasm')), slot('ogre', 4)],
+    };
+    // Eight ogres restricted to one: the four in the side go first, then three of the main.
+    const changes = await legalise({ deck: split, banList: banned('ogre', 'restricted') });
+    expect(changes.map((c) => [c.remove.zone, c.remove.count])).toEqual([
+      ['side', 4],
+      ['main', 3],
+    ]);
+    expect(changes[0]?.reason).toMatch(/from the sideboard/);
+    const legal = changes.reduce((d, c) => applyDeckChange(d, c), split);
+    expect(banViolations(legal, banned('ogre', 'restricted'))).toEqual([]);
+    // The second hole is searched knowing what the first took: nothing past four copies.
+    const held = new Map<OracleId, number>();
+    for (const s of [...legal.main, ...legal.side])
+      held.set(s.oracleId, (held.get(s.oracleId) ?? 0) + s.count);
+    for (const [oracleId, count] of held) {
+      if (!cardsOf(poolMade).get(oracleId)?.basic) expect(count).toBeLessThanOrEqual(4);
+    }
+    expect(legal.side.reduce((sum, s) => sum + s.count, 0)).toBe(15);
+  });
+
+  it('never replaces one banned card with another, nor with a copy the 75 cannot hold', async () => {
+    const list: BanList = new Map([
+      [id('banned-beast'), 'banned'],
+      [id('ogre'), 'banned'],
+      [id('hill-giant'), 'banned'],
+    ]);
+    const [change] = await legalise({ banList: list });
+    expect(change?.add.oracleId).not.toBe(id('hill-giant'));
+    expect(change?.add.oracleId).not.toBe(id('banned-beast'));
+    const legal = applyDeckChange(deck, change as never);
+    expect(banViolations(legal, list)).toEqual([]);
+  });
+
+  it('plays no trial: legalisation happens between two games and must be quick', async () => {
+    let calls = 0;
+    const trial: TrialRunner = async () => {
+      calls += 1;
+      return { matches: 1, winRate: 1 };
+    };
+    await agent({ trialTopK: 3 }).legalise(input({ banList: banned('ogre'), trial }));
+    expect(calls).toBe(0);
+  });
+
+  it('fills the hole with a land when nothing of the card’s kind can be played', async () => {
+    const lands = new FakePool(poolMade.filter((c) => c.land === true));
+    const [change] = await legalise({ banList: banned('ogre'), pool: lands });
+    expect(cardsOf(poolMade).get(change?.add.oracleId as OracleId)?.land).toBe(true);
+    expect(change?.add.count).toBe(4);
+  });
+
+  it('legalises a banned land with a land that makes what it made', async () => {
+    const withSnow = new FakePool([
+      ...poolMade,
+      { name: 'snow-forest', land: true, basic: true, produces: ['G'] },
+    ]);
+    const [change] = await legalise({ banList: banned('forest'), pool: withSnow });
+    expect(change?.remove).toEqual({ oracleId: id('forest'), zone: 'main', count: 12 });
+    // Twelve mountains would strand every green spell; the taiga cannot be held twelve times.
+    expect(change?.add).toEqual({ oracleId: id('snow-forest'), zone: 'main', count: 12 });
   });
 });

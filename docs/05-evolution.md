@@ -152,6 +152,17 @@ Semantics (Vintage-style, decision D12):
 
 Every ban also emits a `RunEvent` on the WebSocket so the UI shows a banner in live view and a marker on the run timeline.
 
+**As built (5.5).** The list is kept as its **audit trail** (`BanEvent` in `@mtg/shared`: the card, `ban` / `restrict` / `unban`, the note, who, when, and the game it took effect after), and `banListOf` replays the applied edits into the list everything reads. `BanRegistry` (`packages/sim/src/bans.ts`) holds the trail: `request` adds a **pending** edit at any time, and `applyPending(gameId)` puts every pending edit into effect after that game — so a game is never played under two lists. `banViolations` names every card a 75 holds more of than the list allows, main and side together, and `applyLegalChange` applies a deck change and **refuses** one that leaves the deck breaking the list — a second copy of a restricted card, main or side; moving the one copy between main and side is allowed, the rule being about the 75.
+
+**Enforcement** is `banEnforcer`, the `afterGame` hook `playMatch` and `runCycle` now take (both are asynchronous for it, since legalising searches the pool, which scripts on demand). After every game it applies what is pending, tells `onApplied` — the `banApplied` event of docs/07 — and legalises each deck the list now catches out, each on its own, with `StatisticalDeckAgent.legalise`; the match goes on with the legalised decks, sideboarding for game 3 starts from them, and the games already played still count. An edit that catches no deck out, and every unban, changes nothing. The match and the cycle report every forced change and after which game (`legalisations`), and the cycle hands back the decks as they stand.
+
+**Legalisation**, where this section leaves a choice:
+
+- The excess copies go **sideboard first**: a restricted card held three in the main and one in the side loses the side copy and two of the main; each zone's hole is its own change, with diagnosis `ban` and a reason like "Restricted to one copy: cut 3 Ogre for 3 Hill Giant".
+- **"The same colour identity"** is read as the removed card's own colours first, within a mana value of it; then anywhere in the deck's colours at that mana value; then at any. A land is replaced by a land that makes every colour it made if the pool has one — twelve Mountains for twelve Forests would strand the green spells — then by any land in the deck's colours. A hole nothing of its kind fills takes a land, since basics are never short.
+- Each hole is searched knowing what the earlier ones took, so two holes do not both take four of the same card. **No trial** is played: a legalisation happens between two games of a match and has to be quick.
+- Recording the legalised deck as a generation with `cause: 'ban'`, and not counting it as the cycle's change, is the run's (5.6); so is putting the trail in `ban_events`.
+
 ## Run lifecycle
 
 `created → running → paused → running … → stopped`. `fork(runId, cycle)` creates a new run with the decks and stats as of that cycle and a fresh seed; the ban list is copied. `export(runId)` produces a JSON bundle (settings, ban history, every deck generation with reasons, per-cycle stats, and optionally every event log) and a plain-text decklist per generation.

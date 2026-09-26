@@ -21,7 +21,7 @@ runs (
   forked_from_run TEXT, forked_from_cycle INTEGER, current_cycle INTEGER
 );
 ban_list (run_id TEXT, oracle_id TEXT, status TEXT CHECK(status IN ('banned','restricted')), PRIMARY KEY(run_id, oracle_id));
-ban_events (id INTEGER PK, run_id TEXT, oracle_id TEXT, action TEXT, note TEXT, at TEXT, applied_after_game_id TEXT);
+ban_events (id INTEGER PK, run_id TEXT, oracle_id TEXT, action TEXT CHECK(action IN ('ban','restrict','unban')), note TEXT, by TEXT, at TEXT, applied_after_game_id TEXT /*null while pending*/);
 
 deck_generations (
   id TEXT PK, run_id TEXT, agent TEXT CHECK(agent IN ('A','B')), generation INTEGER, cycle INTEGER,

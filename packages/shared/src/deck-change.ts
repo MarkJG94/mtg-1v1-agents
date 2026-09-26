@@ -32,6 +32,8 @@ export interface DeckChangeSlot {
 
 /** Why the agent chose the slot it cut. */
 export const diagnoses = [
+  /** Forced by the ban list (docs/05 "Legalisation"): the excess copies out, a replacement in. */
+  'ban',
   /** Too few lands too often: a spell out, a land in. */
   'screw',
   /** Too many: a land out, a spell in. */
