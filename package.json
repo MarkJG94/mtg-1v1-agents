@@ -20,6 +20,7 @@
     "bench:search": "tsx scripts/run-bundled.ts packages/sim/bench/run.ts",
     "ladder": "tsx scripts/run-bundled.ts scripts/ladder.ts",
     "tune": "tsx scripts/run-bundled.ts scripts/tune.ts",
+    "seed:deck": "tsx scripts/seed-deck.ts",
     "cards:schema": "tsx scripts/write-card-schema.ts",
     "cards:new": "tsx scripts/new-card-script.ts",
     "cards:corpus": "tsx scripts/fetch-corpus.ts",

@@ -1,3 +1,4 @@
+export * from './bans.js';
 export * from './eventlog/events.js';
 export * from './eventlog/log.js';
 export * from './eventlog/migrations.js';

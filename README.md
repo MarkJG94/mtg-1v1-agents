@@ -53,7 +53,8 @@ What runs today: `pnpm dev` starts the Fastify API and the Vite dev server toget
 `pnpm fetch:scryfall` builds the card projection from Scryfall's bulk data, `pnpm bench`
 and `pnpm bench:search` play fixed-seed games and report the time they take, `pnpm ladder` plays the agent levels
 against each other, `pnpm tune` plays one set of evaluator weights against another or
-hill-climbs a set, and `pnpm check` (lint, typecheck, test, build) is green.
+hill-climbs a set, `pnpm seed:deck` rolls a seed deck from the whole of Scryfall and prints
+it, and `pnpm check` (lint, typecheck, test, build) is green.
 
 `main` is protected: every change lands through a pull request with all three CI jobs —
 lint/typecheck/test/build, benchmarks, and the Docker build — green.

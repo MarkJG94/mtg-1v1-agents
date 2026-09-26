@@ -19,6 +19,7 @@ pnpm bench:compare   # compare two benchmark reports; fails on a >20% regression
 pnpm ladder          # the sanity ladder: search > greedy > random, 500 games a rung (nightly)
 pnpm tune            # weight tuning: `compare a.json b.json`, or `climb` from a weights file
                      # (bench, bench:search, ladder and tune run on the code as built: ADR 0013)
+pnpm seed:deck       # roll a seed deck from all of Scryfall and print it: --seed, --colours WU
 pnpm cards:schema    # regenerate the card-script JSON Schema; --check fails if it is stale
 pnpm fetch:scryfall  # build data/scryfall/cards.jsonl from the bulk data
 ```

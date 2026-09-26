@@ -14,6 +14,7 @@ export * from './event-log.js';
 export * from './game.js';
 export * from './ladder.js';
 export * from './match.js';
+export * from './seed-deck.js';
 export * from './sideboard-cards.js';
 export * from './stats.js';
 export * from './tuning.js';

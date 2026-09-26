@@ -31,6 +31,22 @@
 
 Both agents start with byte-identical 75s. The deck is recorded as generation 0 of each agent's lineage.
 
+**As built (5.3)**: `generateSeedDeck` in `packages/sim/src/seed-deck.ts`; `pnpm seed:deck` rolls one from the whole of Scryfall and prints it as a decklist. It returns one deck with the definitions of every card in it; giving both agents a copy and recording it as generation 0 is the run's (5.6). Where this section leaves a choice:
+
+- **A card a seed deck may hold** is not digital-only, is `legal` or `restricted` in the run's `legalityFilter`, is not banned by the run, and has a colour identity within the deck's colours. It may hold four copies (CR 100.2a), one if the base format or the run restricts it, and any number of a basic land — snow-covered ones included (CR 205.4c). A card whose own text allows any number of copies is held to four.
+- **Colours** are the run's `seedDeckColours` if it names them (one to three, distinct), otherwise one, two or three at 30/50/20 from the five; they come back in WUBRG order.
+- **A land** is a card whose front face is a land, so a spell with a land on its back is drawn as a spell.
+- **Basics "in proportion to colour count"** is read as an even split across the colours, any remainder going to colours picked at random; weighting them by the spells' coloured pips is left to the deck agent, whose colour-screw diagnosis exists for it. The basic for a colour is the plain basic land whose colour identity is that colour alone. A snow-covered basic is neither a basic the deck is given nor a nonbasic land to draw.
+- **Nonbasic lands**: how many is uniform between none and 40% of the lands, rounded down; if the pool runs out of fitting nonbasics first, basics make up the rest.
+- **Copies** are drawn with weights 1:1:2:4 for one to four copies of a card of mana value 2 or less, 1:1:1:2 for 3–4, and evenly above that, then cut to what the copy limit, the room left and the curve allow.
+- **The curve constraint** counts copies: a name that would take the main deck past eight cards of mana value five or more is cut to what is left, and skipped — without asking the resolver — when nothing is. It does not apply to the sideboard, since it is there so the deck can function.
+- **The sideboard** is drawn the same way from the names the main deck did not take.
+- **A thin pool**: when there are no new names left, the draw adds copies of names already drawn up to their limits — for the sideboard, of main-deck names too, within four in the 75. If that still falls short the generator fails with `SeedDeckError` saying by how much; it never returns a partial deck.
+- **Re-rolls**: every card drawn goes through the `ScriptResolver`. One it cannot support is put back and not drawn again for this deck, listed in the result with the section it was drawn for, and logged by the resolver as an unsupported request with context `seed deck (lands|main|side)` and the run id.
+- **Determinism**: the pool is put in oracle-id order before anything is drawn, so its order changes nothing, and colours, lands, main deck and sideboard each draw from their own fork of the seed.
+
+Over the full pool (34,733 cards, 10.9% supported) a deck takes about half a second including the smoke test of every card it resolves, and puts back 120–300 draws.
+
 ## The cycle
 
 ```

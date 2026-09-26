@@ -87,7 +87,9 @@ export const parseRunSettings = (input: RunSettingsInput): RunSettings =>
   runSettingsSchema.parse(input);
 
 /** Colours must be distinct; an explicit colour list must be 1-3 colours (decision D17). */
-export const validateSeedDeckColours = (settings: RunSettings): string[] => {
+export const validateSeedDeckColours = (
+  settings: Pick<RunSettings, 'seedDeckColours'>,
+): string[] => {
   const problems: string[] = [];
   const chosen = settings.seedDeckColours;
   if (chosen.length === 0) return problems;
