@@ -140,6 +140,19 @@ export class Queries {
     return row === undefined ? null : toRun(row);
   }
 
+  /** The newest cycle — in progress, or else the last finished — and its matches. */
+  progress(runId: string): { cycle: number | null; done: number; planned: number } {
+    const row = this.sqlite
+      .prepare(
+        `SELECT number, matches_done, matches_planned FROM cycles WHERE run_id = ?
+         ORDER BY number DESC LIMIT 1`,
+      )
+      .get(runId) as { number: number; matches_done: number; matches_planned: number } | undefined;
+    return row === undefined
+      ? { cycle: null, done: 0, planned: 0 }
+      : { cycle: row.number, done: row.matches_done, planned: row.matches_planned };
+  }
+
   lineage(runId: string, agent?: PlayerId): DeckGeneration[] {
     const all = this.store.lineage(runId);
     return agent === undefined ? all : all.filter((entry) => entry.agent === agent);
@@ -458,6 +471,14 @@ export class Queries {
       stats,
       unsupportedRequests: requests,
     };
+  }
+
+  /** The printing whose image stands for the card, if the catalogue has it. */
+  printing(oracleId: string): string | null {
+    const row = this.sqlite
+      .prepare('SELECT preferred_printing_id AS printing FROM cards WHERE oracle_id = ?')
+      .get(oracleId) as { printing: string | null } | undefined;
+    return row?.printing ?? null;
   }
 
   /** The whole Scryfall projection, for scripting a card on request. */

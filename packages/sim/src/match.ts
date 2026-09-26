@@ -4,6 +4,7 @@ import type { PlayerView } from '@mtg/engine/view';
 import {
   type DeckChange,
   type DeckSlot,
+  type GameEvent,
   type GameEventLog,
   type GameResult,
   isHiddenZone,
@@ -78,6 +79,42 @@ export interface MatchOptions {
    * goes on with the legalised decks. See `banEnforcer`.
    */
   readonly afterGame?: AfterGame;
+  /** A viewer of the games as they are played (docs/07); nothing is sent unless it is watching. */
+  readonly live?: LiveGames;
+}
+
+/** A game starting, as a live viewer is told of it (docs/07 `gameStart`). */
+export interface LiveGameStart {
+  readonly seed: string;
+  /** From 1 within the match. */
+  readonly game: number;
+  /** Who chooses to play or draw (CR 103.1); the choice is an event of the game. */
+  readonly chooser: PlayerId;
+  /** The sixty each player plays this game, which game 3's sideboarding may have changed. */
+  readonly decks: Readonly<Record<PlayerId, readonly DeckSlot[]>>;
+  readonly generations: Readonly<Record<PlayerId, number>>;
+  /** Where it is, when the cycle and the run say. */
+  readonly cycle?: number;
+  readonly match?: number;
+}
+
+/** A game over, as a live viewer is told of it (docs/07 `gameEnd`). */
+export interface LiveGameEnd {
+  readonly seed: string;
+  readonly onPlay: PlayerId;
+  readonly result: GameResult | null;
+}
+
+/**
+ * Someone watching the games as they are played. `watching` is asked as each game starts,
+ * and a game nobody is watching as it starts is not streamed at all — the simulation never
+ * waits for a viewer, and pays nothing for one that is not there.
+ */
+export interface LiveGames {
+  watching(): boolean;
+  started(game: LiveGameStart): void;
+  event(event: GameEvent): void;
+  ended(game: LiveGameEnd): void;
 }
 
 /** Called with the game that just ended and the decks registered for the match. */
@@ -179,12 +216,24 @@ export const playMatch = async (options: MatchOptions): Promise<MatchResult> => 
       chooser,
       turnCap: options.turnCap,
     });
+    const live = options.live?.watching() === true ? options.live : undefined;
+    live?.started({
+      seed,
+      game: games.length + 1,
+      chooser,
+      decks: { A: decks.A.main, B: decks.B.main },
+      generations: { A: options.generations?.A ?? 0, B: options.generations?.B ?? 0 },
+    });
     const played = playGame(
       board,
       { A: options.players.A.agent, B: options.players.B.agent },
       seed,
-      options.score === undefined ? {} : { score: options.score },
+      {
+        ...(options.score === undefined ? {} : { score: options.score }),
+        ...(live === undefined ? {} : { onEvent: (event: GameEvent) => live.event(event) }),
+      },
     );
+    live?.ended({ seed, onPlay: played.state.config.playerOnPlay, result: played.result });
     if (options.onGame !== undefined) {
       const logged = (player: PlayerId) => ({
         generation: options.generations?.[player] ?? 0,

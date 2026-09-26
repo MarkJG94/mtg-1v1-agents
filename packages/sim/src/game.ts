@@ -46,6 +46,8 @@ export interface PlayOptions {
    * scorer sees the same view the agent does, so the log records nothing hidden from it.
    */
   readonly score?: (view: PlayerView) => number;
+  /** Handed each event as the engine emits it, for a live viewer (docs/07 `gameEvents`). */
+  readonly onEvent?: (event: GameEvent) => void;
 }
 
 export class StalledGameError extends Error {
@@ -66,7 +68,9 @@ export const playGame = (
   options: PlayOptions = {},
 ): PlayedGame => {
   const maxDecisions = options.maxDecisions ?? 5_000;
-  const emitter = createEventEmitter();
+  const emitter = createEventEmitter(
+    options.onEvent === undefined ? {} : { onEvent: options.onEvent },
+  );
   const seats: Record<PlayerId, Rng> = {
     A: createRng(`${seed}:seat:A`),
     B: createRng(`${seed}:seat:B`),

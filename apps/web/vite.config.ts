@@ -11,7 +11,9 @@ export default defineConfig({
     // In development the API runs as a separate process; in Docker the server
     // serves this build itself, so no proxy is involved.
     proxy: {
-      '/api': { target: apiTarget, changeOrigin: true, ws: true },
+      '/api': { target: apiTarget, changeOrigin: true },
+      '/ws': { target: apiTarget, changeOrigin: true, ws: true },
+      '/img': { target: apiTarget, changeOrigin: true },
     },
   },
   build: {

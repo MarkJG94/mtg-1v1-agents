@@ -12,6 +12,7 @@ import {
   type Deck75,
   type DeckChange,
   type DeckGeneration,
+  type GameEvent,
   type GameEventLog,
   type OracleId,
   opponentOf,
@@ -25,7 +26,7 @@ import {
 import { BanRegistry, banEnforcer } from './bans.js';
 import { type AgentFactory, agentsAt, runCycle } from './cycle.js';
 import { cardCount, cardsIn } from './deck.js';
-import type { MatchResult } from './match.js';
+import type { LiveGameEnd, LiveGameStart, LiveGames, MatchResult } from './match.js';
 import { ScryfallPool } from './pool.js';
 import { generateSeedDeck } from './seed-deck.js';
 import { deckCardsFor, sideboardCardsFor } from './sideboard-cards.js';
@@ -208,6 +209,8 @@ export interface DriveOptions {
    * and the check.
    */
   readonly banRequests?: () => readonly BanRequest[];
+  /** A viewer of the run's games as they are played, told which cycle each is in. */
+  readonly live?: LiveGames;
 }
 
 /** An edit to the ban list, as it is asked for; the registry stamps when it took effect. */
@@ -357,7 +360,18 @@ const playCycle = async (
 
   const generations = { A: nextGeneration.A - 1, B: nextGeneration.B - 1 };
   const completed = snapshot.current?.matches ?? [];
+  const live = options.live;
   const result = await runCycle({
+    ...(live === undefined
+      ? {}
+      : {
+          live: {
+            watching: () => live.watching(),
+            started: (game: LiveGameStart) => live.started({ ...game, cycle: number }),
+            event: (event: GameEvent) => live.event(event),
+            ended: (game: LiveGameEnd) => live.ended(game),
+          },
+        }),
     decks,
     definitions: definitions(),
     seed: cycleSeed,

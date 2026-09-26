@@ -5,17 +5,25 @@ import type {
   CycleRecord,
   Deck75,
   DeckGeneration,
+  GameEvent,
   RunSettings,
   RunStatus,
 } from '@mtg/shared';
-import type { BanRequest, RunSnapshot, StoredMatch } from '@mtg/sim';
+import type { BanRequest, LiveGameEnd, LiveGameStart, RunSnapshot, StoredMatch } from '@mtg/sim';
 import type { OpenDatabase } from '../db/open.js';
 import { SqliteRunStore } from '../db/run-store.js';
 import { SqliteScriptStore } from '../db/script-store.js';
 import { RemoteError, serve } from './rpc.js';
 import type { ScriptAnswer, ScriptWrite } from './script-protocol.js';
 import type { ScriptWorkerData } from './script-worker.js';
-import type { CreateJob, JobResult, SimJob, SimWorkerData } from './sim-protocol.js';
+import type {
+  ControlMessage,
+  CreateJob,
+  JobResult,
+  LiveMessage,
+  SimJob,
+  SimWorkerData,
+} from './sim-protocol.js';
 import { spawnWorker } from './spawn.js';
 
 /**
@@ -66,7 +74,17 @@ export type SupervisorEvent =
       readonly played: number;
     }
   | { readonly type: 'runFailed'; readonly runId: string; readonly message: string }
-  | { readonly type: 'unsupportedCard'; readonly request: UnsupportedRequest };
+  | { readonly type: 'unsupportedCard'; readonly request: UnsupportedRequest }
+  /** A ban edit that has just taken effect, found by its game stamp appearing on the trail. */
+  | { readonly type: 'banApplied'; readonly runId: string; readonly event: BanEvent }
+  /** A watched game (see `watch`), as its worker streams it. */
+  | { readonly type: 'gameStart'; readonly runId: string; readonly game: LiveGameStart }
+  | {
+      readonly type: 'gameEvents';
+      readonly runId: string;
+      readonly events: readonly GameEvent[];
+    }
+  | { readonly type: 'gameEnd'; readonly runId: string; readonly game: LiveGameEnd };
 
 export interface NewRun {
   readonly id: string;
@@ -114,6 +132,10 @@ export class Supervisor {
   private readonly active = new Map<string, Active>();
   private readonly listeners = new Set<(event: SupervisorEvent) => void>();
   private readonly scriptAnswers = new Map<number, (answer: ScriptAnswer) => void>();
+  /** Runs whose games someone is watching (`watch`). */
+  private readonly watched = new Set<string>();
+  /** Each run's ban edits already in effect, to tell which a write has just applied. */
+  private readonly applied = new Map<string, Set<string>>();
   private nextJob = 0;
   private nextScript = 0;
   private closed = false;
@@ -236,7 +258,7 @@ export class Supervisor {
   async requestBan(runId: string, request: BanRequest): Promise<void> {
     const active = this.active.get(runId);
     if (active !== undefined) {
-      active.control.postMessage(request);
+      active.control.postMessage({ ban: request } satisfies ControlMessage);
       return;
     }
     const snapshot = await this.store.load(runId);
@@ -252,6 +274,17 @@ export class Supervisor {
         appliedAfterGameId: null,
       },
     ]);
+  }
+
+  /**
+   * Whether anyone is watching a run's games. A run on a worker streams its games only while
+   * watched, and only from the next game to start; a run that starts later is told as it
+   * starts. The simulation never waits for a viewer (docs/07).
+   */
+  watch(runId: string, watching: boolean): void {
+    if (watching) this.watched.add(runId);
+    else this.watched.delete(runId);
+    this.active.get(runId)?.control.postMessage({ watch: watching } satisfies ControlMessage);
   }
 
   /**
@@ -332,6 +365,7 @@ export class Supervisor {
   private spawn(): Slot {
     const store = new MessageChannel();
     const scripts = new MessageChannel();
+    const live = new MessageChannel();
     this.scriptWorker.postMessage({ connect: scripts.port1 }, [scripts.port1]);
     const worker = spawnWorker(
       'sim-worker',
@@ -339,9 +373,12 @@ export class Supervisor {
         cardsPath: this.options.cardsPath,
         storePort: store.port2,
         scriptPort: scripts.port2,
+        livePort: live.port2,
       } satisfies SimWorkerData,
-      [store.port2, scripts.port2],
+      [store.port2, scripts.port2, live.port2],
     );
+    live.port1.on('message', (message: LiveMessage) => this.streamed(message));
+    live.port1.unref();
     const slot: Slot = { worker, job: null };
     serve(store.port1, this.store, (method, args) => this.written(method, args));
     worker.on('message', (result: JobResult) => this.finished(slot, result));
@@ -385,6 +422,10 @@ export class Supervisor {
       control: control.port2,
     };
     slot.worker.postMessage(message, [control.port2]);
+    if (this.watched.has(job.runId)) {
+      control.port1.postMessage({ watch: true } satisfies ControlMessage);
+    }
+    this.applied.set(job.runId, appliedKeys(this.store.trail(job.runId)));
     this.emit({ type: 'runStarted', runId: job.runId });
   }
 
@@ -392,14 +433,37 @@ export class Supervisor {
   private written(method: string, args: readonly unknown[]): void {
     const runId = args[0] as string;
     if (method === 'saveMatch') {
+      this.bansWritten(runId, args[3] as readonly BanEvent[]);
       this.emit({ type: 'matchSaved', runId, match: args[1] as StoredMatch });
       this.changed(runId, args[2] as readonly DeckGeneration[]);
     } else if (method === 'saveGenerations') {
+      this.bansWritten(runId, args[2] as readonly BanEvent[]);
       this.changed(runId, args[1] as readonly DeckGeneration[]);
     } else if (method === 'finishCycle') {
+      this.bansWritten(runId, args[3] as readonly BanEvent[]);
       this.emit({ type: 'cycleFinished', runId, record: args[1] as CycleRecord });
       this.changed(runId, args[2] as readonly DeckGeneration[]);
     }
+  }
+
+  /** docs/07 `banApplied`: every edit the written trail has in effect that it did not before. */
+  private bansWritten(runId: string, trail: readonly BanEvent[]): void {
+    const known = this.applied.get(runId) ?? new Set<string>();
+    for (const event of trail) {
+      if (event.appliedAfterGameId === null) continue;
+      const key = keyOf(event);
+      if (known.has(key)) continue;
+      known.add(key);
+      this.emit({ type: 'banApplied', runId, event });
+    }
+    this.applied.set(runId, known);
+  }
+
+  private streamed(message: LiveMessage): void {
+    const { runId } = message;
+    if ('start' in message) this.emit({ type: 'gameStart', runId, game: message.start });
+    else if ('events' in message) this.emit({ type: 'gameEvents', runId, events: message.events });
+    else this.emit({ type: 'gameEnd', runId, game: message.end });
   }
 
   private changed(runId: string, generations: readonly DeckGeneration[]): void {
@@ -471,3 +535,10 @@ export class Supervisor {
     this.pump();
   }
 }
+
+/** An edit on the trail, told apart from every other: what, who, when asked, when applied. */
+const keyOf = (event: BanEvent): string =>
+  JSON.stringify([event.oracleId, event.action, event.by, event.at, event.appliedAfterGameId]);
+
+const appliedKeys = (trail: readonly BanEvent[]): Set<string> =>
+  new Set(trail.filter((event) => event.appliedAfterGameId !== null).map(keyOf));

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { banActions } from './bans.js';
+import type { GameEvent } from './eventlog/events.js';
 import { deckCauses, runStatuses } from './run.js';
 import { agentLevels, runSettingsSchema, seedSchema } from './settings.js';
 
@@ -441,3 +442,116 @@ export const coverageSchema = z.object({
     }),
   ),
 });
+
+// --- WebSocket (docs/07 "WebSocket `/ws`") ---
+
+const subscription = z.discriminatedUnion('to', [
+  z.object({ to: z.literal('runs') }),
+  z.object({ to: z.literal('run'), runId: z.string().min(1) }),
+  z.object({ to: z.literal('game'), runId: z.string().min(1) }),
+]);
+
+/**
+ * What a client sends: `{ subscribe: 'runs' }`, `{ subscribe: 'run', runId }` or
+ * `{ subscribe: 'game', runId }` (the run's live game), and the same with `unsubscribe`.
+ */
+export const wsClientMessageSchema = z
+  .union([
+    z.object({ subscribe: z.enum(['runs', 'run', 'game']), runId: z.string().min(1).optional() }),
+    z.object({
+      unsubscribe: z.enum(['runs', 'run', 'game']),
+      runId: z.string().min(1).optional(),
+    }),
+  ])
+  .transform((message, context) => {
+    const subscribe = 'subscribe' in message;
+    const to = subscribe ? message.subscribe : message.unsubscribe;
+    const parsed = subscription.safeParse({ to, runId: message.runId });
+    if (!parsed.success) {
+      context.addIssue({ code: 'custom', message: `'${to}' needs a runId` });
+      return z.NEVER;
+    }
+    return { subscribe, subscription: parsed.data };
+  });
+export type WsClientMessage = z.output<typeof wsClientMessageSchema>;
+export type WsSubscription = z.infer<typeof subscription>;
+
+/** A `GameEvent` as the wire carries it: checked for its envelope, typed as the engine's. */
+const gameEventSchema = z.custom<GameEvent>(
+  (value) =>
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { seq?: unknown }).seq === 'number' &&
+    typeof (value as { type?: unknown }).type === 'string',
+  { message: 'a game event has a seq and a type' },
+);
+
+const deckDiffSlot = z.object({ oracleId, zone: z.enum(['main', 'side']), count: z.int().min(1) });
+
+export const wsServerMessageSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('hello'), version: z.string() }),
+  z.object({ type: z.literal('error'), message: z.string() }),
+  z.object({
+    type: z.literal('runStatus'),
+    runId: z.string(),
+    name: z.string(),
+    status: z.enum(runStatuses),
+    playing: z.boolean(),
+    /** The cycle in progress, or the last finished. */
+    cycle: z.int().nullable(),
+    matchesDone: z.int().min(0),
+    matchesPlanned: z.int().min(0),
+    /** Over the last minute of this server's life; 0 when idle. */
+    gamesPerSecond: z.number().min(0),
+    /** Seconds until the cycle's planned matches are played, at that rate. */
+    etaSeconds: z.number().min(0).nullable(),
+  }),
+  z.object({ type: z.literal('cycleFinished'), runId: z.string(), cycle: cycleSummarySchema }),
+  z.object({
+    type: z.literal('deckChanged'),
+    runId: z.string(),
+    agent,
+    generation: z.int().min(0),
+    cause: z.enum(deckCauses),
+    reason: z.string().nullable(),
+    diff: z.object({ removed: z.array(deckDiffSlot), added: z.array(deckDiffSlot) }),
+  }),
+  z.object({ type: z.literal('banApplied'), runId: z.string(), event: banEventSchema }),
+  z.object({
+    type: z.literal('gameStart'),
+    runId: z.string(),
+    seed: z.string(),
+    cycle: z.int().nullable(),
+    match: z.int().nullable(),
+    game: z.int().min(1),
+    /** Who chooses to play or draw; the choice itself is one of the game's events. */
+    chosenBy: agent,
+    decks: byAgent(z.array(deckSlotSchema)),
+    generations: byAgent(z.int().min(0)),
+    /** True when sent to a viewer joining mid-game, with the events so far to follow. */
+    catchUp: z.boolean(),
+  }),
+  z.object({
+    type: z.literal('gameEvents'),
+    runId: z.string(),
+    seed: z.string(),
+    events: z.array(gameEventSchema),
+  }),
+  z.object({
+    type: z.literal('gameEnd'),
+    runId: z.string(),
+    seed: z.string(),
+    onPlay: agent,
+    winner: agent.nullable(),
+    reason: z.string().nullable(),
+    turns: z.int().nullable(),
+  }),
+  z.object({
+    type: z.literal('unsupportedCard'),
+    runId: z.string().nullable(),
+    oracleId,
+    name: z.string().nullable(),
+    reason: z.string(),
+  }),
+]);
+export type WsServerMessage = z.infer<typeof wsServerMessageSchema>;

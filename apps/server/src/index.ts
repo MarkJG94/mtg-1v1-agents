@@ -1,9 +1,11 @@
 import { existsSync, mkdirSync } from 'node:fs';
-import { buildApp } from './app.js';
+import { buildApp, packageVersion } from './app.js';
 import { loadConfig } from './config.js';
 import { loadCatalogue } from './db/catalogue.js';
 import { openDatabase } from './db/open.js';
 import { Queries } from './db/queries.js';
+import { Hub } from './hub.js';
+import { ImageCache } from './images.js';
 import { services } from './services.js';
 import { Supervisor } from './workers/supervisor.js';
 
@@ -23,11 +25,18 @@ const supervisor = new Supervisor({
 });
 const hasCards = existsSync(config.cardsPath);
 const catalogue = hasCards ? loadCatalogue(database, config.cardsPath) : null;
+const queries = new Queries(database, supervisor.store);
+const hub = new Hub(supervisor, queries, { version: packageVersion });
 const app = await buildApp(
   config,
   services({
     supervisor,
-    queries: new Queries(database, supervisor.store),
+    queries,
+    hub,
+    images: new ImageCache({
+      directory: config.imageCacheDir,
+      mode: config.scryfallImageCache,
+    }),
     cardsPath: config.cardsPath,
   }),
 );

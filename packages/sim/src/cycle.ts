@@ -21,6 +21,7 @@ import {
   addCounts,
   type DeckSlot,
   emptyAgentCounts,
+  type GameEvent,
   type GameEventLog,
   type OracleId,
   opponentOf,
@@ -31,6 +32,9 @@ import { cardsIn, type Deck } from './deck.js';
 import {
   type AfterGame,
   type Legalisation,
+  type LiveGameEnd,
+  type LiveGameStart,
+  type LiveGames,
   type MatchResult,
   playMatch,
   type SideboardContext,
@@ -112,6 +116,8 @@ export interface CycleOptions {
   readonly score?: (view: PlayerView) => number;
   /** Handed each game's event log as it finishes, to keep; the cycle keeps none. */
   readonly onGame?: (log: GameEventLog) => void;
+  /** A viewer of the games as they are played (see `LiveGames`); told which match each is. */
+  readonly live?: LiveGames;
   /** Asked after every game whether a ban changes the decks (`banEnforcer`; docs/05). */
   readonly afterGame?: AfterGame;
   /**
@@ -242,6 +248,16 @@ export const runCycle = async (options: CycleOptions): Promise<CycleResult> => {
         },
         definitions,
         seed: `${options.seed}:match-${index}`,
+        ...(options.live === undefined
+          ? {}
+          : {
+              live: {
+                watching: () => options.live?.watching() ?? false,
+                started: (game: LiveGameStart) => options.live?.started({ ...game, match: index }),
+                event: (event: GameEvent) => options.live?.event(event),
+                ended: (game: LiveGameEnd) => options.live?.ended(game),
+              },
+            }),
         firstChooser: index % 2 === 0 ? 'A' : 'B',
         turnCap: settings.turnCap,
         ...(options.generations === undefined ? {} : { generations: options.generations }),

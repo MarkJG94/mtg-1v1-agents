@@ -11,11 +11,13 @@ import {
   asOracleId,
   banViolations,
   type DeckGeneration,
+  type GameEvent,
   parseRunSettings,
   type RunSettings,
 } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
 import { cardCount, cardsIn } from './deck.js';
+import type { LiveGameEnd, LiveGameStart } from './match.js';
 import {
   createRun,
   decklist,
@@ -372,6 +374,58 @@ describe('a cycle whose loser the deck agent cannot change', async () => {
   it('is null on a cycle that did change the loser’s deck', async () => {
     const { snapshot } = await reference;
     expect(snapshot?.cycles.map((cycle) => cycle.unchanged)).toEqual([null, null]);
+  });
+});
+
+describe('a live viewer (roadmap 6.2)', async () => {
+  const { snapshot } = await reference;
+  const watch = async (watching: () => boolean) => {
+    const store = await fresh();
+    const seen = {
+      started: [] as LiveGameStart[],
+      events: [] as GameEvent[],
+      ended: [] as LiveGameEnd[],
+    };
+    await driveRun({
+      store,
+      cards,
+      runId: 'run-1',
+      cycles: 1,
+      live: {
+        watching,
+        started: (game) => seen.started.push(game),
+        event: (event) => seen.events.push(event),
+        ended: (game) => seen.ended.push(game),
+      },
+    });
+    return { seen, store };
+  };
+
+  it('is told of every game, where it is, and every event its log holds', async () => {
+    const { seen, store } = await watch(() => true);
+    const matches = await store.matches('run-1', true);
+    const logs = matches.flatMap((stored) => stored.logs);
+    expect(seen.started.map((game) => game.seed)).toEqual(logs.map((log) => log.seed));
+    expect(seen.started[0]).toMatchObject({ cycle: 1, match: 0, game: 1 });
+    expect(seen.started.at(-1)?.match).toBe(matches.length - 1);
+    expect(seen.events).toEqual(logs.flatMap((log) => log.events));
+    const games = matches.flatMap((stored) => stored.match.games);
+    expect(seen.ended.map((game) => [game.seed, game.onPlay, game.result])).toEqual(
+      games.map((game) => [game.seed, game.onPlay, game.result]),
+    );
+    // Watching changes nothing about the run.
+    expect((await store.load('run-1'))?.cycles[0]).toEqual(snapshot?.cycles[0]);
+  });
+
+  it('is told nothing of a game nobody is watching as it starts', async () => {
+    let asked = 0;
+    const { seen } = await watch(() => {
+      asked += 1;
+      return asked % 2 === 0;
+    });
+    expect(seen.started.length).toBeGreaterThan(0);
+    expect(seen.started.length).toBe(Math.floor(asked / 2));
+    expect(seen.ended.map((game) => game.seed)).toEqual(seen.started.map((game) => game.seed));
   });
 });
 

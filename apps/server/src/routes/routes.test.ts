@@ -29,6 +29,8 @@ import { buildApp } from '../app.js';
 import { loadConfig } from '../config.js';
 import { loadCatalogue } from '../db/catalogue.js';
 import { Queries } from '../db/queries.js';
+import { Hub } from '../hub.js';
+import { ImageCache } from '../images.js';
 import { services } from '../services.js';
 import { inProcessResolver, now, pool, sandbox, settings, within } from '../workers/testing.js';
 
@@ -43,11 +45,34 @@ const box = sandbox();
 // `mtg.db` in the sandbox, where the config puts the database, so health can measure it.
 const { database, supervisor } = box.supervise('mtg.db');
 const catalogue = loadCatalogue(database, box.cardsPath);
+const queries = new Queries(database, supervisor.store);
+/** Scryfall, as the tests see it: a JPEG's first bytes, and a count of what was asked. */
+const scryfall: string[] = [];
+const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+const images = new ImageCache({
+  directory: `${box.directory}/images`,
+  mode: 'lazy',
+  spacingMs: 1,
+  fetcher: async (url) => {
+    scryfall.push(url);
+    if (url.includes('00000000-0000-0000-0000-000000000000')) {
+      return { ok: false, status: 404, arrayBuffer: async () => new ArrayBuffer(0) };
+    }
+    return {
+      ok: true,
+      status: 200,
+      arrayBuffer: async () =>
+        jpeg.buffer.slice(jpeg.byteOffset, jpeg.byteOffset + jpeg.byteLength),
+    };
+  },
+});
 const app: FastifyInstance = await buildApp(
   loadConfig({ NODE_ENV: 'test', LOG_LEVEL: 'silent', SIM_WORKERS: '2', DATA_DIR: box.directory }),
   services({
     supervisor,
-    queries: new Queries(database, supervisor.store),
+    queries,
+    hub: new Hub(supervisor, queries, { version: 'test' }),
+    images,
     cardsPath: box.cardsPath,
     now,
   }),
@@ -377,6 +402,38 @@ describe('cards and coverage', async () => {
   });
 });
 
+describe('card images', async () => {
+  const detail = await call(runDetailSchema, { method: 'GET', url: run });
+  const played = detail.decks.A.deck.main[0]?.oracleId ?? '';
+  const printing = pool.find((card) => card.oracleId === played)?.id;
+
+  it('fetches a card’s image from Scryfall once, by its printing, then serves it from disk', async () => {
+    const first = await app.inject({ method: 'GET', url: `/img/${played}` });
+    expect(first.statusCode).toBe(200);
+    expect(first.headers['content-type']).toBe('image/jpeg');
+    expect(first.headers['x-image-cache']).toBe('miss');
+    expect(first.rawPayload.equals(jpeg)).toBe(true);
+    expect(scryfall).toEqual([
+      `https://api.scryfall.com/cards/${printing}?format=image&version=normal`,
+    ]);
+    const again = await app.inject({ method: 'GET', url: `/img/${played}` });
+    expect(again.headers['x-image-cache']).toBe('hit');
+    expect(again.rawPayload.equals(jpeg)).toBe(true);
+    expect(scryfall).toHaveLength(1);
+  });
+
+  it('keeps each size apart', async () => {
+    const small = await app.inject({ method: 'GET', url: `/img/${played}?size=small` });
+    expect(small.headers['x-image-cache']).toBe('miss');
+    expect(scryfall.at(-1)).toContain('version=small');
+  });
+
+  it('answers a card it does not know with 404, and a size it does not have with 400', async () => {
+    await failure({ method: 'GET', url: '/img/no-such-card' }, 404);
+    await failure({ method: 'GET', url: `/img/${played}?size=huge` }, 400);
+  });
+});
+
 describe('errors (docs/07)', () => {
   it('answers a body that does not match with 400 and the issues', async () => {
     const error = await failure(
@@ -445,8 +502,7 @@ describe('the routes docs/07 lists', () => {
         }));
       },
     );
-    // The image proxy is 6.2's.
-    const served = routes.filter((route) => !route.url.startsWith('/img/'));
+    const served = routes;
     expect(served.length).toBeGreaterThan(20);
     const missing = served.filter(
       (route) => !app.hasRoute({ method: route.method as 'GET', url: route.url }),

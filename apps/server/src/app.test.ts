@@ -36,14 +36,14 @@ describe('the API server', () => {
 });
 
 describe('the live event feed', () => {
-  it('greets a WebSocket client on /api/events', async () => {
+  it('greets a WebSocket client on /ws', async () => {
     const app = await buildApp(testConfig());
     await app.listen({ port: 0, host: '127.0.0.1' });
     const address = app.server.address();
     if (address === null || typeof address === 'string') throw new Error('no TCP address');
 
     try {
-      const socket = new WebSocket(`ws://127.0.0.1:${address.port}/api/events`);
+      const socket = new WebSocket(`ws://127.0.0.1:${address.port}/ws`);
       const greeting = await new Promise<string>((resolvePromise, rejectPromise) => {
         const timer = setTimeout(() => rejectPromise(new Error('no greeting')), 5_000);
         socket.on('message', (data: Buffer) => {
