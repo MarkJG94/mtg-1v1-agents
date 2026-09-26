@@ -9,13 +9,15 @@ import {
   MemoryScriptStore,
   ScriptResolver,
 } from '@mtg/cards';
-import { parseRunSettings, type RunSettings } from '@mtg/shared';
+import { asOracleId, parseRunSettings, type RunSettings } from '@mtg/shared';
 import {
+  cardsIn,
   createRun,
   driveRun,
   exportRun,
   forkRun,
   importRun,
+  latestGenerations,
   MemoryRunStore,
   type RunCards,
   RunError,
@@ -271,5 +273,33 @@ describe('fork, export and import in SQLite', async () => {
     expect(copied?.cycles.map((cycle) => cycle.matches)).toEqual(
       snapshot?.cycles.map((cycle) => cycle.matches),
     );
+  });
+});
+
+describe('a cycle that changed nothing, in SQLite', async () => {
+  // A pool that scripts only what the decks already hold, so no change can be made.
+  const { store } = open('unchanged.db');
+  await createRun({ store, cards, id: 'run-1', name: 'test', settings, now });
+  const held = new Set(
+    cardsIn(latestGenerations((await store.load('run-1'))?.lineage ?? []).A.deck).keys(),
+  );
+  await driveRun({
+    store,
+    cards: {
+      pool: cards.pool,
+      resolver: {
+        resolve: (card, request) =>
+          held.has(asOracleId(card.oracleId))
+            ? cards.resolver.resolve(card, request)
+            : { status: 'unscripted', definition: null, source: 'none', reasons: [] },
+      },
+    },
+    runId: 'run-1',
+    cycles: 1,
+  });
+
+  it('keeps the deck agent’s reason with the cycle', async () => {
+    const [cycle] = (await store.load('run-1'))?.cycles ?? [];
+    expect(cycle?.unchanged).toMatch(/nothing the engine can play/);
   });
 });

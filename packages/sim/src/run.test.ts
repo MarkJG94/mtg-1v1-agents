@@ -287,6 +287,94 @@ describe('a ban asked for between cycles', async () => {
   });
 });
 
+describe('a ban asked for while the run plays (roadmap 5.7)', async () => {
+  const { snapshot } = await reference;
+  const target = [...cardsIn(latestGenerations(snapshot?.lineage ?? []).A.deck).keys()][0];
+  if (target === undefined) throw new Error('no card');
+  const request = { oracleId: target, action: 'ban' as const, by: 'operator', at: now() };
+
+  /** Plays one cycle, handing `request` over on the `call`th time the inbox is asked. */
+  const playWith = async (call: number) => {
+    const store = await fresh();
+    let calls = 0;
+    await driveRun({
+      store,
+      cards,
+      runId: 'run-1',
+      cycles: 1,
+      banRequests: () => {
+        calls += 1;
+        return calls === call ? [request] : [];
+      },
+    });
+    return { store, after: await store.load('run-1'), calls };
+  };
+
+  it('takes effect after the game in progress, not before and not at the cycle’s end', async () => {
+    // The first ask is the cycle's start; the second, the end of its first game.
+    const { store, after } = await playWith(2);
+    const [first] = await store.matches('run-1', false);
+    const firstGame = first?.match.games[0]?.seed;
+    expect(firstGame).toBeDefined();
+    expect(after?.bans).toEqual([{ ...request, note: '', appliedAfterGameId: firstGame }]);
+    // The deck was legalised then, in the middle of the first match.
+    const forced = after?.lineage.filter((entry) => entry.cause === 'ban') ?? [];
+    expect(forced.length).toBeGreaterThan(0);
+    expect(first?.match.legalisations.map((each) => each.afterGameId)).toEqual([firstGame]);
+  });
+
+  it('takes effect before the first match when asked for as the cycle starts', async () => {
+    const { after } = await playWith(1);
+    expect(after?.bans.map((event) => event.appliedAfterGameId)).toEqual([
+      `${settings.seed}:cycle-1:start`,
+    ]);
+  });
+
+  it('asks after every game and once at the start, and records each request once', async () => {
+    const { store, after, calls } = await playWith(3);
+    const games = (await store.matches('run-1', false)).reduce(
+      (sum, stored) => sum + stored.match.games.length,
+      0,
+    );
+    expect(calls).toBe(games + 1);
+    expect(after?.bans).toHaveLength(1);
+  });
+});
+
+describe('a cycle whose loser the deck agent cannot change', async () => {
+  // The pool scripts nothing but what the decks already hold: no replacement can be played.
+  const store = await fresh();
+  const held = new Set(
+    cardsIn(latestGenerations((await store.load('run-1'))?.lineage ?? []).A.deck).keys(),
+  );
+  const narrow: RunCards = {
+    pool: cards.pool,
+    resolver: {
+      resolve: (card, request) =>
+        held.has(asOracleId(card.oracleId))
+          ? cards.resolver.resolve(card, request)
+          : { status: 'unscripted', definition: null, source: 'none', reasons: [] },
+    },
+  };
+  const played = await driveRun({ store, cards: narrow, runId: 'run-1', cycles: 2 });
+  const after = await store.load('run-1');
+
+  it('is recorded with the agent’s reason and no new deck, and the run plays on', () => {
+    expect(played).toEqual({ played: 2, status: 'running' });
+    expect(after?.cycles).toHaveLength(2);
+    for (const cycle of after?.cycles ?? []) {
+      expect(cycle.unchanged).toMatch(/nothing the engine can play/);
+      expect(cycle.trials).toEqual({});
+    }
+    expect(after?.lineage.map((entry) => entry.cause)).toEqual(['seed', 'seed']);
+  });
+
+  it('is null on a cycle that did change the loser’s deck', async () => {
+    const { snapshot } = await reference;
+    expect(snapshot?.cycles.map((cycle) => cycle.unchanged)).toEqual([null, null]);
+  });
+});
+
 describe('fork, export and import', async () => {
   const { store, snapshot } = await reference;
 

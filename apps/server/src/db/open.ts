@@ -37,3 +37,14 @@ export const openDatabase = (path: string): OpenDatabase => {
   migrate(db, { migrationsFolder: migrationsFolder() });
   return { sqlite, db, close: () => sqlite.close() };
 };
+
+/**
+ * A connection that can read and cannot write — SQLite refuses the write itself — for a
+ * worker, since the API process is the only writer (docs/01 "Processes"). It expects the
+ * file to exist and be migrated already, which `openDatabase` in the API process sees to.
+ */
+export const openReadonly = (path: string): OpenDatabase => {
+  const sqlite = new Database(path, { readonly: true, fileMustExist: true });
+  const db = drizzle(sqlite, { schema });
+  return { sqlite, db, close: () => sqlite.close() };
+};

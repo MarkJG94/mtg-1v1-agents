@@ -1,10 +1,11 @@
-import { StatisticalDeckAgent } from '@mtg/agents';
+import { DeckAgentError, StatisticalDeckAgent } from '@mtg/agents';
 import type { CardProjection, ScriptResolver } from '@mtg/cards';
 import { type CardDefinition, createRng } from '@mtg/engine';
 import {
   type AgentCounts,
   applyDeckChange,
   applyLegalChange,
+  type BanAction,
   type BanEvent,
   banViolations,
   type CycleRecord,
@@ -198,7 +199,24 @@ export interface DriveOptions {
   /** The play agents; the run's `agentLevel` if not given. */
   readonly agents?: AgentFactory;
   /** Told of each cycle as it finishes, with the change it made. */
-  readonly onCycle?: (record: CycleRecord, change: DeckGeneration) => void;
+  readonly onCycle?: (record: CycleRecord, change: DeckGeneration | null) => void;
+  /**
+   * Ban edits asked for while the run plays — by an operator, from another thread — taken
+   * and handed to the ban registry after every game and as every cycle starts, so each
+   * takes effect after the game in progress (docs/05 "Bans and restrictions"). It must
+   * return each request once, and synchronously: a game does not yield between its end
+   * and the check.
+   */
+  readonly banRequests?: () => readonly BanRequest[];
+}
+
+/** An edit to the ban list, as it is asked for; the registry stamps when it took effect. */
+export interface BanRequest {
+  readonly oracleId: OracleId;
+  readonly action: BanAction;
+  readonly note?: string;
+  readonly by: string;
+  readonly at: string;
 }
 
 export interface DriveResult {
@@ -302,7 +320,12 @@ const playCycle = async (
       decks[player] = applyDeckChange(decks[player], change);
       return generation(player, 'ban', change);
     });
-  const enforcer = banEnforcer({
+  const take = () => {
+    for (const request of options.banRequests?.() ?? []) {
+      registry.request(request.oracleId, request.action, request);
+    }
+  };
+  const enforce = banEnforcer({
     registry,
     agent: deckAgent,
     pool,
@@ -310,7 +333,12 @@ const playCycle = async (
     counts: history,
     seed: `${cycleSeed}:bans`,
   });
+  const enforcer: typeof enforce = async (context) => {
+    take();
+    return enforce(context);
+  };
 
+  take();
   if (snapshot.current === null) {
     await store.startCycle(runId, number);
     // Between cycles no game is in progress: a pending edit takes effect now, and a deck
@@ -382,7 +410,7 @@ const playCycle = async (
     seed: `${cycleSeed}:trial`,
     generations: { candidate: nextGeneration[loser], opponent: nextGeneration[opponent] - 1 },
   });
-  const change = await deckAgent.chooseChange({
+  const choose = deckAgent.chooseChange({
     deck: result.decks[loser],
     cards: deckCardsFor(definitionsOf(result.decks[loser], all)),
     counts: rollUp([...snapshot.cycles.map((cycle) => cycle.stats[loser]), result.stats[loser]]),
@@ -401,11 +429,22 @@ const playCycle = async (
     ...(settings.trialTopK > 0 ? { trial: trialRunner.run } : {}),
     cycleWinRate: result.winRate[loser],
   });
-  decks[loser] = applyLegalChange(result.decks[loser], change, registry.list);
-  const changed = generation(loser, 'change', change);
+  // An agent that finds nothing the engine can play says so (DeckAgentError); the cycle is
+  // recorded with its reason and no new generation, and the run plays on.
+  const change = await choose.catch((error: unknown) => {
+    if (error instanceof DeckAgentError) return error;
+    throw error;
+  });
+  const unchanged = change instanceof DeckAgentError ? change.message : null;
+  let changed: DeckGeneration | null = null;
+  if (!(change instanceof DeckAgentError)) {
+    decks[loser] = applyLegalChange(result.decks[loser], change, registry.list);
+    changed = generation(loser, 'change', change);
+  }
 
   const trialStats: Record<string, AgentCounts> = {};
-  for (const candidate of change.evidence.candidates) {
+  const candidates = change instanceof DeckAgentError ? [] : change.evidence.candidates;
+  for (const candidate of candidates) {
     const counts = trialRunner.countsFor(candidate.oracleId);
     if (counts !== undefined) trialStats[candidate.oracleId] = counts;
   }
@@ -421,8 +460,9 @@ const playCycle = async (
     stats: result.stats,
     shown: result.shown,
     trials: trialStats,
+    unchanged,
   };
-  await store.finishCycle(runId, record, [changed], registry.history);
+  await store.finishCycle(runId, record, changed === null ? [] : [changed], registry.history);
   options.onCycle?.(record, changed);
 };
 

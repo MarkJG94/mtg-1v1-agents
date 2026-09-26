@@ -6,7 +6,7 @@ Fastify on one port; JSON over HTTP for state, WebSocket for live streams. All D
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/api/health` | liveness, worker count, db size, scryfall data version |
+| GET | `/api/health` | liveness, worker count, runs playing and waiting for a worker, db size, scryfall data version |
 | GET | `/api/runs` | list runs with status and current cycle |
 | POST | `/api/runs` | create run `{ name, settings, seedDeck?: Deck75 }` → run |
 | GET | `/api/runs/:id` | run detail: settings, status, ban list, current decks, cycle summary |

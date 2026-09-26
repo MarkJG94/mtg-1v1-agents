@@ -7,10 +7,16 @@ import {
 } from '@mtg/shared';
 import type { EventEmitter } from '../events/emitter.js';
 import { runEvent } from '../events/perform.js';
-import { activateManaAbility, type ManaAbility, type ManaProduction } from '../mana/ability.js';
+import {
+  activateManaAbility,
+  canActivateManaAbility,
+  type ManaAbility,
+  type ManaProduction,
+} from '../mana/ability.js';
 import type { ManaCost } from '../mana/cost.js';
-import { payCost } from '../mana/payment.js';
+import { canPayFromSources, payCost } from '../mana/payment.js';
 import { addMana, type ManaPool } from '../mana/pool.js';
+import { potentialManaFor } from '../mana/potential.js';
 import { isStackEmpty, putActivatedAbilityOnStack, putOnStack } from '../stack.js';
 import type { GameState } from '../state/game-state.js';
 import { getObject, updateObject, updatePlayer } from '../state/update.js';
@@ -221,9 +227,14 @@ const checkTargets = (
 /**
  * Pay a cost from the pool, tapping mana sources in object order to cover the shortfall.
  *
- * Each source is only tapped if it brings the cost closer to payable, and the modes of a
- * source that offers a choice — a dual land — are tried in order, taking the first that
- * lets the whole cost be paid. Deterministic either way, so a replay pays identically.
+ * A source that offers a choice — a dual land — makes the mode that leaves the cost
+ * payable from the pool and the sources still untapped, by the same exact search
+ * `legalActions` asked before offering the spell (docs/09: an action offered is never
+ * refused). Among modes that do, the one that pays most of the cost at once is taken.
+ * Deterministic either way, so a replay pays identically.
+ *
+ * Mana is spent before life: a phyrexian symbol (CR 107.4f) takes 2 life only when the pool
+ * and the lands cannot make its colour, and the life is lost as paying it (CR 119.4).
  */
 const payFor = (
   state: GameState,
@@ -234,22 +245,47 @@ const payFor = (
   autoTap: boolean,
 ): GameState => {
   let current = state;
+  const life = state.players[player].life;
+  const paid = (withLife: boolean) =>
+    payCost(current.players[player].manaPool, cost, withLife ? { xValue: x, life } : { xValue: x });
 
-  if (autoTap && payCost(current.players[player].manaPool, cost, { xValue: x }) === null) {
-    for (const ability of untappedSources(current, player)) {
-      const attempt = tapForMana(current, emitter, player, ability, cost, x);
+  if (autoTap && paid(false) === null) {
+    const sources = untappedSources(current, player);
+    const manaOnly =
+      !cost.symbols.some((symbol) => symbol.options.some((option) => option.kind === 'life')) ||
+      canPayFromSources(
+        current.players[player].manaPool,
+        potentialManaFor(current, player, sources),
+        cost,
+        { xValue: x },
+      );
+    const withLife = manaOnly ? undefined : life;
+    for (const [index, ability] of sources.entries()) {
+      if (paid(!manaOnly) !== null) break;
+      // Another of this permanent's abilities may have tapped it already.
+      if (!canActivateManaAbility(current, player, ability)) continue;
+      // Every ability that taps this permanent is one choice among them (CR 602.5a).
+      const sameTap = (other: ManaAbility) =>
+        ability.requiresTap && other.requiresTap && other.source === ability.source;
+      const later = sources.slice(index + 1);
+      const choices = [ability, ...later.filter(sameTap)];
+      const rest = later.filter((other) => !sameTap(other));
+      const attempt = tapForMana(current, emitter, player, choices, cost, x, rest, withLife);
       if (attempt === null) continue;
       current = attempt;
-      if (payCost(current.players[player].manaPool, cost, { xValue: x }) !== null) break;
     }
   }
 
-  const payment = payCost(current.players[player].manaPool, cost, { xValue: x });
+  const payment = paid(false) ?? paid(true);
   if (payment === null) {
     throw new IllegalCastError(`${player} cannot pay for this spell from their mana pool`);
   }
 
-  return updatePlayer(current, player, { manaPool: payment.remaining });
+  current = updatePlayer(current, player, { manaPool: payment.remaining });
+  if (payment.life > 0) {
+    current = runEvent(current, emitter, { kind: 'loseLife', player, amount: payment.life });
+  }
+  return current;
 };
 
 const untappedSources = (state: GameState, player: PlayerId): readonly ManaAbility[] =>
@@ -275,25 +311,46 @@ const tapForMana = (
   state: GameState,
   emitter: EventEmitter,
   player: PlayerId,
-  ability: ManaAbility,
+  choices: readonly ManaAbility[],
   cost: ManaCost,
   x: number,
+  rest: readonly ManaAbility[],
+  /** Life the payment may take, when mana alone cannot pay (phyrexian symbols). */
+  life?: number,
 ): GameState | null => {
-  if (ability.modes.length === 0) return null;
-
   const pool = state.players[player].manaPool;
-  let best = 0;
-  let bestShortfall = Number.POSITIVE_INFINITY;
-
-  for (const [index, mode] of ability.modes.entries()) {
-    const remaining = shortfall(poolWith(pool, mode), cost, x);
-    if (remaining < bestShortfall) {
-      best = index;
-      bestShortfall = remaining;
-    }
+  // Every mode of every ability that could tap the source: most of the cost paid first,
+  // the printed order breaking a tie.
+  const ranked = choices
+    .flatMap((ability, order) =>
+      ability.modes.map((mode, index) => ({
+        ability,
+        index,
+        order,
+        mode,
+        shortfall: shortfall(poolWith(pool, mode), cost, x),
+      })),
+    )
+    .sort((a, b) => a.shortfall - b.shortfall || a.order - b.order || a.index - b.index);
+  let chosen = ranked[0];
+  if (chosen === undefined) return null;
+  if (ranked.length > 1) {
+    // The first that leaves the cost payable by what is still untapped. Picking by
+    // shortfall alone tapped a red-or-green land for red beside a Mountain, and the green
+    // the spell needed was then nowhere.
+    const potential = potentialManaFor(state, player, rest);
+    const keeps = ranked.find((option) =>
+      canPayFromSources(
+        poolWith(pool, option.mode),
+        potential,
+        cost,
+        life === undefined ? { xValue: x } : { xValue: x, life },
+      ),
+    );
+    if (keeps !== undefined) chosen = keeps;
   }
 
-  return activateManaAbility(state, emitter, player, ability, best);
+  return activateManaAbility(state, emitter, player, chosen.ability, chosen.index);
 };
 
 /**

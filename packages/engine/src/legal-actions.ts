@@ -11,6 +11,10 @@ import { matchesFilter } from './cards/evaluate.js';
 import type { ManaAbility } from './mana/ability.js';
 import type { ManaCost } from './mana/cost.js';
 import { canPayFromSources, type PotentialMana } from './mana/payment.js';
+import { potentialManaFor } from './mana/potential.js';
+
+export { potentialManaFor };
+
 import { legalLoyaltyAbilities } from './planeswalker.js';
 import { isStackEmpty, splitSecondActive } from './stack-query.js';
 import type { GameState } from './state/game-state.js';
@@ -70,67 +74,6 @@ export type LegalAction =
       readonly ability: string;
       readonly cost: number;
     };
-
-/**
- * Mana the player could still make by tapping what they control. A source that makes
- * several mana at once contributes several entries; one that offers a choice of colours
- * contributes a single entry listing them, which is exactly how the solver reads it.
- */
-export const potentialManaFor = (
-  state: GameState,
-  player: PlayerId,
-  abilities: readonly ManaAbility[],
-): readonly PotentialMana[] => {
-  const potential: PotentialMana[] = [];
-
-  for (const ability of abilities) {
-    const source = state.objects.get(ability.source);
-    if (source?.zone !== 'battlefield' || source.controller !== player) continue;
-    if (ability.requiresTap && source.tapped) continue;
-
-    // Modes almost always make the same number of mana (a dual land offers a choice of
-    // colour, not of count), and then each slot can offer the union of what the modes
-    // could put there — which is exact. When the counts differ, take the smallest, so
-    // this under-reports rather than over-reports: `legalActions` must never offer a
-    // spell the engine would then refuse to let the player pay for (docs/09).
-    const counts = ability.modes.map((mode) => mode.reduce((n, p) => n + p.amount, 0));
-    const width = counts.length === 0 ? 0 : Math.min(...counts);
-
-    for (let slot = 0; slot < width; slot += 1) {
-      const types = new Set<PotentialMana['types'][number]>();
-      let snow = false;
-      for (const mode of ability.modes) {
-        const production = productionAt(mode, slot);
-        if (!production) continue;
-        types.add(production.type);
-        snow = snow || (production.snow ?? false);
-      }
-      if (types.size > 0) potential.push({ types: [...types], snow });
-    }
-  }
-
-  return potential;
-};
-
-/**
- * Which production fills slot `slot` of a mode, counting `amount` as that many slots.
- *
- * Walked rather than materialised. This used to flatten the whole mode into an array for
- * every slot of every ability on every call, and `legalActions` runs on every priority
- * grant — about six hundred times a game, twice over. That allocation was half the cost
- * of the function and a third of the cost of a whole game.
- */
-const productionAt = (
-  mode: ManaAbility['modes'][number],
-  slot: number,
-): ManaAbility['modes'][number][number] | undefined => {
-  let seen = 0;
-  for (const production of mode) {
-    seen += production.amount;
-    if (slot < seen) return production;
-  }
-  return undefined;
-};
 
 /** Whether a land may be played right now (CR 305.1). */
 const canPlayLandNow = (state: GameState, player: PlayerId): boolean =>

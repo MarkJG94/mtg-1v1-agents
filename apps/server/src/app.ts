@@ -3,13 +3,23 @@ import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { ServerConfig } from './config.js';
+import type { Supervisor } from './workers/supervisor.js';
 
 /** Reported by `GET /api/health`; also the shape the UI polls on startup. */
 export interface HealthResponse {
   status: 'ok';
   version: string;
+  /** Simulation workers allowed (`SIM_WORKERS`). */
   simWorkers: number;
+  /** Runs on a worker now, and runs waiting for one. */
+  runsPlaying: number;
+  runsWaiting: number;
   uptimeSeconds: number;
+}
+
+/** What the routes work with; phase 6 adds to it. */
+export interface Services {
+  readonly supervisor?: Supervisor;
 }
 
 const packageVersion = '0.0.0';
@@ -18,7 +28,10 @@ const packageVersion = '0.0.0';
  * Build the API server without listening, so tests can drive it with `app.inject`.
  * Routes for runs, cycles, decks, stats, bans, games and cards arrive in phase 6.
  */
-export const buildApp = async (config: ServerConfig): Promise<FastifyInstance> => {
+export const buildApp = async (
+  config: ServerConfig,
+  services: Services = {},
+): Promise<FastifyInstance> => {
   const app = Fastify({
     logger: { level: config.logLevel },
   });
@@ -30,6 +43,8 @@ export const buildApp = async (config: ServerConfig): Promise<FastifyInstance> =
       status: 'ok',
       version: packageVersion,
       simWorkers: config.simWorkers,
+      runsPlaying: services.supervisor?.load.busy ?? 0,
+      runsWaiting: services.supervisor?.load.queued ?? 0,
       uptimeSeconds: Math.round(process.uptime()),
     };
   });

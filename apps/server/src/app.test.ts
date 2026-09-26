@@ -24,6 +24,7 @@ describe('the API server', () => {
     const body = response.json<HealthResponse>();
     expect(body.status).toBe('ok');
     expect(body.simWorkers).toBe(2);
+    expect([body.runsPlaying, body.runsWaiting]).toEqual([0, 0]);
     expect(body.uptimeSeconds).toBeGreaterThanOrEqual(0);
   });
 

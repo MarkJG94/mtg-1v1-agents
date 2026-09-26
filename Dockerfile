@@ -47,6 +47,8 @@ COPY --from=prod-deps /app/node_modules /app/node_modules
 COPY --from=prod-deps /app/apps/server/node_modules /app/apps/server/node_modules
 COPY --from=build /app/apps/server/dist /app/apps/server/dist
 COPY --from=build /app/apps/server/drizzle /app/apps/server/drizzle
+# The hand-written card scripts, which the scripting worker reads (CARD_SCRIPTS_DIR).
+COPY --from=build /app/packages/cards/scripts /app/packages/cards/scripts
 COPY --from=build /app/apps/web/dist /app/web
 COPY --from=build /app/scripts /app/scripts
 COPY --from=build /app/package.json /app/package.json

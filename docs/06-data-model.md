@@ -69,11 +69,11 @@ Size: a typical game produces 300–1,500 events, ≈ 20–80 KB uncompressed, �
 
 ## Resume protocol
 
-The run driver (`driveRun`, `packages/sim/src/run.ts`) writes through a `RunStore` port; `SqliteRunStore` (`apps/server/src/db/run-store.ts`) is the port over these tables, one transaction per write. The checkpoints:
+The run driver (`driveRun`, `packages/sim/src/run.ts`) writes through a `RunStore` port; `SqliteRunStore` (`apps/server/src/db/run-store.ts`) is the port over these tables, one transaction per write. The driver runs on a simulation worker and the store in the API process, which serves it to the worker over a message port (5.7), so the API process is the only writer. The checkpoints:
 
 1. **Cycle start** — a `cycles` row with status `running`, then, if a ban is pending or a deck breaks the list (after a ban between cycles, a fork, an import), the legalised decks as generations with `cause: 'ban'` and the trail with those edits applied after game `<cycleSeed>:start`.
 2. **Every match** — the match row with its whole result (`detail`), its games with their logs, any generations a ban forced during it, and the ban trail as it stands.
-3. **Cycle end** — the cycle's record (columns, `summary`, `card_stats`), the loser's changed deck as a generation with `cause: 'change'`, and the trail.
+3. **Cycle end** — the cycle's record (columns, `summary`, `card_stats`), the loser's changed deck as a generation with `cause: 'change'` — or none, and the deck agent's reason in the summary's `unchanged`, when it found nothing playable to change with (ADR 0017) — and the trail.
 
 On restart, a run whose status is `running` is loaded; if it has a cycle in progress, that cycle is handed its stored matches and their logs and plays on from the next match number (match seeds are `<run seed>:cycle-<n>:match-<m>`, so a replayed match is identical). Its play/draw records and statistics are rebuilt from those matches, so the resumed cycle ends exactly where the one that never stopped would have (ADR 0015). **Trials are not stored**: they are replayed with the change, from the same seeds, to the same change. A run that is paused or stopped between two matches halts after the match in progress has been written.
 

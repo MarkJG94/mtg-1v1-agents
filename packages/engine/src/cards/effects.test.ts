@@ -109,7 +109,54 @@ const pinger: CardDefinition = {
   ],
 };
 
-const definitions = [spark, grove, bear, anthem, welcomer, pinger];
+/** A basic-like land that makes one colour only. */
+const crag: CardDefinition = {
+  oracleId: id('crag'),
+  name: 'Crag',
+  manaCost: parseManaCost(''),
+  types: ['land'],
+  colours: [],
+  abilities: [{ kind: 'mana', id: 'tap-for-r', modes: [[{ type: 'R', amount: 1 }]] }],
+};
+
+/** Two colours to pay, so a dual land has to make the one the other land cannot. */
+const hybrid: CardDefinition = {
+  oracleId: id('hybrid'),
+  name: 'Hybrid',
+  manaCost: parseManaCost('{R}{G}'),
+  types: ['creature'],
+  colours: ['R', 'G'],
+  power: 2,
+  toughness: 2,
+  abilities: [],
+};
+
+/** One land, two abilities that each tap it: it makes one mana, never two. */
+const painland: CardDefinition = {
+  oracleId: id('painland'),
+  name: 'Painland',
+  manaCost: parseManaCost(''),
+  types: ['land'],
+  colours: [],
+  abilities: [
+    { kind: 'mana', id: 'tap-for-c', modes: [[{ type: 'C', amount: 1 }]] },
+    { kind: 'mana', id: 'tap-for-g', modes: [[{ type: 'G', amount: 1 }]] },
+  ],
+};
+
+/** A phyrexian symbol and a generic one: green or 2 life, and one more of anything. */
+const mutant: CardDefinition = {
+  oracleId: id('mutant'),
+  name: 'Mutant',
+  manaCost: parseManaCost('{1}{G/P}'),
+  types: ['creature'],
+  colours: ['G'],
+  power: 2,
+  toughness: 2,
+  abilities: [],
+};
+
+const definitions = [spark, grove, bear, anthem, welcomer, pinger, crag, hybrid, painland, mutant];
 
 const table = (options: { readonly seed?: string } = {}) =>
   game({ definitions, ...(options.seed !== undefined ? { seed: options.seed } : {}) });
@@ -131,6 +178,96 @@ describe('casting a spell from a card script', () => {
     expect(scenario.lifeOf('B')).toBe(17);
     expect(scenario.object('land').tapped).toBe(true);
     expect(scenario.zoneOf('bolt')).toBe(playerZone('A', 'graveyard'));
+  });
+
+  it('taps a dual land for the colour the other lands cannot make, whatever order they are in', () => {
+    // CR 601.2g–h: the player activates mana abilities and then pays. Tapping the dual
+    // first for red — its first mode — would leave green unpaid; legality said the spell
+    // could be paid, so the tapper must find the way it can (docs/09: an offered action is
+    // never refused).
+    const scenario = table()
+      .player('A')
+      .battlefield({ name: 'dual', definitionId: grove.oracleId })
+      .battlefield({ name: 'mountain', definitionId: crag.oracleId })
+      .hand({ name: 'hybrid', definitionId: hybrid.oracleId })
+      .start()
+      .to('precombatMain')
+      .player('A')
+      .cast('hybrid')
+      .resolve();
+
+    expect(scenario.zoneOf('hybrid')).toBe('battlefield');
+    expect([scenario.object('dual').tapped, scenario.object('mountain').tapped]).toEqual([
+      true,
+      true,
+    ]);
+  });
+
+  it('taps a land with two mana abilities once, and pays with the lands after it', () => {
+    // CR 605.3a / 602.5a: an ability with {T} in its cost cannot be activated once the
+    // permanent is tapped, whichever of its abilities tapped it.
+    const scenario = table()
+      .player('A')
+      .battlefield({ name: 'painland', definitionId: painland.oracleId })
+      .battlefield({ name: 'mountain', definitionId: crag.oracleId })
+      .hand({ name: 'bear', definitionId: bear.oracleId })
+      .start()
+      .to('precombatMain')
+      .player('A')
+      .cast('bear')
+      .resolve();
+
+    expect(scenario.zoneOf('bear')).toBe('battlefield');
+  });
+
+  it('does not offer a two-mana spell to one land with two mana abilities', () => {
+    const scenario = table()
+      .player('A')
+      .battlefield({ name: 'painland', definitionId: painland.oracleId })
+      .hand({ name: 'bear', definitionId: bear.oracleId })
+      .start()
+      .to('precombatMain')
+      .player('A');
+
+    const decision = scenario.get().pendingDecision;
+    expect(decision?.kind).toBe('priority');
+    const options = decision?.kind === 'priority' ? decision.options : [];
+    expect(options.some((action) => action.kind === 'cast')).toBe(false);
+  });
+
+  it('pays a phyrexian symbol with life when no land can make its colour', () => {
+    // CR 107.4f: {G/P} is paid with {G} or 2 life; CR 119.4: paying life is losing it.
+    const scenario = table()
+      .player('A')
+      .life(20)
+      .battlefield({ name: 'mountain', definitionId: crag.oracleId })
+      .hand({ name: 'mutant', definitionId: mutant.oracleId })
+      .start()
+      .to('precombatMain')
+      .player('A')
+      .cast('mutant')
+      .resolve();
+
+    expect(scenario.zoneOf('mutant')).toBe('battlefield');
+    expect(scenario.object('mountain').tapped).toBe(true);
+    expect(scenario.lifeOf('A')).toBe(18);
+  });
+
+  it('pays a phyrexian symbol with mana, not life, when the lands can make it', () => {
+    const scenario = table()
+      .player('A')
+      .life(20)
+      .battlefield({ name: 'dual', definitionId: grove.oracleId })
+      .battlefield({ name: 'mountain', definitionId: crag.oracleId })
+      .hand({ name: 'mutant', definitionId: mutant.oracleId })
+      .start()
+      .to('precombatMain')
+      .player('A')
+      .cast('mutant')
+      .resolve();
+
+    expect(scenario.zoneOf('mutant')).toBe('battlefield');
+    expect(scenario.lifeOf('A')).toBe(20);
   });
 
   it('refuses a spell there is no mana for', () => {

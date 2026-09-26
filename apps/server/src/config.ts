@@ -14,6 +14,8 @@ const envSchema = z.object({
   /** Simulation workers. Defaults to one per core, less the API process. */
   SIM_WORKERS: z.coerce.number().int().min(1).max(256).optional(),
   SCRYFALL_IMAGE_CACHE: z.enum(['lazy', 'off']).default('lazy'),
+  /** The hand-written card scripts; the repository's, relative to where the server runs. */
+  CARD_SCRIPTS_DIR: z.string().default('packages/cards/scripts'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   /** Directory of the built web app; served as static files when it exists. */
@@ -27,6 +29,9 @@ export interface ServerConfig {
   databasePath: string;
   scryfallDir: string;
   imageCacheDir: string;
+  /** Scryfall's projections, one per line (`pnpm fetch:scryfall`). */
+  cardsPath: string;
+  cardScriptsDir: string;
   simWorkers: number;
   scryfallImageCache: 'lazy' | 'off';
   logLevel: z.infer<typeof envSchema>['LOG_LEVEL'];
@@ -51,6 +56,8 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): ServerConfig =
     databasePath: resolve(dataDir, 'mtg.db'),
     scryfallDir: resolve(dataDir, 'scryfall'),
     imageCacheDir: resolve(dataDir, 'images'),
+    cardsPath: resolve(dataDir, 'scryfall', 'cards.jsonl'),
+    cardScriptsDir: resolve(parsed.CARD_SCRIPTS_DIR),
     simWorkers: parsed.SIM_WORKERS ?? defaultSimWorkers(),
     scryfallImageCache: parsed.SCRYFALL_IMAGE_CACHE,
     logLevel: parsed.LOG_LEVEL,

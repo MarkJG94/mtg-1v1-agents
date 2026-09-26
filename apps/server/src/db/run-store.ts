@@ -56,6 +56,7 @@ interface CycleSummary {
   readonly playDraw: CycleRecord['playDraw'];
   readonly shown: CycleRecord['shown'];
   readonly trials: CycleRecord['trials'];
+  readonly unchanged?: string | null;
   readonly deck: Readonly<Record<PlayerId, DeckCounts>>;
 }
 
@@ -179,21 +180,20 @@ export class SqliteRunStore implements RunStore {
     );
   }
 
+  /** Every run, oldest first: what `GET /api/runs` lists and the server resumes at boot. */
+  async list(): Promise<RunInfo[]> {
+    return this.db
+      .select()
+      .from(runs)
+      .orderBy(asc(runs.createdAt), asc(runs.id))
+      .all()
+      .map(runInfoOf);
+  }
+
   async load(runId: string): Promise<RunSnapshot | null> {
     const row = this.db.select().from(runs).where(eq(runs.id, runId)).get();
     if (row === undefined) return null;
-    const run: RunInfo = {
-      id: row.id,
-      name: row.name,
-      seed: row.seed,
-      settings: JSON.parse(row.settings) as RunSettings,
-      status: row.status,
-      createdAt: row.createdAt,
-      forkedFrom:
-        row.forkedFromRun === null
-          ? null
-          : { run: row.forkedFromRun, cycle: row.forkedFromCycle ?? 0 },
-    };
+    const run = runInfoOf(row);
     const lineage = this.db
       .select()
       .from(deckGenerations)
@@ -275,6 +275,7 @@ export class SqliteRunStore implements RunStore {
       playDraw: record.playDraw,
       shown: record.shown,
       trials: record.trials,
+      unchanged: record.unchanged,
       deck: { A: record.stats.A.deck, B: record.stats.B.deck },
     };
     this.db
@@ -355,6 +356,7 @@ export class SqliteRunStore implements RunStore {
       stats: { A: stats('A'), B: stats('B') },
       shown: summary.shown,
       trials: summary.trials,
+      unchanged: summary.unchanged ?? null,
     };
   }
 
@@ -506,6 +508,17 @@ export class SqliteRunStore implements RunStore {
 }
 
 const cycleId = (runId: string, number: number): string => `${runId}:${number}`;
+
+const runInfoOf = (row: typeof runs.$inferSelect): RunInfo => ({
+  id: row.id,
+  name: row.name,
+  seed: row.seed,
+  settings: JSON.parse(row.settings) as RunSettings,
+  status: row.status,
+  createdAt: row.createdAt,
+  forkedFrom:
+    row.forkedFromRun === null ? null : { run: row.forkedFromRun, cycle: row.forkedFromCycle ?? 0 },
+});
 
 /** A cycle's statistics for one agent as `card_stats` rows. */
 const statRows = (

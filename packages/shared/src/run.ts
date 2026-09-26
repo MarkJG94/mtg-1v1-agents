@@ -67,4 +67,10 @@ export interface CycleRecord {
   readonly shown: Readonly<Record<PlayerId, readonly DeckSlot[]>>;
   /** The statistics each trial of the deck change recorded, by candidate (docs/05 step 3). */
   readonly trials: Readonly<Record<string, AgentCounts>>;
+  /**
+   * Why the loser's deck did not change, when the deck agent found nothing the engine can
+   * play to make the change with (docs/05 "Choosing the change"); `null` when it changed.
+   * The run goes on: a cycle that changes nothing is a cycle, not a failure.
+   */
+  readonly unchanged: string | null;
 }
