@@ -176,3 +176,29 @@ const slotsOf = (zone: ReadonlyMap<OracleId, number>): DeckSlot[] =>
   [...zone]
     .map(([oracleId, count]) => ({ oracleId, count }))
     .sort((a, b) => (a.oracleId < b.oracleId ? -1 : a.oracleId > b.oracleId ? 1 : 0));
+
+/** What a new generation of a deck took out and put in, zone by zone. */
+export interface DeckDiff {
+  readonly removed: readonly DeckChangeSlot[];
+  readonly added: readonly DeckChangeSlot[];
+}
+
+/**
+ * Two decks compared copy by copy in each zone: a change's slot out and slot in, a swap's
+ * moves both ways, or a legalisation's cuts and the cards that filled them (roadmap 6.4).
+ * Main before side, then by oracle id, so the same two decks always read the same.
+ */
+export const deckDiff = (before: Deck75, after: Deck75): DeckDiff => {
+  const removed: DeckChangeSlot[] = [];
+  const added: DeckChangeSlot[] = [];
+  for (const zone of ['main', 'side'] as const) {
+    const was = counted(before[zone]);
+    const now = counted(after[zone]);
+    for (const oracleId of [...new Set([...was.keys(), ...now.keys()])].sort()) {
+      const delta = (now.get(oracleId) ?? 0) - (was.get(oracleId) ?? 0);
+      if (delta < 0) removed.push({ oracleId, zone, count: -delta });
+      if (delta > 0) added.push({ oracleId, zone, count: delta });
+    }
+  }
+  return { removed, added };
+};

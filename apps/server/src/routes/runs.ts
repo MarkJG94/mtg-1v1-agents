@@ -5,8 +5,10 @@ import {
   banListOf,
   banRequestSchema,
   createRunRequestSchema,
+  type DeckGeneration,
   exportQuerySchema,
   forkRunRequestSchema,
+  type Legalisation,
   paginationSchema,
   parseRunSettings,
   type RunSummary,
@@ -58,6 +60,29 @@ const initialBans = (
 /** Export bundles carry every match and, if asked, every log: far past Fastify's 1 MB. */
 const BUNDLE_LIMIT = 1024 * 1024 * 1024;
 
+/**
+ * Each generation a ban made, newest first: a legalisation is one forced change (docs/05),
+ * so its change record says what it cut and put in.
+ */
+const legalisations = (lineage: readonly DeckGeneration[]): Legalisation[] =>
+  lineage
+    .flatMap((entry) =>
+      entry.cause !== 'ban' || entry.change === null
+        ? []
+        : [
+            {
+              agent: entry.agent,
+              generation: entry.generation,
+              cycle: entry.cycle,
+              removed: [{ ...entry.change.remove }],
+              added: [{ ...entry.change.add }],
+            },
+          ],
+    )
+    .sort(
+      (a, b) => b.cycle - a.cycle || b.generation - a.generation || (a.agent < b.agent ? -1 : 1),
+    );
+
 export const runRoutes = async (app: FastifyInstance, services: Services): Promise<void> => {
   const { supervisor, queries, now } = services;
   const { store } = supervisor;
@@ -96,6 +121,7 @@ export const runRoutes = async (app: FastifyInstance, services: Services): Promi
       })),
       history,
       playing: supervisor.isActive(runId),
+      legalisations: legalisations(queries.lineage(runId)),
     };
   };
 

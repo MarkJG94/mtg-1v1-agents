@@ -28,6 +28,7 @@ Fastify on one port; JSON over HTTP for state, WebSocket for live streams. All D
 | GET | `/api/cards?q=` | search Scryfall projection (name/type/text), with support status |
 | GET | `/api/cards/:oracleId` | card + script status + stats across runs |
 | POST | `/api/cards/resolve` | `{ names, script? }` → each typed name's card and support status |
+| POST | `/api/cards/lookup` | `{ oracleIds }` → each card's name, cost, type line and support (6.4) |
 | POST | `/api/cards/:oracleId/script` | force (re)scripting; returns validation result |
 | GET | `/api/coverage` | parser coverage summary + most-requested unsupported cards |
 | GET | `/img/:oracleId?size=small|normal` | cached image proxy |
@@ -55,6 +56,11 @@ Errors are `{ error: { code, message, details? } }` with proper status codes; va
 - **Run summaries** carry `winRates` (A's rate in each of the last 40 finished cycles, oldest first) and `lastChange` (the newest change's reason), for the runs list.
 - **The web app**: when `WEB_DIST` is served, any `GET` that is no route, not under `/api`, `/ws` or `/img` and not a file name answers the app's `index.html`, so a reload or a pasted link to `/runs/…` lands on the page. Before 6.3 this was a second not-found handler, which Fastify refuses — a server with `WEB_DIST` set, which is to say the Docker image, did not start.
 
+
+**As built (6.4)**, for the run dashboard (docs/08):
+
+- **`POST /api/cards/lookup`** answers, for up to 500 oracle ids, each card's summary (name, mana cost, mana value, type line, colour identity, support) in the order asked, each once, leaving out an id the catalogue lacks. A deck is a list of oracle ids, and the dashboard names, groups and curves both seventy-fives from one or two of these rather than a request per card.
+- **`GET /api/runs/:id/bans`** also answers `legalisations`: every generation a ban made — `{ agent, generation, cycle, removed, added }` — newest first. A legalisation is one forced change (docs/05), so its change record is what it cut and put in; a test holds each one to the difference between that generation's deck and the one before it in the lineage. The same slots are what `deckChanged` carries for a `ban` generation.
 
 ## WebSocket `/ws`
 

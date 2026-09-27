@@ -442,6 +442,18 @@ export class Queries {
     return rows.map(summaryOfCard);
   }
 
+  /** Cards by oracle id, in the order asked, each once; an id the catalogue lacks is left out. */
+  cardsById(oracleIds: readonly string[]) {
+    const statement = this.sqlite.prepare(
+      `SELECT c.*, s.status AS support FROM cards c
+       LEFT JOIN card_scripts s ON s.oracle_id = c.oracle_id WHERE c.oracle_id = ?`,
+    );
+    return [...new Set(oracleIds)].flatMap((oracleId) => {
+      const row = statement.get(oracleId) as CardRow | undefined;
+      return row === undefined ? [] : [summaryOfCard(row)];
+    });
+  }
+
   card(oracleId: string) {
     const row = this.sqlite
       .prepare(

@@ -9,6 +9,7 @@ import {
   coverageSchema,
   cycleDetailSchema,
   cyclePageSchema,
+  deckDiff,
   gameDetailSchema,
   gameLogSchema,
   healthSchema,
@@ -323,6 +324,70 @@ describe('bans', async () => {
   });
 });
 
+const slot = (each: { oracleId: string; count: number }) => ({
+  oracleId: asOracleId(each.oracleId),
+  count: each.count,
+});
+
+describe('a ban that takes effect', async () => {
+  const made = await call(
+    runSummarySchema,
+    { method: 'POST', url: '/api/runs', payload: { name: 'banned', settings: request } },
+    201,
+  );
+  const url = `/api/runs/${made.id}`;
+  const detail = await call(runDetailSchema, { method: 'GET', url });
+  const target = detail.decks.A.deck.main.find(
+    (slot) => !pool.some((card) => card.oracleId === slot.oracleId && /Basic/.test(card.typeLine)),
+  );
+  if (target === undefined) throw new Error('no card to ban');
+  await call(
+    banStateSchema,
+    { method: 'PUT', url: `${url}/bans/${target.oracleId}`, payload: { status: 'banned' } },
+    202,
+  );
+  await call(runSummarySchema, { method: 'POST', url: `${url}/start`, payload: { cycles: 1 } });
+  await within(supervisor.idle(made.id), 'the banned run playing its cycle');
+
+  it('says what legalising each deck cut and put in, from the lineage', async () => {
+    const state = await call(banStateSchema, { method: 'GET', url: `${url}/bans` });
+    expect(state.list.map((entry) => [entry.oracleId, entry.status])).toEqual([
+      [target.oracleId, 'banned'],
+    ]);
+    // Both agents began on the same seventy-five, so both held the card.
+    expect(state.legalisations.map((each) => each.agent).sort()).toEqual(['A', 'B']);
+    for (const agent of ['A', 'B'] as const) {
+      const { generations } = await call(lineageSchema, {
+        method: 'GET',
+        url: `${url}/decks/${agent}`,
+      });
+      const legalised = state.legalisations.find((each) => each.agent === agent);
+      const after = generations.find((each) => each.generation === legalised?.generation);
+      const before = generations.find(
+        (each) => each.generation === (legalised?.generation ?? 0) - 1,
+      );
+      if (legalised === undefined || after === undefined || before === undefined) {
+        throw new Error(`no legalisation of ${agent}`);
+      }
+      expect(after.cause).toBe('ban');
+      expect(legalised.cycle).toBe(after.cycle);
+      const diff = deckDiff(
+        { main: before.deck.main.map(slot), side: before.deck.side.map(slot) },
+        { main: after.deck.main.map(slot), side: after.deck.side.map(slot) },
+      );
+      expect({ removed: legalised.removed, added: legalised.added }).toEqual(diff);
+      expect(legalised.removed).toContainEqual({
+        oracleId: target.oracleId,
+        zone: 'main',
+        count: target.count,
+      });
+      const count = (slots: { count: number }[]) =>
+        slots.reduce((sum, each) => sum + each.count, 0);
+      expect(count(legalised.added)).toBe(count(legalised.removed));
+    }
+  });
+});
+
 describe('fork, export and import', () => {
   it('forks a run at a finished cycle', async () => {
     const fork = await call(
@@ -383,6 +448,18 @@ describe('cards and coverage', async () => {
       name: card.name,
       support: 'supported',
     });
+  });
+
+  it('looks cards up by oracle id, each once, in the order asked, leaving out the unknown', async () => {
+    const other = detail.decks.A.deck.main[1]?.oracleId ?? '';
+    const { cards } = await call(cardSearchSchema, {
+      method: 'POST',
+      url: '/api/cards/lookup',
+      payload: { oracleIds: [other, 'no-such-card', played, other] },
+    });
+    expect(cards.map((each) => each.oracleId)).toEqual([other, played]);
+    expect(cards[1]).toMatchObject({ name: card.name, typeLine: card.typeLine });
+    await failure({ method: 'POST', url: '/api/cards/lookup', payload: { oracleIds: [] } }, 400);
   });
 
   it('shows a card with its script and its record across runs', async () => {

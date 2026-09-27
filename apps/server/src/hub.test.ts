@@ -1,5 +1,6 @@
 import {
   asOracleId,
+  deckDiff,
   type GameEvent,
   type WsServerMessage,
   wsServerMessageSchema,
@@ -137,6 +138,21 @@ describe('a viewer of a run played on real workers', async () => {
     if (change !== undefined) {
       expect(change.reason).not.toBeNull();
       expect(change.diff.removed[0]?.count).toBe(change.diff.added[0]?.count);
+    }
+  });
+
+  it('tells it what a ban’s legalisation cut and put in, as the decks bear out', () => {
+    const all = supervisor.store.lineage('watched');
+    const legalised = viewer.of('deckChanged').filter((each) => each.cause === 'ban');
+    expect(legalised.length).toBeGreaterThan(0);
+    for (const message of legalised) {
+      const at = (generation: number) =>
+        all.find((entry) => entry.agent === message.agent && entry.generation === generation);
+      const before = at(message.generation - 1);
+      const after = at(message.generation);
+      if (before === undefined || after === undefined) throw new Error('no such generation');
+      expect(message.diff).toEqual(deckDiff(before.deck, after.deck));
+      expect(message.diff.removed.map((slot) => slot.oracleId)).toContain(target);
     }
   });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyDeckChange, type Deck75, IllegalDeckChangeError } from './deck-change.js';
+import { applyDeckChange, type Deck75, deckDiff, IllegalDeckChangeError } from './deck-change.js';
 import { asOracleId } from './ids.js';
 
 /** Applying a deck change (docs/05 "Choosing the change"; roadmap 5.4). */
@@ -108,5 +108,54 @@ describe('a swap', () => {
         add: { oracleId: id('wolf'), zone: 'main', count: 4 },
       }),
     ).toThrow(/side deck holds 0 of wolf/);
+  });
+});
+
+describe('the difference between two decks', () => {
+  const before: Deck75 = {
+    main: [
+      { oracleId: id('bolt'), count: 4 },
+      { oracleId: id('shock'), count: 4 },
+      { oracleId: id('mountain'), count: 52 },
+    ],
+    side: [{ oracleId: id('pyro'), count: 15 }],
+  };
+
+  it('is a replacement’s slot out and slot in', () => {
+    const after = applyDeckChange(before, {
+      shape: 'replace',
+      remove: { oracleId: id('shock'), zone: 'main', count: 4 },
+      add: { oracleId: id('chain'), zone: 'main', count: 4 },
+    });
+    expect(deckDiff(before, after)).toEqual({
+      removed: [{ oracleId: id('shock'), zone: 'main', count: 4 }],
+      added: [{ oracleId: id('chain'), zone: 'main', count: 4 }],
+    });
+  });
+
+  it('counts copies, zone by zone: a card moved to the side is out of one and into the other', () => {
+    const after: Deck75 = {
+      main: [
+        { oracleId: id('bolt'), count: 1 },
+        { oracleId: id('shock'), count: 4 },
+        { oracleId: id('mountain'), count: 52 },
+        { oracleId: id('pyro'), count: 3 },
+      ],
+      side: [
+        { oracleId: id('pyro'), count: 12 },
+        { oracleId: id('bolt'), count: 3 },
+      ],
+    };
+    expect(deckDiff(before, after)).toEqual({
+      removed: [
+        { oracleId: id('bolt'), zone: 'main', count: 3 },
+        { oracleId: id('pyro'), zone: 'side', count: 3 },
+      ],
+      added: [
+        { oracleId: id('pyro'), zone: 'main', count: 3 },
+        { oracleId: id('bolt'), zone: 'side', count: 3 },
+      ],
+    });
+    expect(deckDiff(before, before)).toEqual({ removed: [], added: [] });
   });
 });

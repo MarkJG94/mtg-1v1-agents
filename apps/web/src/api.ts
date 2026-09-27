@@ -1,13 +1,19 @@
 import {
   apiErrorSchema,
+  banStateSchema,
+  type CardSummary,
   type CreateRunRequest,
+  type CycleSummary,
   cardSearchSchema,
+  cycleDetailSchema,
+  cyclePageSchema,
   healthSchema,
   resolveCardsSchema,
   runDetailSchema,
   runListSchema,
   runSummarySchema,
   seedDeckPreviewSchema,
+  statsTableSchema,
 } from '@mtg/shared';
 import type { z } from 'zod';
 
@@ -68,6 +74,9 @@ const runPath = (id: string) => `/api/runs/${encodeURIComponent(id)}`;
 
 export type RunAction = 'start' | 'pause' | 'stop';
 
+/** The most the API pages at once (docs/07: cycles `limit` at most 500) and looks up. */
+const PAGE = 500;
+
 export const api = {
   health: () => request(healthSchema, '/api/health'),
   runs: () => request(runListSchema, '/api/runs'),
@@ -85,6 +94,46 @@ export const api = {
   }) => post(seedDeckPreviewSchema, '/api/seed-decks', body),
   resolveCards: (names: readonly string[], script = true) =>
     post(resolveCardsSchema, '/api/cards/resolve', { names, script }),
+  cycles: (id: string, offset = 0, limit = 50) =>
+    request(cyclePageSchema, `${runPath(id)}/cycles?offset=${offset}&limit=${limit}`),
+  /** Every finished cycle, page by page: the win-rate chart plots them all. */
+  allCycles: async (id: string): Promise<CycleSummary[]> => {
+    const all: CycleSummary[] = [];
+    for (;;) {
+      const page = await api.cycles(id, all.length, PAGE);
+      all.push(...page.cycles);
+      if (page.cycles.length === 0 || all.length >= page.total) return all;
+    }
+  },
+  cycle: (id: string, number: number) =>
+    request(cycleDetailSchema, `${runPath(id)}/cycles/${number}`),
+  stats: (id: string, agent: 'A' | 'B', cycle?: number) =>
+    request(
+      statsTableSchema,
+      `${runPath(id)}/stats?agent=${agent}${cycle === undefined ? '' : `&cycle=${cycle}`}`,
+    ),
+  bans: (id: string) => request(banStateSchema, `${runPath(id)}/bans`),
+  ban: (id: string, oracleId: string, body: { status: 'banned' | 'restricted'; note: string }) =>
+    request(banStateSchema, `${runPath(id)}/bans/${encodeURIComponent(oracleId)}`, {
+      method: 'PUT',
+      body,
+    }),
+  unban: (id: string, oracleId: string) =>
+    request(banStateSchema, `${runPath(id)}/bans/${encodeURIComponent(oracleId)}`, {
+      method: 'DELETE',
+    }),
+  /** Cards by oracle id, as many as asked, in requests of at most 500. */
+  lookupCards: async (oracleIds: readonly string[]): Promise<CardSummary[]> => {
+    const unique = [...new Set(oracleIds)];
+    const found: CardSummary[] = [];
+    for (let start = 0; start < unique.length; start += PAGE) {
+      const { cards } = await post(cardSearchSchema, '/api/cards/lookup', {
+        oracleIds: unique.slice(start, start + PAGE),
+      });
+      found.push(...cards);
+    }
+    return found;
+  },
   searchCards: (q: string, limit = 12) =>
     request(cardSearchSchema, `/api/cards?${new URLSearchParams({ q, limit: String(limit) })}`),
 };

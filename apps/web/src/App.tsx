@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from './api.js';
 import { useConnected } from './live.js';
+import { CyclePage } from './pages/CyclePage.js';
 import { NewRunPage } from './pages/NewRunPage.js';
 import { RunPage } from './pages/RunPage.js';
 import { RunsPage } from './pages/RunsPage.js';
@@ -8,8 +9,7 @@ import { Link, type Route, useRoute } from './router.js';
 
 /**
  * The app shell (docs/08): a header with the pages and the server's state, and the page
- * the path names. Pages to come — the run dashboard, the game viewer, coverage — are
- * roadmap 6.4 to 6.6.
+ * the path names. Pages to come — the game viewer and coverage — are roadmap 6.5 and 6.6.
  */
 export const App = () => {
   const route = useRoute();
@@ -20,7 +20,12 @@ export const App = () => {
           <Link to="/" className="font-semibold tracking-tight">
             MTG 1v1 Agents
           </Link>
-          <Link to="/" className={navClass(route.page === 'runs' || route.page === 'run')}>
+          <Link
+            to="/"
+            className={navClass(
+              route.page === 'runs' || route.page === 'run' || route.page === 'cycle',
+            )}
+          >
             Runs
           </Link>
           <Link to="/runs/new" className={navClass(route.page === 'newRun')}>
@@ -49,6 +54,8 @@ const Page = ({ route }: { route: Route }) => {
       return <NewRunPage />;
     case 'run':
       return <RunPage runId={route.runId} />;
+    case 'cycle':
+      return <CyclePage runId={route.runId} cycle={route.cycle} />;
     case 'notFound':
       return (
         <p>

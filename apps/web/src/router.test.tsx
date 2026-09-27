@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { Link, matchRoute, navigate, runPath, usePathname } from './router.js';
+import { cyclePath, Link, matchRoute, navigate, runPath, usePathname } from './router.js';
 
 /** The app's routes (docs/08 "Pages"): runs, a new run, and a run by its id. */
 
@@ -12,6 +12,13 @@ describe('matching a path', () => {
     expect(matchRoute('/runs/')).toEqual({ page: 'runs' });
     expect(matchRoute('/runs/new')).toEqual({ page: 'newRun' });
     expect(matchRoute('/runs/abc-123')).toEqual({ page: 'run', runId: 'abc-123' });
+  });
+
+  it('knows a run’s cycle, numbered from 1', () => {
+    expect(matchRoute('/runs/abc/cycles/12')).toEqual({ page: 'cycle', runId: 'abc', cycle: 12 });
+    expect(matchRoute(cyclePath('a b', 3))).toEqual({ page: 'cycle', runId: 'a b', cycle: 3 });
+    expect(matchRoute('/runs/abc/cycles/0').page).toBe('notFound');
+    expect(matchRoute('/runs/abc/cycles/x').page).toBe('notFound');
   });
 
   it('round-trips a run id that needs escaping', () => {

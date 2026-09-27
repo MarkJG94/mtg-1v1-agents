@@ -305,12 +305,32 @@ export const unbanRequestSchema = z.object({
   by: z.string().max(200).default('operator'),
 });
 
+const deckSlotChangeSchema = z.object({
+  oracleId,
+  zone: z.enum(['main', 'side']),
+  count: z.int().min(1),
+});
+
+/** A deck the list made illegal, and what legalising it cut and put in (docs/05). */
+export const legalisationSchema = z.object({
+  agent,
+  generation: z.int().min(1),
+  /** The cycle it was made in: the one whose game the ban took effect after. */
+  cycle: z.int().min(0),
+  removed: z.array(deckSlotChangeSchema),
+  added: z.array(deckSlotChangeSchema),
+});
+export type Legalisation = z.infer<typeof legalisationSchema>;
+
 export const banStateSchema = z.object({
   list: z.array(banEntrySchema),
   history: z.array(banEventSchema),
   /** Whether the run is on a worker, where an edit takes effect after the game in progress. */
   playing: z.boolean(),
+  /** Every legalisation the list has caused, newest first (roadmap 6.4). */
+  legalisations: z.array(legalisationSchema),
 });
+export type BanState = z.infer<typeof banStateSchema>;
 
 // --- Export ---
 
@@ -405,6 +425,11 @@ export const cardSummarySchema = z.object({
 export type CardSummary = z.infer<typeof cardSummarySchema>;
 
 export const cardSearchSchema = z.object({ cards: z.array(cardSummarySchema) });
+
+/** Cards by oracle id, for a page that holds ids and shows names (roadmap 6.4). */
+export const cardLookupRequestSchema = z.object({
+  oracleIds: z.array(oracleId).min(1).max(500),
+});
 
 export const scriptStatusSchema = z.object({
   status: z.enum(['supported', 'partial', 'unsupported']),

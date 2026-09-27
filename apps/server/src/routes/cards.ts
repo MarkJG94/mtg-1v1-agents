@@ -1,4 +1,8 @@
-import { cardSearchQuerySchema, resolveCardsRequestSchema } from '@mtg/shared';
+import {
+  cardLookupRequestSchema,
+  cardSearchQuerySchema,
+  resolveCardsRequestSchema,
+} from '@mtg/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { Services } from '../services.js';
@@ -40,6 +44,12 @@ export const cardRoutes = async (app: FastifyInstance, services: Services): Prom
   });
 
   app.get('/api/coverage', async () => queries.coverage());
+
+  // Cards a page holds the ids of — decks, changes, bans — named in one request (6.4).
+  app.post('/api/cards/lookup', async (request) => {
+    const { oracleIds } = cardLookupRequestSchema.parse(request.body);
+    return { cards: queries.cardsById(oracleIds) };
+  });
 
   // Names a person typed — a pasted decklist, a ban list — as the catalogue's cards, each
   // scripted so its support is known rather than guessed (docs/08 "New run").
