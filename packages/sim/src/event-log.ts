@@ -1,3 +1,4 @@
+import { identityOf } from '@mtg/engine';
 import {
   asGameId,
   CURRENT_EVENT_LOG_VERSION,
@@ -36,6 +37,7 @@ export const eventLogOf = (input: {
 }): GameEventLog => {
   const { played } = input;
   if (played.result === null) throw new UnfinishedGameError(input.gameId);
+  const named = new Set(played.objects.map((object) => object.id));
   const player = (logged: LoggedPlayer) => ({
     deckGeneration: logged.generation,
     main: logged.main,
@@ -46,14 +48,15 @@ export const eventLogOf = (input: {
     gameId: asGameId(input.gameId),
     seed: input.seed,
     players: { A: player(input.players.A), B: player(input.players.B) },
-    // An object keeps its id wherever it goes in this engine, so the final table names
-    // every card that was ever in the game.
-    objects: [...played.state.objects].map(([id, object]) => ({
-      id,
-      oracleId: object.definitionId,
-      owner: object.owner,
-      ...(object.token ? { token: true } : {}),
-    })),
+    // What each object was as an event first named it — abilities and tokens included,
+    // which have ceased to exist by the end — then anything still in the game that no
+    // event ever named, such as a card that sat in a library all game.
+    objects: [
+      ...played.objects,
+      ...[...played.state.objects]
+        .filter(([id]) => !named.has(id))
+        .map(([, object]) => identityOf(object)),
+    ],
     events: played.events,
     result: {
       winner: played.result.winner,

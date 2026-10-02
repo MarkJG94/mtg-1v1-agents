@@ -1,6 +1,6 @@
 import { greedyAgent } from '@mtg/agents';
 import { fuzzBoard } from '@mtg/engine/testing';
-import { CURRENT_EVENT_LOG_VERSION, migrateEventLog } from '@mtg/shared';
+import { CURRENT_EVENT_LOG_VERSION, migrateEventLog, objectsNamedBy } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
 import { eventLogOf, UnfinishedGameError } from './event-log.js';
 import { playGame } from './game.js';
@@ -16,13 +16,31 @@ const players = {
 describe('the event log of a game', () => {
   const log = eventLogOf({ gameId: 'log', seed: 'log', played, players });
 
-  it('names every object any event mentions', () => {
+  it('names every object any event mentions, those gone by the end included', () => {
     const named = new Set(log.objects.map((object) => object.id));
     for (const event of log.events) {
-      if ('object' in event && typeof event.object === 'number')
-        expect(named).toContain(event.object);
+      for (const id of objectsNamedBy(event)) expect(named).toContain(id);
     }
-    expect(named.size).toBe(played.state.objects.size);
+    for (const id of played.state.objects.keys()) expect(named).toContain(id);
+    expect(named.size).toBe(log.objects.length);
+  });
+
+  it('names the abilities that went on the stack, though they ceased to exist (CR 113.7)', () => {
+    const withAbilities = playGame(
+      fuzzBoard('log-3'),
+      { A: greedyAgent(), B: greedyAgent() },
+      'log-3',
+    );
+    const logged = eventLogOf({ gameId: 'x', seed: 'log-3', played: withAbilities, players });
+    const ceased = logged.events.flatMap((event) =>
+      event.type === 'putOnStack' && !withAbilities.state.objects.has(event.object)
+        ? [event.object]
+        : [],
+    );
+    expect(ceased.length).toBeGreaterThan(0);
+    for (const id of ceased) {
+      expect(logged.objects.find((object) => object.id === id)).toMatchObject({ ability: true });
+    }
   });
 
   it('says which generation of each deck played, and how the game ended', () => {

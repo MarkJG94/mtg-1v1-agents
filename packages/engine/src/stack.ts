@@ -41,6 +41,13 @@ export interface StackProperties {
   readonly splitSecond: boolean;
   /** What the spell targets (CR 115). Empty for a spell that targets nothing. */
   readonly targets: readonly EventTarget[];
+  /**
+   * Each object target's timestamp as it was chosen. An object that has changed zones
+   * since is a new object with a new timestamp (CR 400.7, 613.7d), so it is no longer a
+   * legal target (CR 608.2b), even though this engine gives it the same id wherever it
+   * goes.
+   */
+  readonly targetTimestamps?: Readonly<Record<number, number>>;
   /** The spell's own colours, which decide what protection stops it. */
   readonly colours: readonly Colour[];
   /**
@@ -137,18 +144,55 @@ export const putOnStack = (
     resolvesTo: options.resolvesTo ?? playerZone(object.owner, 'graveyard'),
     splitSecond: options.splitSecond ?? false,
     targets,
+    ...(targets.length > 0 ? { targetTimestamps: timestampsOfTargets(state, targets) } : {}),
     colours,
     ...(options.x !== undefined ? { x: options.x } : {}),
   };
 
   const moved = updateObject(moveObject(state, id, 'stack'), id, { stack: stackProperties });
-  emitter.emit(moved, { type: 'cast', player, object: id, targets: [] });
+  emitter.emit(moved, {
+    type: 'cast',
+    player,
+    object: id,
+    targets,
+    ...(options.x !== undefined ? { x: options.x } : {}),
+  });
   emitter.emit(moved, { type: 'putOnStack', object: id });
 
   // The caster receives priority again (CR 117.3c), and the pass count restarts because
   // a spell went on the stack. Handing priority back here rather than leaving the caller
   // to do it keeps the state always answerable.
   return withPriority(moved, player, { passesInARow: 0 });
+};
+
+/** Each object target's timestamp now: what it must still have when the spell resolves. */
+export const timestampsOfTargets = (
+  state: GameState,
+  targets: readonly EventTarget[],
+): Record<number, number> => {
+  const stamps: Record<number, number> = {};
+  for (const target of targets) {
+    if (target.kind !== 'object') continue;
+    const object = state.objects.get(target.object);
+    if (object !== undefined) stamps[target.object] = object.timestamp;
+  }
+  return stamps;
+};
+
+/**
+ * Whether a target is still the thing that was targeted: a player always is, and an
+ * object is if it has not changed zones since (CR 400.7).
+ */
+export const stillTargeted = (
+  state: GameState,
+  stack: Pick<StackProperties, 'targetTimestamps'> | undefined,
+  target: EventTarget,
+): boolean => {
+  if (target.kind !== 'object') return true;
+  const object = state.objects.get(target.object);
+  if (object === undefined) return false;
+  const was = stack?.targetTimestamps?.[target.object];
+  return was === undefined || was === object.timestamp;
 };
 
 const describeTarget = (target: EventTarget): string =>
@@ -165,7 +209,9 @@ export const hasFizzled = (state: GameState, id: ObjectId): boolean => {
   if (!stack || stack.targets.length === 0) return false;
 
   const source: TargetSource = { controller: object.controller, colours: stack.colours };
-  return stack.targets.every((target) => !canBeTargeted(state, target, source).legal);
+  return stack.targets.every(
+    (target) => !stillTargeted(state, stack, target) || !canBeTargeted(state, target, source).legal,
+  );
 };
 
 /**
@@ -308,6 +354,9 @@ const createAbilityOnStack = (
         resolvesTo: 'exile',
         splitSecond: false,
         targets: ability.targets ?? [],
+        ...(ability.targets !== undefined && ability.targets.length > 0
+          ? { targetTimestamps: timestampsOfTargets(state, ability.targets) }
+          : {}),
         colours: [],
         isAbility: true,
         abilityId: ability.abilityId,
@@ -351,7 +400,7 @@ export const putActivatedAbilityOnStack = (
     player: ability.controller,
     source: ability.source,
     abilityIndex: 0,
-    targets: [],
+    targets: ability.targets ?? [],
   });
   emitter.emit(created, { type: 'putOnStack', object: id });
 

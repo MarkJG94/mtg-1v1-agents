@@ -239,6 +239,28 @@ describe('moveObject', () => {
     assertStateInvariants(moved);
   });
 
+  it('makes a new object of one that changes zones, with no memory of the old (CR 400.7)', () => {
+    const { state, field } = stateWithObjects();
+    const used = updateObject(state, field, {
+      tapped: true,
+      counters: { '+1/+1': 2 },
+      damage: 3,
+      deathtouched: true,
+    });
+    const back = moveObject(moveObject(used, field, 'A:hand'), field, 'battlefield');
+    const { tapped, counters, damage, deathtouched } = getObject(back, field);
+    expect({ tapped, counters, damage, deathtouched }).toEqual({
+      tapped: false,
+      counters: {},
+      damage: 0,
+      deathtouched: false,
+    });
+    // Moving within a zone is not changing zones.
+    expect(getObject(moveObject(used, field, 'battlefield'), field).counters).toEqual({
+      '+1/+1': 2,
+    });
+  });
+
   it('appends to the destination by default', () => {
     const { state, top, library, field } = stateWithObjects();
     const moved = moveObject(state, top, 'battlefield');

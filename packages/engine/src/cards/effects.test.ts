@@ -156,7 +156,41 @@ const mutant: CardDefinition = {
   abilities: [],
 };
 
-const definitions = [spark, grove, bear, anthem, welcomer, pinger, crag, hybrid, painland, mutant];
+/** Two targets, so one can go away while the other stays. */
+const fork: CardDefinition = {
+  oracleId: id('fork'),
+  name: 'Fork',
+  manaCost: parseManaCost('{R}'),
+  types: ['instant'],
+  colours: ['R'],
+  abilities: [
+    {
+      kind: 'spell',
+      targets: [
+        { id: 'first', filter: { kind: 'any' } },
+        { id: 'second', filter: { kind: 'any' } },
+      ],
+      effects: [
+        { op: 'damage', to: { kind: 'chosen', id: 'first' }, amount: 2 },
+        { op: 'damage', to: { kind: 'chosen', id: 'second' }, amount: 2 },
+      ],
+    },
+  ],
+};
+
+const definitions = [
+  fork,
+  spark,
+  grove,
+  bear,
+  anthem,
+  welcomer,
+  pinger,
+  crag,
+  hybrid,
+  painland,
+  mutant,
+];
 
 const table = (options: { readonly seed?: string } = {}) =>
   game({ definitions, ...(options.seed !== undefined ? { seed: options.seed } : {}) });
@@ -280,6 +314,24 @@ describe('casting a spell from a card script', () => {
     expect(() => scenario.cast('bolt', { targets: [{ kind: 'player', player: 'B' }] })).toThrow(
       /cannot pay/,
     );
+  });
+
+  it('does nothing to a target that changed zones before it resolved, and the rest to the others (CR 608.2b, 400.7)', () => {
+    const scenario = table()
+      .player('A')
+      .battlefield({ name: 'land', definitionId: grove.oracleId })
+      .hand({ name: 'fork', definitionId: fork.oracleId })
+      .player('B')
+      .battlefield({ name: 'gone', power: 1, toughness: 3 })
+      .battlefield({ name: 'stays', power: 1, toughness: 3 })
+      .start()
+      .to('precombatMain')
+      .player('A');
+    scenario.cast('fork', { targets: [scenario.target('gone'), scenario.target('stays')] });
+    scenario.exile('gone').resolve();
+
+    expect(scenario.object('stays').damage).toBe(2);
+    expect(scenario.object('gone').damage).toBe(0);
   });
 
   it('refuses an illegal target as the spell is cast (CR 601.2c)', () => {

@@ -5,6 +5,7 @@ export * from './decklist.js';
 export * from './eventlog/events.js';
 export * from './eventlog/log.js';
 export * from './eventlog/migrations.js';
+export * from './eventlog/replay.js';
 export * from './game/card-kinds.js';
 export * from './game/colour.js';
 export * from './game/decisions.js';

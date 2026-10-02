@@ -311,8 +311,11 @@ const applyOp = (
     case 'tap':
     case 'untap': {
       let current = state;
+      const tapped = effect.op === 'tap';
       for (const object of resolveObjects(state, context, effect.object)) {
-        current = updateObject(current, object, { tapped: effect.op === 'tap' });
+        if (current.objects.get(object)?.tapped === tapped) continue;
+        current = updateObject(current, object, { tapped });
+        emitter.emit(current, { type: effect.op, object });
       }
       return current;
     }

@@ -1,6 +1,6 @@
 import type { ObjectId } from '@mtg/shared';
 import type { EventEmitter } from '../events/emitter.js';
-import { hasFizzled, resolveTopOfStack, topOfStack } from '../stack.js';
+import { hasFizzled, resolveTopOfStack, stillTargeted, topOfStack } from '../stack.js';
 import type { GameState } from '../state/game-state.js';
 import { getObject } from '../state/update.js';
 import {
@@ -54,7 +54,16 @@ export const resolveTop = (state: GameState, emitter: EventEmitter): GameState =
   const context: EffectContext = {
     source: object.stack?.source ?? id,
     controller: object.controller,
-    targets: bindTargets(targetsOf(ability), object.stack?.targets ?? []),
+    // A target that has left the zone it was targeted in is illegal now, and the spell
+    // does nothing to it (CR 608.2b); the rest it still does.
+    targets: Object.fromEntries(
+      Object.entries(bindTargets(targetsOf(ability), object.stack?.targets ?? [])).map(
+        ([id, targets]) => [
+          id,
+          targets.filter((target) => stillTargeted(state, object.stack, target)),
+        ],
+      ),
+    ),
     x: object.stack?.x ?? 0,
   };
 

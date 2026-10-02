@@ -12,7 +12,7 @@ import {
   viewFor,
 } from '@mtg/engine';
 import type { PlayerView } from '@mtg/engine/view';
-import type { GameEvent, GameResult, PlayerId } from '@mtg/shared';
+import type { EventLogObject, GameEvent, GameResult, PlayerId } from '@mtg/shared';
 
 /**
  * Play one game between two agents (the core of roadmap 5.1's match runner).
@@ -35,6 +35,8 @@ export interface PlayedGame {
   readonly state: GameState;
   /** Everything the engine emitted, oldest first — what an event log is made of. */
   readonly events: readonly GameEvent[];
+  /** What every object an event named is, including those gone by the end (docs/06). */
+  readonly objects: readonly EventLogObject[];
 }
 
 export interface PlayOptions {
@@ -47,7 +49,7 @@ export interface PlayOptions {
    */
   readonly score?: (view: PlayerView) => number;
   /** Handed each event as the engine emits it, for a live viewer (docs/07 `gameEvents`). */
-  readonly onEvent?: (event: GameEvent) => void;
+  readonly onEvent?: (event: GameEvent, introduced: readonly EventLogObject[]) => void;
 }
 
 export class StalledGameError extends Error {
@@ -103,5 +105,11 @@ export const playGame = (
     state = applyDecision(state, emitter, response);
   }
 
-  return { result: state.result, decisions, state, events: emitter.events };
+  return {
+    result: state.result,
+    decisions,
+    state,
+    events: emitter.events,
+    objects: emitter.objects,
+  };
 };

@@ -208,7 +208,7 @@ const applyOne = (state: GameState, emitter: EventEmitter, event: RulesEvent): G
     case 'addCounters':
       return applyCounters(state, emitter, event);
     case 'poison':
-      return applyPoison(state, event);
+      return applyPoison(state, emitter, event);
   }
 };
 
@@ -275,7 +275,9 @@ const applyEnters = (
 
   // A permanent has summoning sickness until its controller's next turn begins
   // (CR 302.6); "as it enters" replacements decide the rest of how it arrives.
-  let counters = object.counters;
+  // It enters as a new object (CR 400.7), so the only counters it has are the ones it
+  // enters with.
+  let counters: Readonly<Record<string, number>> = {};
   for (const [counter, amount] of Object.entries(event.counters)) {
     if (amount > 0) counters = withCounters({ ...object, counters }, counter, amount).counters;
   }
@@ -293,7 +295,7 @@ const applyEnters = (
         type: 'counterChange',
         object: event.object,
         counter,
-        from: object.counters[counter] ?? 0,
+        from: 0,
         to: amount,
       });
     }
@@ -323,13 +325,14 @@ const applyLife = (state: GameState, emitter: EventEmitter, event: LifeEvent): G
 /** CR 122.1: poison counters sit on the player; ten of them is a loss (CR 704.5c). */
 const applyPoison = (
   state: GameState,
+  emitter: EventEmitter,
   event: Extract<RulesEvent, { kind: 'poison' }>,
 ): GameState => {
-  const poison = state.players[event.player].poison + event.amount;
-  // No log event yet: `counterChange` in @mtg/shared is about an object, and a player
-  // counter needs its own entry. It goes in with the log consumer the replay viewer
-  // wants, which is the same work that `replay(log) == state` waits on (docs/09).
-  return updatePlayer(state, event.player, { poison });
+  if (event.amount <= 0) return state;
+  const from = state.players[event.player].poison;
+  const next = updatePlayer(state, event.player, { poison: from + event.amount });
+  emitter.emit(next, { type: 'poisonChange', player: event.player, from, to: from + event.amount });
+  return next;
 };
 
 const applyCounters = (

@@ -13,7 +13,14 @@ import {
   topOfStack,
 } from './stack.js';
 import { createGameState, type GameState } from './state/game-state.js';
-import { createObject, destroyObject, getObject, objectsIn, updateObject } from './state/update.js';
+import {
+  createObject,
+  destroyObject,
+  getObject,
+  moveObject,
+  objectsIn,
+  updateObject,
+} from './state/update.js';
 import { noKeywords, objectTarget } from './targeting.js';
 import { applyDecision, startGame } from './turn/turn.js';
 
@@ -356,6 +363,16 @@ describe('targets and fizzling (CR 608.2b)', () => {
     const cast = putOnStack(state, emitter, 'A', id, { targets: [objectTarget(creature)] });
     const gone = destroyObject(cast, creature);
     expect(hasFizzled(gone, id)).toBe(true);
+  });
+
+  it('fizzles when its only target has gone to a hand, though the card still exists (CR 400.7)', () => {
+    const { state, emitter, hands, creature } = withTargetableCreature();
+    const id = hands.A[0] as ObjectId;
+    const cast = putOnStack(state, emitter, 'A', id, { targets: [objectTarget(creature)] });
+    const bounced = moveObject(cast, creature, playerZone('B', 'hand'));
+    expect(hasFizzled(bounced, id)).toBe(true);
+    // Back on the battlefield it is a new object, not the one that was targeted.
+    expect(hasFizzled(moveObject(bounced, creature, 'battlefield'), id)).toBe(true);
   });
 
   it('does not fizzle while one of several targets is still legal', () => {

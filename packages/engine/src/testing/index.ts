@@ -9,5 +9,6 @@
 export * from './fuzz.js';
 export * from './fuzz-cards.js';
 export * from './random-agent.js';
+export * from './replay-check.js';
 export * from './scenario.js';
 export * from './unseen.js';

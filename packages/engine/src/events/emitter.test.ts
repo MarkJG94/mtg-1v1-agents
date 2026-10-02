@@ -1,8 +1,10 @@
-import type { GameEvent } from '@mtg/shared';
+import { asOracleId, type GameEvent } from '@mtg/shared';
 import { describe, expect, it, vi } from 'vitest';
 import { stateFromSeed } from '../rng.js';
 import { createGameState, type GameState } from '../state/game-state.js';
+import { createObject, destroyObject, updateObject } from '../state/update.js';
 import { createEventEmitter, nullEventEmitter } from './emitter.js';
+import { runEvent } from './perform.js';
 
 const state = (patch: Partial<GameState> = {}): GameState => ({
   ...createGameState({ rng: stateFromSeed('1'), onPlay: 'A' }),
@@ -25,6 +27,63 @@ describe('createEventEmitter', () => {
       type: 'stepStart',
     });
     expect(event).toMatchObject({ seq: 0, turn: 4, step: 'declareBlockers', type: 'stepStart' });
+  });
+
+  it('records what each object is the first time an event names it (docs/06 `objects`)', () => {
+    const card = createObject(state(), {
+      definitionId: asOracleId('card'),
+      owner: 'A',
+      zone: 'battlefield',
+    });
+    const token = createObject(card.state, {
+      definitionId: asOracleId('card'),
+      owner: 'B',
+      zone: 'battlefield',
+      token: true,
+      name: 'Spirit',
+      power: 1,
+      toughness: 1,
+    });
+    const ability = createObject(token.state, {
+      definitionId: asOracleId('card'),
+      owner: 'A',
+      zone: 'stack',
+    });
+    const game = updateObject(ability.state, ability.object.id, {
+      stack: { resolvesTo: 'exile', splitSecond: false, targets: [], colours: [], isAbility: true },
+    });
+    const introduced: unknown[][] = [];
+    const emitter = createEventEmitter({
+      onEvent: (_event, objects) => introduced.push([...objects]),
+    });
+
+    emitter.emit(game, { type: 'tap', object: card.object.id });
+    emitter.emit(game, {
+      type: 'block',
+      blocker: token.object.id,
+      blocking: [card.object.id],
+    });
+    emitter.emit(game, { type: 'putOnStack', object: ability.object.id });
+    // Named once, recorded once — and still known after it has ceased to exist.
+    emitter.emit(destroyObject(game, ability.object.id), {
+      type: 'resolve',
+      object: ability.object.id,
+    });
+
+    expect(emitter.objects).toEqual([
+      { id: card.object.id, oracleId: 'card', owner: 'A' },
+      {
+        id: token.object.id,
+        oracleId: 'card',
+        owner: 'B',
+        token: true,
+        name: 'Spirit',
+        power: 1,
+        toughness: 1,
+      },
+      { id: ability.object.id, oracleId: 'card', owner: 'A', ability: true },
+    ]);
+    expect(introduced.map((objects) => objects.length)).toEqual([1, 1, 1, 0]);
   });
 
   it('keeps the payload alongside the envelope', () => {
@@ -97,5 +156,18 @@ describe('nullEventEmitter', () => {
     emitter.emit(state(), { type: 'stepStart' });
     expect(emitter.events).toEqual([]);
     expect(emitter.drain()).toEqual([]);
+  });
+});
+
+describe('poison, as the log records it', () => {
+  it('is logged with the count before and after, which no object counter can carry (CR 122.1)', () => {
+    const emitter = createEventEmitter();
+    const poisoned = runEvent(state(), emitter, { kind: 'poison', player: 'B', amount: 2 });
+    const again = runEvent(poisoned, emitter, { kind: 'poison', player: 'B', amount: 3 });
+    expect(again.players.B.poison).toBe(5);
+    expect(emitter.events).toMatchObject([
+      { type: 'poisonChange', player: 'B', from: 0, to: 2 },
+      { type: 'poisonChange', player: 'B', from: 2, to: 5 },
+    ]);
   });
 });

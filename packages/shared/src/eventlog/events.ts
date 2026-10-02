@@ -161,6 +161,13 @@ export type GameEventBody =
       readonly to: number;
       readonly reason: string;
     }
+  /** Poison counters sit on the player (CR 122.1); ten of them is a loss (CR 704.5c). */
+  | {
+      readonly type: 'poisonChange';
+      readonly player: PlayerId;
+      readonly from: number;
+      readonly to: number;
+    }
 
   // --- Combat ---
   | { readonly type: 'attack'; readonly attacker: ObjectId; readonly defender: EventTarget }
@@ -202,8 +209,67 @@ export const isEvent = <T extends GameEventType>(
  */
 export interface EventLogObject {
   readonly id: ObjectId;
+  /**
+   * The card it is. A token, which was never printed, carries the oracle id of the card
+   * that made it; an ability on the stack, that of its source.
+   */
   readonly oracleId: OracleId;
   readonly owner: PlayerId;
   /** Tokens have no card in a deck; they are created during the game. */
   readonly token?: boolean;
+  /** A token's own name and printed power and toughness, which no card says (CR 111.4). */
+  readonly name?: string;
+  readonly power?: number | null;
+  readonly toughness?: number | null;
+  /** An activated or triggered ability on the stack, an object in its own right (CR 113.7). */
+  readonly ability?: boolean;
 }
+
+const targetObjects = (targets: readonly EventTarget[]): ObjectId[] =>
+  targets.flatMap((target) => (target.kind === 'object' ? [target.object] : []));
+
+/**
+ * Every object an event names, in the order it names them: what a reader needs an
+ * identity for before it can make sense of the event (docs/06 `objects`).
+ */
+export const objectsNamedBy = (event: GameEventBody): ObjectId[] => {
+  switch (event.type) {
+    case 'gameStart':
+      return (['A', 'B'] as const).flatMap((player) => [
+        ...event.decks[player].library,
+        ...event.decks[player].hand,
+      ]);
+    case 'keep':
+      return [...event.bottomed];
+    case 'draw':
+    case 'playLand':
+    case 'putOnStack':
+    case 'resolve':
+    case 'fizzle':
+    case 'moveZone':
+    case 'tap':
+    case 'untap':
+    case 'counterChange':
+      return [event.object];
+    case 'cast':
+      return [event.object, ...targetObjects(event.targets)];
+    case 'activate':
+      return [event.source, ...targetObjects(event.targets)];
+    case 'trigger':
+      return [event.source];
+    case 'counter':
+      return [event.object, event.by];
+    case 'damage':
+      return [event.source, ...targetObjects([event.target])];
+    case 'attack':
+      return [event.attacker, ...targetObjects([event.defender])];
+    case 'block':
+      return [event.blocker, ...event.blocking];
+    case 'sba':
+      return [...event.objects];
+    case 'effectStart':
+      return [event.source];
+    default:
+      return [];
+  }
+};

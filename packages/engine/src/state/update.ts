@@ -275,8 +275,20 @@ export const moveObject = (
   }
 
   const zones = withInserted(withRemoved(state.zones, object.zone, id), to, id, position);
-  const objects = state.objects.withObject(id, { ...object, zone: to });
-  return updateState(state, { objects, zones });
+  // An object that changes zones becomes a new object with no memory of its previous
+  // existence (CR 400.7): it arrives untapped, with no counters and no damage marked,
+  // and with a timestamp of its own (CR 613.7d) — which is also how a spell can tell the
+  // object it targeted from the one that came back.
+  const objects = state.objects.withObject(id, {
+    ...object,
+    zone: to,
+    timestamp: state.nextTimestamp,
+    tapped: false,
+    counters: {},
+    damage: 0,
+    deathtouched: false,
+  });
+  return updateState(state, { objects, zones, nextTimestamp: state.nextTimestamp + 1 });
 };
 
 /**

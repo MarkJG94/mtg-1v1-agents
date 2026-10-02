@@ -76,11 +76,22 @@ const drawHand = (state: GameState, emitter: EventEmitter, player: PlayerId): Ga
   return runBatch(state, emitter, { kind: 'plain' }, draws);
 };
 
-/** Put a player's whole hand back into their library and shuffle (CR 103.4). */
-const returnHandAndShuffle = (state: GameState, player: PlayerId): GameState => {
+/**
+ * Put a player's whole hand back into their library and shuffle (CR 103.4). Each card's
+ * return is logged, so a reader of the log knows the hand is empty before the new one is
+ * drawn; the shuffle itself is not, since the library's order is hidden.
+ */
+const returnHandAndShuffle = (
+  state: GameState,
+  emitter: EventEmitter,
+  player: PlayerId,
+): GameState => {
+  const hand = playerZone(player, 'hand');
+  const library = playerZone(player, 'library');
   let next = state;
-  for (const id of [...objectsIn(state, playerZone(player, 'hand'))]) {
-    next = moveObject(next, id, playerZone(player, 'library'));
+  for (const id of [...objectsIn(state, hand)]) {
+    next = moveObject(next, id, library);
+    emitter.emit(next, { type: 'moveZone', object: id, from: hand, to: library, cause: 'shuffle' });
   }
   return shuffleLibrary(next, player);
 };
@@ -197,7 +208,7 @@ export const advanceMulligans = (state: GameState, emitter: EventEmitter): GameS
     const taken = { ...mulligans.taken };
 
     for (const player of mulligans.mulliganing) {
-      next = returnHandAndShuffle(next, player);
+      next = returnHandAndShuffle(next, emitter, player);
       next = drawHand(next, emitter, player);
       taken[player] = (taken[player] ?? 0) + 1;
       emitter.emit(next, {
