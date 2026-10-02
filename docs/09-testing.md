@@ -82,6 +82,8 @@ Thousands of random games per CI run with random supported decks. After every en
 - `legalActions` never returns an action the engine subsequently rejects, and every pending decision has at least one option;
 - games terminate within the turn/decision cap, and the event log replays to an identical final state (`replay(log) == state`).
 
+As built (6.5), `replay(log) == state` is `replayCheckedGame` in `@mtg/engine/testing`: after every decision of a random game it folds the events logged so far into a board (`@mtg/shared` replay.ts, the same fold the game viewer draws) and compares every zone's contents (a library as a set, since its shuffled order is never logged; the stack in order), each permanent's tapped state and counters, damage on creatures, life, poison, turn, step, active player and result. It runs over 150 fuzz games and 60 games dealt from the whole bootstrap set, which is what reaches tokens, counters, planeswalkers and abilities on the stack. Its first runs found what the log failed to say and two rules bugs (docs/02 "As built (6.5)").
+
 A failure reports the seed, the turn and the number of decisions taken, which is enough to replay it exactly; every decision is recorded on the result for the same reason. Automatic minimisation to the shortest failing prefix wants the shrinking a property-testing library gives and is the next refinement.
 
 What this catches is **illegal states**, not wrong-but-legal outcomes. A rule that quietly stops applying — damage that is never cleared in cleanup, say — leaves every position legal and the fuzzer silent; that class is what the unit suites and the seeded regression games above are for. Worth knowing before trusting a green fuzz run.

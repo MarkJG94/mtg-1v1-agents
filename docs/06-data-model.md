@@ -64,7 +64,9 @@ Deck lineage is reconstructed from `deck_generations`; nothing is ever updated i
 
 ## Event log format
 
-`GameEventLog = { version, gameId, seed, players: { A: {deckGen, main, side}, B: ... }, events: GameEvent[] }`. Events carry a monotonic `seq`, `turn`, `step`, and compact payloads referencing object ids; a `objects` table at the head maps object id → oracle id + owner so the UI can render without the engine. Version bumps come with a migration in `packages/shared/src/eventlog/migrations.ts`; old logs are always readable.
+`GameEventLog = { version, gameId, seed, players: { A: {deckGen, main, side}, B: ... }, events: GameEvent[] }`. Events carry a monotonic `seq`, `turn`, `step`, and compact payloads referencing object ids; a `objects` table at the head maps object id → oracle id + owner so the UI can render without the engine.
+
+As built (6.5): the engine's emitter records each object's identity the first time an event names it (`objectsNamedBy` in `packages/shared/src/eventlog/events.ts`), since by the end of the game an ability on the stack and a token that left the battlefield have ceased to exist (CR 113.7, 111.7) and the final state cannot say what they were. An identity is `{ id, oracleId, owner }`, with `token`, `name`, `power` and `toughness` for a token (CR 111.4) and `ability` for an ability on the stack, whose oracle id is its source's. The same identities go out with a live game's events (docs/07). There are no per-turn snapshots in the log: a viewer folds the events itself, keeping a board at the start of every turn (ADR 0019). Version bumps come with a migration in `packages/shared/src/eventlog/migrations.ts`; old logs are always readable.
 
 Size: a typical game produces 300–1,500 events, ≈ 20–80 KB uncompressed, ≈ 5–15 KB compressed. A 100-match cycle is therefore ≈ 3 MB; a month-long run of 1,000 cycles ≈ 3 GB. A retention setting can drop event logs (not results/stats) older than N cycles; the run export offers "with logs / without logs".
 
