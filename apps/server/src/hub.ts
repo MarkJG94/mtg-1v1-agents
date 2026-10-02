@@ -1,5 +1,6 @@
 import {
   type DeckGeneration,
+  type EventLogObject,
   type GameEvent,
   type WsServerMessage,
   type WsSubscription,
@@ -44,6 +45,7 @@ interface Client {
 interface LiveGame {
   readonly start: Extract<WsServerMessage, { type: 'gameStart' }>;
   readonly events: GameEvent[];
+  readonly objects: EventLogObject[];
 }
 
 /** Bytes a socket may have waiting before a live game skips it. */
@@ -154,6 +156,7 @@ export class Hub {
           runId,
           seed: game.start.seed,
           events: [...game.events],
+          objects: [...game.objects],
         });
       }
     }
@@ -245,7 +248,7 @@ export class Hub {
           generations: { ...game.generations },
           catchUp: false,
         };
-        this.live.set(event.runId, { start, events: [] });
+        this.live.set(event.runId, { start, events: [], objects: [] });
         for (const client of this.clients) client.lagging.delete(event.runId);
         this.broadcast((client) => client.game.has(event.runId), start);
         return;
@@ -254,11 +257,13 @@ export class Hub {
         const game = this.live.get(event.runId);
         if (game === undefined) return;
         game.events.push(...event.events);
+        game.objects.push(...event.objects);
         const message = JSON.stringify({
           type: 'gameEvents',
           runId: event.runId,
           seed: game.start.seed,
           events: [...event.events],
+          objects: [...event.objects],
         } satisfies WsServerMessage);
         for (const client of this.clients) {
           if (!client.game.has(event.runId) || client.lagging.has(event.runId)) continue;

@@ -11,7 +11,9 @@ import {
   asOracleId,
   banViolations,
   type DeckGeneration,
+  type EventLogObject,
   type GameEvent,
+  objectsNamedBy,
   parseRunSettings,
   type RunSettings,
 } from '@mtg/shared';
@@ -384,6 +386,7 @@ describe('a live viewer (roadmap 6.2)', async () => {
     const seen = {
       started: [] as LiveGameStart[],
       events: [] as GameEvent[],
+      objects: [] as EventLogObject[],
       ended: [] as LiveGameEnd[],
     };
     await driveRun({
@@ -394,7 +397,10 @@ describe('a live viewer (roadmap 6.2)', async () => {
       live: {
         watching,
         started: (game) => seen.started.push(game),
-        event: (event) => seen.events.push(event),
+        event: (event, introduced) => {
+          seen.events.push(event);
+          seen.objects.push(...introduced);
+        },
         ended: (game) => seen.ended.push(game),
       },
     });
@@ -409,6 +415,13 @@ describe('a live viewer (roadmap 6.2)', async () => {
     expect(seen.started[0]).toMatchObject({ cycle: 1, match: 0, game: 1 });
     expect(seen.started.at(-1)?.match).toBe(matches.length - 1);
     expect(seen.events).toEqual(logs.flatMap((log) => log.events));
+    // And what each object is, as its log says, by the time an event first names it.
+    expect(seen.objects).toEqual(
+      logs.flatMap((log) => {
+        const named = new Set(log.events.flatMap((event) => objectsNamedBy(event)));
+        return log.objects.filter((object) => named.has(object.id));
+      }),
+    );
     const games = matches.flatMap((stored) => stored.match.games);
     expect(seen.ended.map((game) => [game.seed, game.onPlay, game.result])).toEqual(
       games.map((game) => [game.seed, game.onPlay, game.result]),

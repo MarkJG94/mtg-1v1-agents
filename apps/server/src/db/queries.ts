@@ -442,7 +442,10 @@ export class Queries {
     return rows.map(summaryOfCard);
   }
 
-  /** Cards by oracle id, in the order asked, each once; an id the catalogue lacks is left out. */
+  /**
+   * Cards by oracle id, with their faces, in the order asked, each once; an id the
+   * catalogue lacks is left out.
+   */
   cardsById(oracleIds: readonly string[]) {
     const statement = this.sqlite.prepare(
       `SELECT c.*, s.status AS support FROM cards c
@@ -450,7 +453,7 @@ export class Queries {
     );
     return [...new Set(oracleIds)].flatMap((oracleId) => {
       const row = statement.get(oracleId) as CardRow | undefined;
-      return row === undefined ? [] : [summaryOfCard(row)];
+      return row === undefined ? [] : [faceOfCard(row)];
     });
   }
 
@@ -617,6 +620,14 @@ const summaryOfCard = (row: CardRow) => ({
   typeLine: row.type_line,
   colorIdentity: JSON.parse(row.color_identity) as string[],
   support: (row.support ?? 'unscripted') as SupportStatus,
+});
+
+const faceOfCard = (row: CardRow) => ({
+  ...summaryOfCard(row),
+  oracleText: row.oracle_text,
+  power: row.power,
+  toughness: row.toughness,
+  loyalty: row.loyalty,
 });
 
 /**

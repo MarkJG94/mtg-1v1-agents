@@ -5,6 +5,7 @@ import {
   asOracleId,
   banStateSchema,
   cardDetailSchema,
+  cardLookupSchema,
   cardSearchSchema,
   coverageSchema,
   cycleDetailSchema,
@@ -452,13 +453,21 @@ describe('cards and coverage', async () => {
 
   it('looks cards up by oracle id, each once, in the order asked, leaving out the unknown', async () => {
     const other = detail.decks.A.deck.main[1]?.oracleId ?? '';
-    const { cards } = await call(cardSearchSchema, {
+    const { cards } = await call(cardLookupSchema, {
       method: 'POST',
       url: '/api/cards/lookup',
       payload: { oracleIds: [other, 'no-such-card', played, other] },
     });
     expect(cards.map((each) => each.oracleId)).toEqual([other, played]);
     expect(cards[1]).toMatchObject({ name: card.name, typeLine: card.typeLine });
+    // With its face, for the game viewer's hover card.
+    const face = await call(cardDetailSchema, { method: 'GET', url: `/api/cards/${played}` });
+    expect(cards[1]).toMatchObject({
+      oracleText: face.oracleText,
+      power: face.power,
+      toughness: face.toughness,
+      loyalty: face.loyalty,
+    });
     await failure({ method: 'POST', url: '/api/cards/lookup', payload: { oracleIds: [] } }, 400);
   });
 

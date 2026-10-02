@@ -20,6 +20,7 @@ import {
   type AgentLevel,
   addCounts,
   type DeckSlot,
+  type EventLogObject,
   emptyAgentCounts,
   type GameEvent,
   type GameEventLog,
@@ -254,7 +255,8 @@ export const runCycle = async (options: CycleOptions): Promise<CycleResult> => {
               live: {
                 watching: () => options.live?.watching() ?? false,
                 started: (game: LiveGameStart) => options.live?.started({ ...game, match: index }),
-                event: (event: GameEvent) => options.live?.event(event),
+                event: (event: GameEvent, introduced: readonly EventLogObject[]) =>
+                  options.live?.event(event, introduced),
                 ended: (game: LiveGameEnd) => options.live?.ended(game),
               },
             }),

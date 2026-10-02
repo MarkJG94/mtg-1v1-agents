@@ -4,6 +4,7 @@ import type { PlayerView } from '@mtg/engine/view';
 import {
   type DeckChange,
   type DeckSlot,
+  type EventLogObject,
   type GameEvent,
   type GameEventLog,
   type GameResult,
@@ -113,7 +114,8 @@ export interface LiveGameEnd {
 export interface LiveGames {
   watching(): boolean;
   started(game: LiveGameStart): void;
-  event(event: GameEvent): void;
+  /** An event, with what each object it names for the first time is (docs/06 `objects`). */
+  event(event: GameEvent, introduced: readonly EventLogObject[]): void;
   ended(game: LiveGameEnd): void;
 }
 
@@ -230,7 +232,12 @@ export const playMatch = async (options: MatchOptions): Promise<MatchResult> => 
       seed,
       {
         ...(options.score === undefined ? {} : { score: options.score }),
-        ...(live === undefined ? {} : { onEvent: (event: GameEvent) => live.event(event) }),
+        ...(live === undefined
+          ? {}
+          : {
+              onEvent: (event: GameEvent, introduced: readonly EventLogObject[]) =>
+                live.event(event, introduced),
+            }),
       },
     );
     live?.ended({ seed, onPlay: played.state.config.playerOnPlay, result: played.result });

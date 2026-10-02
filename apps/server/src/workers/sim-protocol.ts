@@ -1,5 +1,12 @@
 import type { MessagePort } from 'node:worker_threads';
-import type { BanEvent, Deck75, GameEvent, RunSettings, RunStatus } from '@mtg/shared';
+import type {
+  BanEvent,
+  Deck75,
+  EventLogObject,
+  GameEvent,
+  RunSettings,
+  RunStatus,
+} from '@mtg/shared';
 import type { BanRequest, LiveGameEnd, LiveGameStart, RunSnapshot } from '@mtg/sim';
 
 /** What the API process and a simulation worker say to each other (roadmap 5.7). */
@@ -25,7 +32,12 @@ export type ControlMessage = { readonly ban: BanRequest } | { readonly watch: bo
 /** A watched game, as the worker streams it: its start, its events in batches, its end. */
 export type LiveMessage =
   | { readonly runId: string; readonly start: LiveGameStart }
-  | { readonly runId: string; readonly events: readonly GameEvent[] }
+  | {
+      readonly runId: string;
+      readonly events: readonly GameEvent[];
+      /** What each object these events name for the first time is. */
+      readonly objects: readonly EventLogObject[];
+    }
   | { readonly runId: string; readonly end: LiveGameEnd };
 
 export interface CreateJob {

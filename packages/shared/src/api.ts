@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { banActions } from './bans.js';
-import type { GameEvent } from './eventlog/events.js';
+import type { EventLogObject, GameEvent } from './eventlog/events.js';
 import { deckCauses, runStatuses } from './run.js';
 import { agentLevels, runSettingsSchema, seedSchema } from './settings.js';
 
@@ -426,7 +426,19 @@ export type CardSummary = z.infer<typeof cardSummarySchema>;
 
 export const cardSearchSchema = z.object({ cards: z.array(cardSummarySchema) });
 
-/** Cards by oracle id, for a page that holds ids and shows names (roadmap 6.4). */
+/** A card as the game viewer shows it on hovering: its summary, and its face (6.5). */
+export const cardFaceSchema = cardSummarySchema.extend({
+  oracleText: z.string(),
+  power: z.string().nullable(),
+  toughness: z.string().nullable(),
+  loyalty: z.string().nullable(),
+});
+
+export type CardFace = z.infer<typeof cardFaceSchema>;
+
+export const cardLookupSchema = z.object({ cards: z.array(cardFaceSchema) });
+
+/** Cards by oracle id, for a page that holds ids and shows names (roadmap 6.4) or faces (6.5). */
 export const cardLookupRequestSchema = z.object({
   oracleIds: z.array(oracleId).min(1).max(500),
 });
@@ -525,6 +537,16 @@ const gameEventSchema = z.custom<GameEvent>(
   { message: 'a game event has a seq and a type' },
 );
 
+/** What an object a live game's events name is (docs/06 `objects`), checked as lightly. */
+const eventLogObjectSchema = z.custom<EventLogObject>(
+  (value) =>
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { id?: unknown }).id === 'number' &&
+    typeof (value as { oracleId?: unknown }).oracleId === 'string',
+  { message: 'an object identity has an id and an oracle id' },
+);
+
 const deckDiffSlot = z.object({ oracleId, zone: z.enum(['main', 'side']), count: z.int().min(1) });
 
 export const wsServerMessageSchema = z.discriminatedUnion('type', [
@@ -575,6 +597,12 @@ export const wsServerMessageSchema = z.discriminatedUnion('type', [
     runId: z.string(),
     seed: z.string(),
     events: z.array(gameEventSchema),
+    /**
+     * What each object these events name for the first time is — on catching up, every
+     * object named so far — so a viewer can show a card no deck list says, such as a
+     * token or an ability on the stack.
+     */
+    objects: z.array(eventLogObjectSchema),
   }),
   z.object({
     type: z.literal('gameEnd'),

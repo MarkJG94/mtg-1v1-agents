@@ -1,7 +1,9 @@
 import {
   asOracleId,
   deckDiff,
+  type EventLogObject,
   type GameEvent,
+  objectsNamedBy,
   type WsServerMessage,
   wsServerMessageSchema,
 } from '@mtg/shared';
@@ -110,6 +112,14 @@ describe('a viewer of a run played on real workers', async () => {
     });
     const streamed = viewer.of('gameEvents').flatMap((batch) => batch.events);
     expect(streamed).toEqual(logs.flatMap((log) => log.events));
+    // What each object is, as its stored log says, from the batch that first names it.
+    const objects = viewer.of('gameEvents').flatMap((batch) => batch.objects);
+    expect(objects).toEqual(
+      logs.flatMap((log) => {
+        const named = new Set(log.events.flatMap((event) => objectsNamedBy(event)));
+        return log.objects.filter((object) => named.has(object.id));
+      }),
+    );
     expect(viewer.of('gameEnd').map((end) => [end.seed, end.winner])).toEqual(
       games.map((game) => [game.seed, game.result?.winner ?? null]),
     );
@@ -198,6 +208,8 @@ describe('the hub’s rules, with the test playing the supervisor', async () => 
   };
   const event = (seq: number): GameEvent =>
     ({ seq, turn: 1, step: 'upkeep', type: 'untap', object: 1 }) as unknown as GameEvent;
+  const identity = (id: number): EventLogObject =>
+    ({ id, oracleId: `card-${id}`, owner: 'A' }) as EventLogObject;
   const start = (seed: string): SupervisorEvent => ({
     type: 'gameStart',
     runId: 'run',
@@ -212,12 +224,17 @@ describe('the hub’s rules, with the test playing the supervisor', async () => 
     },
   });
 
-  it('catches a viewer who joins mid-game up on the start and every event so far', () => {
+  it('catches a viewer who joins mid-game up on the start, every event and every object so far', () => {
     const { supervisor, send } = fake();
     const hub = new Hub(supervisor, queries, { version: 'test' });
     send(start('g1'));
-    send({ type: 'gameEvents', runId: 'run', events: [event(0), event(1)] });
-    send({ type: 'gameEvents', runId: 'run', events: [event(2)] });
+    send({
+      type: 'gameEvents',
+      runId: 'run',
+      events: [event(0), event(1)],
+      objects: [identity(1), identity(2)],
+    });
+    send({ type: 'gameEvents', runId: 'run', events: [event(2)], objects: [identity(3)] });
     const late = new FakeSocket();
     hub.connect(late);
     late.say({ subscribe: 'game', runId: 'run' });
@@ -225,13 +242,17 @@ describe('the hub’s rules, with the test playing the supervisor', async () => 
     expect(late.of('gameEvents').flatMap((batch) => batch.events.map((e) => e.seq))).toEqual([
       0, 1, 2,
     ]);
-    send({ type: 'gameEvents', runId: 'run', events: [event(3)] });
+    expect(late.of('gameEvents').flatMap((batch) => batch.objects.map((o) => o.id))).toEqual([
+      1, 2, 3,
+    ]);
+    send({ type: 'gameEvents', runId: 'run', events: [event(3)], objects: [identity(4)] });
     expect(
       late
         .of('gameEvents')
         .at(-1)
         ?.events.map((e) => e.seq),
     ).toEqual([3]);
+    expect(late.of('gameEvents').at(-1)?.objects).toEqual([identity(4)]);
     hub.close();
   });
 
@@ -242,16 +263,16 @@ describe('the hub’s rules, with the test playing the supervisor', async () => 
     hub.connect(slow);
     slow.say({ subscribe: 'game', runId: 'run' });
     send(start('g1'));
-    send({ type: 'gameEvents', runId: 'run', events: [event(0)] });
+    send({ type: 'gameEvents', runId: 'run', events: [event(0)], objects: [] });
     slow.bufferedAmount = 1_000;
-    send({ type: 'gameEvents', runId: 'run', events: [event(1)] });
+    send({ type: 'gameEvents', runId: 'run', events: [event(1)], objects: [] });
     slow.bufferedAmount = 0;
     // Caught up on the socket, but the game it fell behind on stays skipped.
-    send({ type: 'gameEvents', runId: 'run', events: [event(2)] });
+    send({ type: 'gameEvents', runId: 'run', events: [event(2)], objects: [] });
     expect(slow.of('gameEvents').flatMap((b) => b.events.map((e) => e.seq))).toEqual([0]);
     send({ type: 'gameEnd', runId: 'run', game: { seed: 'g1', onPlay: 'A', result: null } });
     send(start('g2'));
-    send({ type: 'gameEvents', runId: 'run', events: [event(10)] });
+    send({ type: 'gameEvents', runId: 'run', events: [event(10)], objects: [] });
     expect(slow.of('gameStart').map((s) => s.seed)).toEqual(['g1', 'g2']);
     expect(
       slow

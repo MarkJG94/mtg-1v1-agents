@@ -1,9 +1,10 @@
 import {
   apiErrorSchema,
   banStateSchema,
-  type CardSummary,
+  type CardFace,
   type CreateRunRequest,
   type CycleSummary,
+  cardLookupSchema,
   cardSearchSchema,
   cycleDetailSchema,
   cyclePageSchema,
@@ -123,11 +124,11 @@ export const api = {
       method: 'DELETE',
     }),
   /** Cards by oracle id, as many as asked, in requests of at most 500. */
-  lookupCards: async (oracleIds: readonly string[]): Promise<CardSummary[]> => {
+  lookupCards: async (oracleIds: readonly string[]): Promise<CardFace[]> => {
     const unique = [...new Set(oracleIds)];
-    const found: CardSummary[] = [];
+    const found: CardFace[] = [];
     for (let start = 0; start < unique.length; start += PAGE) {
-      const { cards } = await post(cardSearchSchema, '/api/cards/lookup', {
+      const { cards } = await post(cardLookupSchema, '/api/cards/lookup', {
         oracleIds: unique.slice(start, start + PAGE),
       });
       found.push(...cards);

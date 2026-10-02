@@ -13,6 +13,7 @@ import {
   type Deck75,
   type DeckChange,
   type DeckGeneration,
+  type EventLogObject,
   type GameEvent,
   type GameEventLog,
   type OracleId,
@@ -384,7 +385,8 @@ const playCycle = async (
           live: {
             watching: () => live.watching(),
             started: (game: LiveGameStart) => live.started({ ...game, cycle: number }),
-            event: (event: GameEvent) => live.event(event),
+            event: (event: GameEvent, introduced: readonly EventLogObject[]) =>
+              live.event(event, introduced),
             ended: (game: LiveGameEnd) => live.ended(game),
           },
         }),

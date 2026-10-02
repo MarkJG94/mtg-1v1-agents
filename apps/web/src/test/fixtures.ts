@@ -23,14 +23,29 @@ export const cards = {
     manaCost: '{R}',
     manaValue: 1,
     typeLine: 'Instant',
+    oracleText: 'Lightning Bolt deals 3 damage to any target.',
+    power: null,
+    toughness: null,
   },
-  shock: { oracleId: 'shock', name: 'Shock', manaCost: '{R}', manaValue: 1, typeLine: 'Instant' },
+  shock: {
+    oracleId: 'shock',
+    name: 'Shock',
+    manaCost: '{R}',
+    manaValue: 1,
+    typeLine: 'Instant',
+    oracleText: 'Shock deals 2 damage to any target.',
+    power: null,
+    toughness: null,
+  },
   chain: {
     oracleId: 'chain',
     name: 'Chain Lightning',
     manaCost: '{R}',
     manaValue: 1,
     typeLine: 'Sorcery',
+    oracleText: 'Chain Lightning deals 3 damage to any target.',
+    power: null,
+    toughness: null,
   },
   goblin: {
     oracleId: 'goblin',
@@ -38,6 +53,9 @@ export const cards = {
     manaCost: '{R}',
     manaValue: 1,
     typeLine: 'Creature — Goblin Scout',
+    oracleText: 'Haste',
+    power: '2',
+    toughness: '2',
   },
   mountain: {
     oracleId: 'mountain',
@@ -45,21 +63,50 @@ export const cards = {
     manaCost: null,
     manaValue: 0,
     typeLine: 'Basic Land — Mountain',
+    oracleText: '({T}: Add {R}.)',
+    power: null,
+    toughness: null,
   },
-  pyro: { oracleId: 'pyro', name: 'Pyroblast', manaCost: '{R}', manaValue: 1, typeLine: 'Instant' },
+  pyro: {
+    oracleId: 'pyro',
+    name: 'Pyroblast',
+    manaCost: '{R}',
+    manaValue: 1,
+    typeLine: 'Instant',
+    oracleText:
+      'Choose one — Counter target spell if it’s blue; or destroy target permanent if it’s blue.',
+    power: null,
+    toughness: null,
+  },
   forest: {
     oracleId: 'forest',
     name: 'Forest',
     manaCost: null,
     manaValue: 0,
     typeLine: 'Basic Land — Forest',
+    oracleText: '({T}: Add {G}.)',
+    power: null,
+    toughness: null,
   },
 } as const;
 
 export const summaryOf = (card: (typeof cards)[keyof typeof cards]) => ({
-  ...card,
+  oracleId: card.oracleId,
+  name: card.name,
+  manaCost: card.manaCost,
+  manaValue: card.manaValue,
+  typeLine: card.typeLine,
   colorIdentity: [] as string[],
   support: 'supported' as const,
+});
+
+/** What `POST /api/cards/lookup` says of a fixture card: its summary and its face. */
+export const faceOf = (card: (typeof cards)[keyof typeof cards]) => ({
+  ...summaryOf(card),
+  oracleText: card.oracleText,
+  power: card.power,
+  toughness: card.toughness,
+  loyalty: null,
 });
 
 const deckA = {
@@ -282,7 +329,7 @@ export const lookup = (body: unknown) => {
     body: {
       cards: oracleIds.flatMap((id) => {
         const card = known.find((each) => each.oracleId === id);
-        return card === undefined ? [] : [summaryOf(card)];
+        return card === undefined ? [] : [faceOf(card)];
       }),
     },
   };

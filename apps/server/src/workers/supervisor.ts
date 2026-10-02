@@ -6,6 +6,7 @@ import type {
   CycleRecord,
   Deck75,
   DeckGeneration,
+  EventLogObject,
   GameEvent,
   RunSettings,
   RunStatus,
@@ -86,6 +87,7 @@ export type SupervisorEvent =
       readonly type: 'gameEvents';
       readonly runId: string;
       readonly events: readonly GameEvent[];
+      readonly objects: readonly EventLogObject[];
     }
   | { readonly type: 'gameEnd'; readonly runId: string; readonly game: LiveGameEnd };
 
@@ -545,8 +547,9 @@ export class Supervisor {
   private streamed(message: LiveMessage): void {
     const { runId } = message;
     if ('start' in message) this.emit({ type: 'gameStart', runId, game: message.start });
-    else if ('events' in message) this.emit({ type: 'gameEvents', runId, events: message.events });
-    else this.emit({ type: 'gameEnd', runId, game: message.end });
+    else if ('events' in message) {
+      this.emit({ type: 'gameEvents', runId, events: message.events, objects: message.objects });
+    } else this.emit({ type: 'gameEnd', runId, game: message.end });
   }
 
   private changed(runId: string, generations: readonly DeckGeneration[]): void {

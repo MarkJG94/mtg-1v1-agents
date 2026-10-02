@@ -5,7 +5,7 @@ import {
   workerData,
 } from 'node:worker_threads';
 import type { CardProjection } from '@mtg/cards';
-import { banListOf, type GameEvent } from '@mtg/shared';
+import { banListOf, type EventLogObject, type GameEvent } from '@mtg/shared';
 import {
   type BanRequest,
   createRun,
@@ -88,11 +88,13 @@ const BATCH_MS = 50;
  */
 const liveStream = (runId: string, control: Control): LiveGames => {
   let batch: GameEvent[] = [];
+  let objects: EventLogObject[] = [];
   let sent = 0;
   const post = (message: LiveMessage) => data.livePort.postMessage(message);
   const flush = () => {
-    if (batch.length > 0) post({ runId, events: batch });
+    if (batch.length > 0) post({ runId, events: batch, objects });
     batch = [];
+    objects = [];
     sent = Date.now();
   };
   return {
@@ -101,8 +103,9 @@ const liveStream = (runId: string, control: Control): LiveGames => {
       post({ runId, start: game });
       sent = Date.now();
     },
-    event: (event) => {
+    event: (event, introduced) => {
       batch.push(event);
+      objects.push(...introduced);
       if (Date.now() - sent >= BATCH_MS) flush();
     },
     ended: (game) => {

@@ -1,4 +1,4 @@
-import type { CardSummary } from '@mtg/shared';
+import type { CardFace, CardSummary } from '@mtg/shared';
 import { useQuery } from '@tanstack/react-query';
 import { api } from './api.js';
 
@@ -7,7 +7,7 @@ import { api } from './api.js';
  * query is keyed by the sorted ids, so the same set asked twice is one request, and a
  * card looked up keeps its facts while a bigger set loads.
  */
-export const useCardFacts = (oracleIds: readonly string[]): ReadonlyMap<string, CardSummary> => {
+export const useCardFacts = (oracleIds: readonly string[]): ReadonlyMap<string, CardFace> => {
   const ids = [...new Set(oracleIds)].sort();
   const query = useQuery({
     queryKey: ['card-facts', ids],
