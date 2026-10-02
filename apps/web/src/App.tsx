@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from './api.js';
 import { useConnected } from './live.js';
 import { CyclePage } from './pages/CyclePage.js';
+import { GamePage } from './pages/GamePage.js';
+import { LivePage } from './pages/LivePage.js';
 import { NewRunPage } from './pages/NewRunPage.js';
 import { RunPage } from './pages/RunPage.js';
 import { RunsPage } from './pages/RunsPage.js';
@@ -9,7 +11,7 @@ import { Link, type Route, useRoute } from './router.js';
 
 /**
  * The app shell (docs/08): a header with the pages and the server's state, and the page
- * the path names. Pages to come — the game viewer and coverage — are roadmap 6.5 and 6.6.
+ * the path names. The coverage page to come is roadmap 6.6.
  */
 export const App = () => {
   const route = useRoute();
@@ -23,7 +25,11 @@ export const App = () => {
           <Link
             to="/"
             className={navClass(
-              route.page === 'runs' || route.page === 'run' || route.page === 'cycle',
+              route.page === 'runs' ||
+                route.page === 'run' ||
+                route.page === 'cycle' ||
+                route.page === 'live' ||
+                route.page === 'game',
             )}
           >
             Runs
@@ -56,6 +62,10 @@ const Page = ({ route }: { route: Route }) => {
       return <RunPage runId={route.runId} />;
     case 'cycle':
       return <CyclePage runId={route.runId} cycle={route.cycle} />;
+    case 'live':
+      return <LivePage runId={route.runId} />;
+    case 'game':
+      return <GamePage gameId={route.gameId} />;
     case 'notFound':
       return (
         <p>

@@ -1,6 +1,15 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { cyclePath, Link, matchRoute, navigate, runPath, usePathname } from './router.js';
+import {
+  cyclePath,
+  gamePath,
+  Link,
+  livePath,
+  matchRoute,
+  navigate,
+  runPath,
+  usePathname,
+} from './router.js';
 
 /** The app's routes (docs/08 "Pages"): runs, a new run, and a run by its id. */
 
@@ -19,6 +28,14 @@ describe('matching a path', () => {
     expect(matchRoute(cyclePath('a b', 3))).toEqual({ page: 'cycle', runId: 'a b', cycle: 3 });
     expect(matchRoute('/runs/abc/cycles/0').page).toBe('notFound');
     expect(matchRoute('/runs/abc/cycles/x').page).toBe('notFound');
+  });
+
+  it('knows a game’s replay and a run’s live games', () => {
+    expect(matchRoute('/games/g-1')).toEqual({ page: 'game', gameId: 'g-1' });
+    expect(matchRoute(gamePath('run:2:0:1'))).toEqual({ page: 'game', gameId: 'run:2:0:1' });
+    expect(matchRoute('/runs/abc/live')).toEqual({ page: 'live', runId: 'abc' });
+    expect(matchRoute(livePath('a b'))).toEqual({ page: 'live', runId: 'a b' });
+    expect(matchRoute('/games/').page).toBe('notFound');
   });
 
   it('round-trips a run id that needs escaping', () => {

@@ -390,14 +390,45 @@ export const gameDetailSchema = gameSummarySchema.extend({
   cycle: z.int().min(1),
 });
 
-/** A decoded event log (docs/06 "Event log format"); its events are checked by version. */
+/** A `GameEvent` as the wire carries it: checked for its envelope, typed as the engine's. */
+const gameEventSchema = z.custom<GameEvent>(
+  (value) =>
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { seq?: unknown }).seq === 'number' &&
+    typeof (value as { type?: unknown }).type === 'string',
+  { message: 'a game event has a seq and a type' },
+);
+
+/** What an object a live game's events name is (docs/06 `objects`), checked as lightly. */
+const eventLogObjectSchema = z.custom<EventLogObject>(
+  (value) =>
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { id?: unknown }).id === 'number' &&
+    typeof (value as { oracleId?: unknown }).oracleId === 'string',
+  { message: 'an object identity has an id and an oracle id' },
+);
+
+/**
+ * A decoded event log (docs/06 "Event log format"). Its events and objects are checked as
+ * lightly as the live stream's: by version, the log's own format is the engine's to keep.
+ */
 export const gameLogSchema = z
   .object({
     version: z.int(),
     gameId: z.string(),
     seed: z.string(),
-    players: z.object({ A: z.unknown(), B: z.unknown() }),
-    events: z.array(z.unknown()),
+    players: byAgent(
+      z.object({
+        deckGeneration: z.int().min(0),
+        main: z.array(deckSlotSchema),
+        side: z.array(deckSlotSchema),
+      }),
+    ),
+    objects: z.array(eventLogObjectSchema),
+    events: z.array(gameEventSchema),
+    result: z.object({ winner: agent.nullable(), reason: z.string(), turns: z.int().min(0) }),
   })
   .loose();
 
@@ -526,26 +557,6 @@ export const wsClientMessageSchema = z
   });
 export type WsClientMessage = z.output<typeof wsClientMessageSchema>;
 export type WsSubscription = z.infer<typeof subscription>;
-
-/** A `GameEvent` as the wire carries it: checked for its envelope, typed as the engine's. */
-const gameEventSchema = z.custom<GameEvent>(
-  (value) =>
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as { seq?: unknown }).seq === 'number' &&
-    typeof (value as { type?: unknown }).type === 'string',
-  { message: 'a game event has a seq and a type' },
-);
-
-/** What an object a live game's events name is (docs/06 `objects`), checked as lightly. */
-const eventLogObjectSchema = z.custom<EventLogObject>(
-  (value) =>
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as { id?: unknown }).id === 'number' &&
-    typeof (value as { oracleId?: unknown }).oracleId === 'string',
-  { message: 'an object identity has an id and an oracle id' },
-);
 
 const deckDiffSlot = z.object({ oracleId, zone: z.enum(['main', 'side']), count: z.int().min(1) });
 

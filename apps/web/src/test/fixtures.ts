@@ -3,6 +3,11 @@ import {
   type CycleSummary,
   cycleDetailSchema,
   cycleSummarySchema,
+  type GameEvent,
+  type GameEventBody,
+  gameDetailSchema,
+  gameLogSchema,
+  matchDetailSchema,
   runDetailSchema,
   runSettingsSchema,
   statsTableSchema,
@@ -334,3 +339,238 @@ export const lookup = (body: unknown) => {
     },
   };
 };
+
+// --- A game, for the viewer ---
+
+const GAME = 'game-1';
+
+export { GAME };
+
+/** Who each object of the fixture game is: A plays red, B a little blue-red. */
+const objects = [
+  [1, 'chain', 'A'],
+  [2, 'mountain', 'A'],
+  [3, 'mountain', 'A'],
+  [4, 'goblin', 'A'],
+  [5, 'bolt', 'A'],
+  [6, 'mountain', 'A'],
+  [11, 'forest', 'B'],
+  [12, 'forest', 'B'],
+  [13, 'shock', 'B'],
+  [14, 'pyro', 'B'],
+] as const;
+
+/**
+ * Three turns: A plays a land and a creature and attacks; B shocks the creature; A casts
+ * Chain Lightning, which B counters, then Lightning Bolt, and B concedes. Each body is
+ * stamped with the turn and step it happened in, as the engine's emitter does.
+ */
+const turns: [number, string, GameEventBody[]][] = [
+  [
+    0,
+    'untap',
+    [
+      {
+        type: 'gameStart',
+        onPlay: 'A',
+        chosenBy: 'B',
+        startingLife: 20,
+        decks: {
+          A: { library: [1, 2, 3], hand: [4, 5, 6] },
+          B: { library: [11, 12], hand: [13, 14] },
+        } as never,
+      },
+      { type: 'keep', player: 'A', handSize: 3, bottomed: [] },
+      { type: 'keep', player: 'B', handSize: 2, bottomed: [] },
+    ],
+  ],
+  [1, 'untap', [{ type: 'turnStart', activePlayer: 'A' }]],
+  [
+    1,
+    'precombatMain',
+    [
+      { type: 'stepStart' },
+      { type: 'decision', player: 'A', kind: 'priority', chosen: {}, score: 2 },
+      { type: 'playLand', player: 'A', object: 6 as never },
+      { type: 'moveZone', object: 6 as never, from: 'A:hand', to: 'battlefield', cause: 'play' },
+      { type: 'decision', player: 'A', kind: 'priority', chosen: {}, score: 3 },
+      { type: 'activate', player: 'A', source: 6 as never, abilityIndex: 0, targets: [] },
+      { type: 'tap', object: 6 as never },
+      { type: 'cast', player: 'A', object: 4 as never, targets: [] },
+      { type: 'putOnStack', object: 4 as never },
+      { type: 'resolve', object: 4 as never },
+      { type: 'moveZone', object: 4 as never, from: 'stack', to: 'battlefield', cause: 'resolve' },
+    ],
+  ],
+  [
+    1,
+    'declareAttackers',
+    [
+      { type: 'stepStart' },
+      { type: 'attack', attacker: 4 as never, defender: { kind: 'player', player: 'B' } },
+    ],
+  ],
+  [
+    1,
+    'combatDamage',
+    [
+      { type: 'stepStart' },
+      {
+        type: 'damage',
+        source: 4 as never,
+        target: { kind: 'player', player: 'B' },
+        amount: 2,
+        combat: true,
+      },
+      { type: 'lifeChange', player: 'B', from: 20, to: 18, reason: 'damage' },
+    ],
+  ],
+  [1, 'endCombat', [{ type: 'stepStart' }]],
+  [
+    2,
+    'untap',
+    [
+      { type: 'turnStart', activePlayer: 'B' },
+      { type: 'untap', object: 6 as never },
+    ],
+  ],
+  [2, 'draw', [{ type: 'stepStart' }, { type: 'draw', player: 'B', object: 11 as never }]],
+  [
+    2,
+    'precombatMain',
+    [
+      { type: 'stepStart' },
+      { type: 'decision', player: 'B', kind: 'priority', chosen: {}, score: -1.5 },
+      {
+        type: 'cast',
+        player: 'B',
+        object: 13 as never,
+        targets: [{ kind: 'object', object: 4 as never }],
+      },
+      { type: 'putOnStack', object: 13 as never },
+      { type: 'resolve', object: 13 as never },
+      {
+        type: 'damage',
+        source: 13 as never,
+        target: { kind: 'object', object: 4 as never },
+        amount: 2,
+        combat: false,
+      },
+      { type: 'moveZone', object: 13 as never, from: 'stack', to: 'B:graveyard', cause: 'resolve' },
+      { type: 'sba', kind: 'creatureLethalDamage', objects: [4 as never] },
+      {
+        type: 'moveZone',
+        object: 4 as never,
+        from: 'battlefield',
+        to: 'A:graveyard',
+        cause: 'stateBasedAction',
+      },
+    ],
+  ],
+  [3, 'untap', [{ type: 'turnStart', activePlayer: 'A' }]],
+  [3, 'draw', [{ type: 'stepStart' }, { type: 'draw', player: 'A', object: 1 as never }]],
+  [
+    3,
+    'precombatMain',
+    [
+      { type: 'stepStart' },
+      {
+        type: 'cast',
+        player: 'A',
+        object: 1 as never,
+        targets: [{ kind: 'player', player: 'B' }],
+      },
+      { type: 'putOnStack', object: 1 as never },
+      {
+        type: 'cast',
+        player: 'B',
+        object: 14 as never,
+        targets: [{ kind: 'object', object: 1 as never }],
+      },
+      { type: 'putOnStack', object: 14 as never },
+      { type: 'resolve', object: 14 as never },
+      { type: 'counter', object: 1 as never, by: 14 as never },
+      { type: 'moveZone', object: 1 as never, from: 'stack', to: 'A:graveyard', cause: 'effect' },
+      { type: 'moveZone', object: 14 as never, from: 'stack', to: 'B:graveyard', cause: 'resolve' },
+      {
+        type: 'cast',
+        player: 'A',
+        object: 5 as never,
+        targets: [{ kind: 'player', player: 'B' }],
+      },
+      { type: 'putOnStack', object: 5 as never },
+      { type: 'resolve', object: 5 as never },
+      {
+        type: 'damage',
+        source: 5 as never,
+        target: { kind: 'player', player: 'B' },
+        amount: 3,
+        combat: false,
+      },
+      { type: 'lifeChange', player: 'B', from: 18, to: 15, reason: 'damage' },
+      { type: 'moveZone', object: 5 as never, from: 'stack', to: 'A:graveyard', cause: 'resolve' },
+      { type: 'gameEnd', winner: 'A', reason: 'concede' },
+    ],
+  ],
+];
+
+export const gameEvents: GameEvent[] = turns
+  .flatMap(([turn, step, bodies]) => bodies.map((body) => ({ turn, step, ...body }) as GameEvent))
+  .map((event, seq) => ({ ...event, seq }));
+
+export const gameObjects = objects.map(([id, oracleId, owner]) => ({
+  id: id as never,
+  oracleId: oracleId as never,
+  owner,
+}));
+
+const slots = (player: 'A' | 'B') => {
+  const counts = new Map<string, number>();
+  for (const [, oracleId, owner] of objects) {
+    if (owner === player) counts.set(oracleId, (counts.get(oracleId) ?? 0) + 1);
+  }
+  return [...counts].map(([oracleId, count]) => ({ oracleId, count }));
+};
+
+export const gameLog = gameLogSchema.parse({
+  version: 1,
+  gameId: GAME,
+  seed: `${RUN}:cycle-2:match-0:game-1`,
+  players: {
+    A: { deckGeneration: 0, main: slots('A'), side: [] },
+    B: { deckGeneration: 0, main: slots('B'), side: [] },
+  },
+  objects: gameObjects,
+  events: gameEvents,
+  result: { winner: 'A', reason: 'concede', turns: 3 },
+});
+
+export const gameDetail = gameDetailSchema.parse({
+  id: GAME,
+  number: 0,
+  seed: gameLog.seed,
+  chooser: 'B',
+  onPlay: 'A',
+  winner: 'A',
+  reason: 'concede',
+  turns: 3,
+  decisions: 4,
+  hasLog: true,
+  matchId: `${RUN}:2:0`,
+  runId: RUN,
+  cycle: 2,
+});
+
+export const matchDetail = matchDetailSchema.parse({
+  id: `${RUN}:2:0`,
+  runId: RUN,
+  cycle: 2,
+  number: 0,
+  kind: 'cycle',
+  winner: 'A',
+  wins: { A: 2, B: 1 },
+  games: [gameDetail, { ...gameDetail, id: 'game-2', number: 1, winner: 'B', hasLog: false }].map(
+    ({ matchId: _m, runId: _r, cycle: _c, ...game }) => game,
+  ),
+  sideboarding: null,
+});

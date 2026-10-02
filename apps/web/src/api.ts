@@ -8,7 +8,10 @@ import {
   cardSearchSchema,
   cycleDetailSchema,
   cyclePageSchema,
+  gameDetailSchema,
+  gameLogSchema,
   healthSchema,
+  matchDetailSchema,
   resolveCardsSchema,
   runDetailSchema,
   runListSchema,
@@ -113,6 +116,9 @@ export const api = {
       statsTableSchema,
       `${runPath(id)}/stats?agent=${agent}${cycle === undefined ? '' : `&cycle=${cycle}`}`,
     ),
+  match: (id: string) => request(matchDetailSchema, `/api/matches/${encodeURIComponent(id)}`),
+  game: (id: string) => request(gameDetailSchema, `/api/games/${encodeURIComponent(id)}`),
+  gameLog: (id: string) => request(gameLogSchema, `/api/games/${encodeURIComponent(id)}/log`),
   bans: (id: string) => request(banStateSchema, `${runPath(id)}/bans`),
   ban: (id: string, oracleId: string, body: { status: 'banned' | 'restricted'; note: string }) =>
     request(banStateSchema, `${runPath(id)}/bans/${encodeURIComponent(oracleId)}`, {

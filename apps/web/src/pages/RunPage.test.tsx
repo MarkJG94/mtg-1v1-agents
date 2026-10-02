@@ -91,6 +91,13 @@ describe('the run dashboard', () => {
     );
   });
 
+  it('links to the run’s live games', async () => {
+    server();
+    renderWith(<RunPage runId={RUN} />, fakeLive().live);
+    const link = await screen.findByRole('link', { name: 'Watch live' });
+    expect(link.getAttribute('href')).toBe(`/runs/${RUN}/live`);
+  });
+
   it('reads a cycle’s numbers from the chart by keyboard', async () => {
     server();
     renderWith(<RunPage runId={RUN} />, fakeLive().live);

@@ -9,7 +9,7 @@ import { Timeline } from '../components/Timeline.js';
 import { type BanMark, WinRateChart } from '../components/WinRateChart.js';
 import { banMarkers } from '../dashboard.js';
 import { mergeRun, useRunsStore, useSubscription } from '../live.js';
-import { Link } from '../router.js';
+import { Link, livePath } from '../router.js';
 import { actionsFor, runsQueryKey } from './RunsPage.js';
 
 /**
@@ -162,6 +162,9 @@ export const RunPage = ({ runId }: { runId: string }) => {
           )}
         </div>
         <div className="flex gap-2">
+          <Link to={livePath(runId)} className="btn">
+            Watch live
+          </Link>
           {actionsFor(row.status).map((action) => (
             <button
               key={action}

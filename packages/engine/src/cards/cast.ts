@@ -96,7 +96,8 @@ export const castSpell = (
     splitSecond: definition.splitSecond ?? false,
     targets,
     colours: definition.colours,
-    x,
+    // Only a spell with an X has a value for it, and only then does the log say one.
+    ...(options.x === undefined ? {} : { x }),
   });
 };
 

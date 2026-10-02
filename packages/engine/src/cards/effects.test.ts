@@ -1,7 +1,9 @@
 import { asOracleId, playerZone } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
+import { createEventEmitter } from '../events/emitter.js';
 import { parseManaCost } from '../mana/cost.js';
 import { game } from '../testing/scenario.js';
+import { castSpell } from './cast.js';
 import type { CardDefinition } from './definition.js';
 
 /**
@@ -332,6 +334,22 @@ describe('casting a spell from a card script', () => {
 
     expect(scenario.object('stays').damage).toBe(2);
     expect(scenario.object('gone').damage).toBe(0);
+  });
+
+  it('logs a value for X only for a spell cast with one (CR 601.2b)', () => {
+    const scenario = table()
+      .player('A')
+      .battlefield({ name: 'land', definitionId: grove.oracleId })
+      .hand({ name: 'bolt', definitionId: spark.oracleId })
+      .start()
+      .to('precombatMain')
+      .player('A');
+    const emitter = createEventEmitter();
+    const target = { kind: 'player', player: 'B' } as const;
+    castSpell(scenario.get(), emitter, 'A', scenario.ref('bolt'), { targets: [target] });
+    const cast = emitter.events.find((event) => event.type === 'cast');
+    expect(cast).toBeDefined();
+    expect(cast !== undefined && 'x' in cast).toBe(false);
   });
 
   it('refuses an illegal target as the spell is cast (CR 601.2c)', () => {

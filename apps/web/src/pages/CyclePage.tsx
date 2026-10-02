@@ -7,13 +7,13 @@ import { DeltaChip } from '../components/DeckPanel.js';
 import { SlotDiff } from '../components/Timeline.js';
 import { agentColour } from '../components/WinRateChart.js';
 import { held } from '../dashboard.js';
-import { Link, runPath } from '../router.js';
+import { gamePath, Link, runPath } from '../router.js';
 
 /**
  * A cycle in full (docs/08 "Cycle detail"): its result, the change with its evidence —
  * the diagnosis, the card cut, the candidate shortlist and trial results — each deck's
  * rates, the matches, and the card statistics table, sortable by any column and filtered to
- * the main deck or the sideboard. The game viewer the matches will link to is roadmap 6.5.
+ * the main deck or the sideboard. Each match opens to its games, each a link to its replay.
  */
 
 const rate = (value: number | null) => (value === null ? '—' : `${Math.round(value * 100)}%`);
@@ -93,18 +93,12 @@ export const CyclePage = ({ runId, cycle }: { runId: string; cycle: number }) =>
                   <th className="py-1 pr-3">Kind</th>
                   <th className="py-1 pr-3">Winner</th>
                   <th className="py-1 pr-3">Games</th>
+                  <th className="py-1 pr-3">Replays</th>
                 </tr>
               </thead>
               <tbody>
                 {data.matchList.map((match) => (
-                  <tr key={match.id} className="border-t border-slate-800">
-                    <td className="py-1 pr-3 tabular-nums">{match.number + 1}</td>
-                    <td className="py-1 pr-3">{match.kind}</td>
-                    <td className="py-1 pr-3">{match.winner ?? 'draw'}</td>
-                    <td className="py-1 pr-3 tabular-nums">
-                      {match.wins.A}–{match.wins.B} of {match.games}
-                    </td>
-                  </tr>
+                  <MatchRow key={match.id} match={match} />
                 ))}
               </tbody>
             </table>
@@ -114,6 +108,67 @@ export const CyclePage = ({ runId, cycle }: { runId: string; cycle: number }) =>
         </>
       )}
     </section>
+  );
+};
+
+/** A match, which opens to its games — fetched when asked for — each linking to its replay. */
+const MatchRow = ({ match }: { match: CycleDetail['matchList'][number] }) => {
+  const [open, setOpen] = useState(false);
+  const detail = useQuery({
+    queryKey: ['match', match.id],
+    queryFn: () => api.match(match.id),
+    enabled: open,
+  });
+  return (
+    <>
+      <tr className="border-t border-slate-800">
+        <td className="py-1 pr-3 tabular-nums">{match.number + 1}</td>
+        <td className="py-1 pr-3">{match.kind}</td>
+        <td className="py-1 pr-3">{match.winner ?? 'draw'}</td>
+        <td className="py-1 pr-3 tabular-nums">
+          {match.wins.A}–{match.wins.B} of {match.games}
+        </td>
+        <td className="py-1 pr-3">
+          <button
+            type="button"
+            className="text-sky-300 hover:underline"
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+          >
+            {open ? 'Hide games' : 'Games'}
+          </button>
+        </td>
+      </tr>
+      {open && (
+        <tr>
+          <td colSpan={5} className="pb-2 pl-6">
+            {detail.isError ? (
+              <span className="text-orange-300">{describeError(detail.error)}</span>
+            ) : detail.data === undefined ? (
+              <span className="text-slate-400">Loading…</span>
+            ) : (
+              <ul aria-label={`Match ${match.number + 1} games`} className="flex flex-col gap-0.5">
+                {detail.data.games.map((game) => (
+                  <li key={game.id} className="text-xs text-slate-300">
+                    Game {game.number + 1}: {game.onPlay} on the play,{' '}
+                    {game.winner === null ? 'a draw' : `${game.winner} won`}
+                    {game.turns !== null && ` in ${game.turns} turns`}
+                    {' · '}
+                    {game.hasLog ? (
+                      <Link to={gamePath(game.id)} className="text-sky-300 hover:underline">
+                        Watch the replay
+                      </Link>
+                    ) : (
+                      <span className="text-slate-500">no log kept</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
   );
 };
 

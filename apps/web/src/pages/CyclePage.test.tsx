@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cycleDetail, lookup, RUN, stats } from '../test/fixtures.js';
+import { cycleDetail, lookup, matchDetail, RUN, stats } from '../test/fixtures.js';
 import { fakeLive, fakeServer, renderWith } from '../test/harness.js';
 import { CyclePage } from './CyclePage.js';
 
@@ -17,6 +17,7 @@ const server = () =>
       return { body: stats(params.get('agent') as 'A' | 'B', Number(params.get('cycle'))) };
     },
     'POST /api/cards/lookup': (call) => lookup(call.body),
+    [`GET /api/matches/${encodeURIComponent(`${RUN}:2:0`)}`]: () => ({ body: matchDetail }),
   });
 
 const names = () =>
@@ -94,5 +95,23 @@ describe('the cycle page', () => {
     await waitFor(() =>
       expect(calls.some((call) => call.path === `${base}/stats?agent=B&cycle=2`)).toBe(true),
     );
+  });
+
+  it('opens a match to its games, each a link to its replay when its log was kept', async () => {
+    const { calls } = server();
+    renderWith(<CyclePage runId={RUN} cycle={2} />, fakeLive().live);
+    const open = await screen.findByRole('button', { name: 'Games' });
+    expect(calls.some((call) => call.path.startsWith('/api/matches/'))).toBe(false);
+    fireEvent.click(open);
+    const games = await screen.findByRole('list', { name: 'Match 1 games' });
+    const items = within(games).getAllByRole('listitem');
+    expect(items[0]?.textContent).toContain('Game 1: A on the play, A won in 3 turns');
+    expect(
+      within(items[0] as HTMLElement)
+        .getByRole('link')
+        .getAttribute('href'),
+    ).toBe('/games/game-1');
+    expect(items[1]?.textContent).toContain('no log kept');
+    expect(within(items[1] as HTMLElement).queryByRole('link')).toBeNull();
   });
 });

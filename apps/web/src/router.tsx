@@ -1,7 +1,7 @@
 import { type AnchorHTMLAttributes, type MouseEvent, useSyncExternalStore } from 'react';
 
 /**
- * A history router the size of this app: five kinds of page, matched by hand. The server
+ * A history router the size of this app: seven kinds of page, matched by hand. The server
  * answers `index.html` for any path that is not the API's (apps/server app.ts), so a
  * reload or a pasted link lands on the right page.
  */
@@ -11,6 +11,8 @@ export type Route =
   | { readonly page: 'newRun' }
   | { readonly page: 'run'; readonly runId: string }
   | { readonly page: 'cycle'; readonly runId: string; readonly cycle: number }
+  | { readonly page: 'live'; readonly runId: string }
+  | { readonly page: 'game'; readonly gameId: string }
   | { readonly page: 'notFound'; readonly path: string };
 
 export const matchRoute = (pathname: string): Route => {
@@ -23,6 +25,22 @@ export const matchRoute = (pathname: string): Route => {
       return { page: 'cycle', runId: decodeURIComponent(cycle[1]), cycle: Number(cycle[2]) };
     } catch {
       // A malformed escape is no run's id.
+    }
+  }
+  const live = /^\/runs\/([^/]+)\/live$/.exec(path);
+  if (live?.[1] !== undefined) {
+    try {
+      return { page: 'live', runId: decodeURIComponent(live[1]) };
+    } catch {
+      // A malformed escape is no run's id.
+    }
+  }
+  const game = /^\/games\/([^/]+)$/.exec(path);
+  if (game?.[1] !== undefined) {
+    try {
+      return { page: 'game', gameId: decodeURIComponent(game[1]) };
+    } catch {
+      // A malformed escape is no game's id.
     }
   }
   const run = /^\/runs\/([^/]+)$/.exec(path);
@@ -38,6 +56,8 @@ export const matchRoute = (pathname: string): Route => {
 
 export const runPath = (runId: string) => `/runs/${encodeURIComponent(runId)}`;
 export const cyclePath = (runId: string, cycle: number) => `${runPath(runId)}/cycles/${cycle}`;
+export const livePath = (runId: string) => `${runPath(runId)}/live`;
+export const gamePath = (gameId: string) => `/games/${encodeURIComponent(gameId)}`;
 
 const listeners = new Set<() => void>();
 const notify = () => {
