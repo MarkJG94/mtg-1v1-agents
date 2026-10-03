@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { MessagePort } from 'node:worker_threads';
 import { banListOf, banViolations, type OracleId } from '@mtg/shared';
 import {
   cardsIn,
@@ -274,6 +275,56 @@ describe('a ban asked for while a run is on a worker', async () => {
     await within(supervisor.idle('run-1'), 'run run-1 going idle');
     const bans = (await supervisor.store.load('run-1'))?.bans ?? [];
     expect(bans.at(-1)).toMatchObject({ action: 'restrict', oracleId: target });
+  });
+
+  it('is kept as pending when the worker never has it, as when its job has just ended', async () => {
+    // A worker that has just finished closes its control port before the API process
+    // hears that its job is over; an edit sent between the two goes nowhere. Dropping the
+    // message here is that, made certain.
+    const active = (supervisor as unknown as { active: Map<string, { control: MessagePort }> })
+      .active;
+    const dropping = supervisor.on((event) => {
+      if (event.type !== 'runStarted' || event.runId !== 'run-1') return;
+      dropping();
+      const control = active.get('run-1')?.control;
+      if (control === undefined) return;
+      const post = control.postMessage.bind(control);
+      control.postMessage = (message: unknown) => {
+        if (typeof message === 'object' && message !== null && 'ban' in message) return;
+        post(message);
+      };
+    });
+    const halting = supervisor.on((event) => {
+      if (event.type !== 'matchSaved' || event.runId !== 'run-1') return;
+      halting();
+      void supervisor.requestBan('run-1', {
+        oracleId: target,
+        action: 'unban',
+        note: 'never reached the worker',
+        by: 'operator',
+        at: now(),
+      });
+      void supervisor.pause('run-1');
+    });
+    await supervisor.start('run-1');
+    await within(supervisor.idle('run-1'), 'run run-1 going idle');
+    const bans = (await supervisor.store.load('run-1'))?.bans ?? [];
+    expect(bans.filter((ban) => ban.note === 'never reached the worker')).toEqual([
+      {
+        oracleId: target,
+        action: 'unban',
+        note: 'never reached the worker',
+        by: 'operator',
+        at: now(),
+        appliedAfterGameId: null,
+      },
+    ]);
+  });
+
+  it('is kept once, not twice, when the worker has it', async () => {
+    const bans = (await supervisor.store.load('run-1'))?.bans ?? [];
+    const keys = bans.map((ban) => JSON.stringify([ban.oracleId, ban.action, ban.at, ban.note]));
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });
 
