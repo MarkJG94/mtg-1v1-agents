@@ -1,0 +1,16 @@
+{
+  "name": "@mtg/smoke",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The browser smoke (docs/09 §7): a run made, watched and banned in, against the built server or the Docker image",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "smoke": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}
