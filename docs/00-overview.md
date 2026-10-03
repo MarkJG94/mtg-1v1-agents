@@ -46,7 +46,7 @@ These were settled at planning time and the rest of the docs assume them.
 | D13 | Runs | Multiple concurrent runs, ban list per run | Runs can be paused, resumed, forked, exported. |
 | D14 | Runtime | Node backend + browser frontend | Simulation on the server; browser is viewer and control plane. |
 | D15 | Stack | TS monorepo, Fastify + WS, React + Vite, SQLite | pnpm workspaces; Docker Compose for the homelab. |
-| D16 | Card data | Scryfall bulk data at build time, images cached lazily by the server | Container needs outbound HTTPS to api.scryfall.com / cards.scryfall.io only for image cache misses. |
+| D16 | Card data | Scryfall bulk data at build time, images cached lazily by the server | Container needs outbound HTTPS to api.scryfall.com / cards.scryfall.io only for image cache misses. Bulk data arrives as gzipped JSONL and is projected to `data/scryfall/cards.jsonl`; see ADR 0001. |
 | D17 | Seed deck | Constrained random from all of Scryfall | 1–3 random colours, ~22–26 lands, max 4 per name, all nonland cards castable in the chosen colours; everything else is dice. Unsupported draws are re-rolled. |
 | D17b | Replacement search | Filtered Scryfall shortlist + on-demand scripting + trial stats | Filter by legality/bans/castability/mana-value band, rank by a static quality model plus prior stats, script top K on demand, optionally trial the top 3. |
 | D18 | v1 rules scope | Full stack, evergreen combat keywords, real Eternal mana bases, planeswalkers, layer system | Planeswalkers/layers are the largest single item; see roadmap ordering. |

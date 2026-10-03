@@ -8,6 +8,10 @@ Cards are data, not code. A **card script** is a YAML/JSON document that describ
 2. **Hand scripts** in `packages/cards/scripts/<first-letter>/<slug>.yaml`, keyed by oracle id. These win over auto-generated scripts.
 3. **Auto scripts** produced by the parser at request time and cached in the `card_scripts` table together with the parser version and validation result. Bumping the parser version invalidates the cache.
 
+`ScriptResolver` (roadmap 2.4) is what walks those three in order: a hand script wins, then a cached verdict *reached by the version that is running now*, then the auto-scripter, and otherwise the card is unsupported and the request is logged. Whatever the answer, it is cached — including "unsupported", because re-running a parser and a smoke test for a card that was unplayable an hour ago is the cost the cache exists to avoid. A **partial script is never played**; it is logged like any other card the run could not have.
+
+The cache and the log are ports (`ScriptStore`), shaped exactly like docs/06's `card_scripts` and `unsupported_requests` rows. An in-memory implementation runs today; the SQLite one arrives with the server's persistence in phase 5 and the resolver does not change. The auto-scripter is likewise a port: until phase 3 builds it, the resolver simply has no third step, which is a legitimate configuration — everything outside the bootstrap set is unsupported and says so.
+
 Card identity everywhere in the system is the Scryfall **oracle id** (stable across printings); the UI resolves an oracle id to a preferred printing for images.
 
 ## Script schema (abridged)
@@ -74,37 +78,168 @@ abilities:
 - **Quantities** are numbers or expressions: `{ count: <selector> }`, `{ x }`, `{ add|mul|sub }`, `{ devotion: colour }`, `{ lifeTotal }`, `{ cardsInHand }`, etc.
 - **Targets** declare id, filter, count (`1`, `upTo: 2`, `any`), and `distinct` flags; the engine validates targets on cast and on resolution.
 
-The schema is enforced with zod (`packages/cards/src/schema.ts`), which also generates JSON Schema for editor completion in YAML files.
+The schema is enforced with zod (`packages/cards/src/schema.ts`), which also generates JSON Schema for editor completion in YAML files — `pnpm cards:schema` writes `packages/cards/schema/card-script.schema.json`, and CI fails if the committed file has drifted from the schema.
+
+### What is implemented (roadmap 2.1)
+
+The vocabulary above is the target; this is where it stands.
+
+- **39 effect ops**, each implemented once in `packages/engine/src/cards/effects.ts`, every one of them proposing `RulesEvent`s so replacement effects apply without either side knowing about the other. `packages/cards/src/ops-spec.ts` is the table of what each op takes, and is what the loader converts against and the validator will check.
+- **Ops that need a player choice mid-resolution are not among them**: `search`, `scry`, `surveil`, `may`, `choose` (modal), `unless ... pays`, and a discard the player picks. They need the effect list to pause and resume the way a replacement batch does, and land with that machinery — see ADR 0006. A batch that pauses mid-effects throws rather than dropping the rest.
+- **Seven ability kinds** — spell, triggered, activated, static, mana, loyalty, replacement. A keyword line is expanded into the engine's keywords at load time, as the vocabulary says.
+- **Dynamic characteristics are not there yet**: a static ability sets power and toughness to fixed numbers, so a card whose P/T counts something (the `*`/`*+1` example above) waits for quantity-valued layer changes.
+- Filters and quantities are written in the short forms above (`filter: any`, `to: $t`, `{ type: creature, controller: opponent }`) and the loader turns them into the engine's tagged unions. An object with several keys reads as "all of these at once".
+
+The loader checks what a shape check cannot: that every op exists, that it has the arguments it needs and none it does not, that a `$target` was actually declared by the ability that mentions it, and that a `when`, an `affects` or a `change` names something the engine really has — all against the engine's own exported lists, so the two can never drift.
+
+## Tags (roadmap 4.6)
+
+`cardTags(definition)` in `packages/cards/src/tags.ts` reads two lists off a script for the sideboarding agent (docs/04). **`is`** — what the card is: its card types, `spell` for every nonland card, and the roles its ops give it: `burn` (damage that can go to a player), `counterspell`, `lifegain`, `graveyard` (returns cards from one). **`vs`** — what it answers: the kinds its removal-shaped ops (destroy, exile, bounce, damage, fight, gain control, a toughness-lowering pump, counter) can be pointed at, as the filters of their targets or their `forEach` say. `and` keeps what every part allows, `or` what any part does, a filter confined to the controller's own things answers nothing, and "noncreature" excludes creatures. Gaining life answers `burn`, split second answers `counterspell`, and exiling from a graveyard answers `graveyard`. Tags are as good as the script: they are read from the definition, never from the card's name. The vocabulary (`CardKind`) lives in `@mtg/shared`, because the agents that read the tags may not import this package.
 
 ## Validation
 
-`validateScript(script, scryfallCard)` checks:
+`validateScript(script, scryfallCard)` runs four checks and returns one of three verdicts.
+The difference between the verdicts is the point:
 
-1. Schema validity and that every referenced op/filter/trigger exists in the engine's registry.
-2. **Characteristic agreement** with Scryfall: name, mana cost, types, P/T, loyalty, colours must match exactly. A script can't accidentally make a card cheaper.
-3. **Text coverage**: every sentence of the oracle text must be claimed by exactly one ability in the script (`covers: [sentenceIndex...]`). Reminder text (in parentheses) is ignored. An unclaimed sentence makes the script `partial`, and partial scripts are never played (decision: skip and log).
-4. **Executability smoke test**: the card is put into a synthetic game (cast from hand with infinite mana against an empty board, and against a board with a vanilla 2/2, and with the opponent holding priority) and the engine must reach a stable state without throwing, without an unfulfillable decision, and within a step budget.
-5. Optional hand-written **scenario tests** (see 09) for cards with hand scripts.
+- **unsupported** — the script is wrong: it does not load, it disagrees with the printed
+  card, or the engine falls over when the card is played. Nothing plays it.
+- **partial** — the script is right about what it does but does not do everything the card
+  says. Partial scripts are never played; they are listed so somebody can finish them.
+- **supported** — loads, agrees, claims every sentence, and survives being played.
 
-Result: `{ status: 'supported' | 'partial' | 'unsupported', reasons[], parserVersion }`.
+The checks:
+
+1. **It loads.** The schema, and then the loader's own checks: every op exists, has the
+   arguments it needs and none it does not, every `$target` was declared, and every
+   `when`/`affects`/`change` names a rule the engine has. All against the engine's own
+   exported lists.
+2. **Characteristic agreement** with Scryfall: oracle id, name, mana cost, types,
+   supertypes, subtypes, power, toughness, loyalty and colours, all exact. This is the
+   check that matters most — a script that gets a cost wrong is not one broken card, it is
+   a card quietly better than the one everyone else is playing with, and a run of thousands
+   of games would build on it unnoticed. Costs are compared as parsed costs, so `{1}{G}`
+   and `{G}{1}` agree; a printed `*` power is a disagreement, because the script vocabulary
+   cannot say it yet.
+3. **Text coverage**: `covers:` on each ability lists the sentences of the oracle text it
+   claims, and every sentence must be claimed by exactly one. Reminder text is dropped
+   before splitting — it is in parentheses precisely because it restates rules that are
+   true anyway (CR 207.2). A sentence claimed twice, or one that does not exist, is an
+   error; a sentence claimed by nobody makes the script partial.
+4. **Executability smoke test**: the card is put into three synthetic games — an empty
+   board, a 2/2 opposite, and the opponent's turn — with enough any-colour lands that its
+   own cost is never what stops it, and cast where there is a legal way to. What is checked
+   is not that it did the right thing, which no validator can know, but that the engine came
+   out the other side in a legal, answerable state without throwing. A card with no legal
+   target in a scenario is **skipped** there rather than failed: having no target is a
+   normal fact about Magic. A sorcery-speed card skips the opponent's turn for the same
+   reason.
+
+Result: `{ status, reasons[], validatorVersion, definition, skipped[] }`. The version is
+part of the answer because verdicts are cached (2.4): a cached "unsupported" from an older
+validator has to be re-earned rather than believed.
 
 ## Auto-scripter
 
 The auto-scripter converts oracle text to a script. It is a layered, deterministic pipeline; no LLM is involved in the run loop (an LLM-assisted mode for producing *draft hand scripts* offline is a later option).
 
-1. **Normalise**: replace the card's own name with `~`, strip reminder text, split into sentences, resolve "this spell/creature/permanent" to `~`, expand keyword lines (`Flying, first strike` → keyword abilities) using Scryfall's `keywords` array as a cross-check.
-2. **Classify** each sentence: keyword line, activated (`[cost]: [effect]`), triggered (`When/Whenever/At ...`), static (present-tense, "as long as", "can't", "get +1/+1", "enters tapped"), spell text (for instants/sorceries), loyalty (`+N:`/`−N:`), or unknown.
-3. **Parse** with a grammar (a PEG via `peggy`) over a controlled vocabulary of Magic templating: costs, target phrases (`target creature an opponent controls`), quantities (`X`, `that many`, `for each ...`), durations (`until end of turn`), conditions (`if ...`, `unless ...`), object references (`it`, `that creature`, `the exiled card`), and effect verbs. Anaphora ("it", "that player") are resolved to the most recent matching binding.
-4. **Emit** the script; unparseable sentences are recorded with the failing token position.
-5. **Validate** as above.
+1. **Normalise** (roadmap 3.1, `packages/cards/src/auto/normalise.ts`): replace the card's own name with `~` — including the short name a legendary card calls itself by, "Chandra" for "Chandra, Torch of Defiance" — strip reminder text, split into lines and sentences, resolve "this spell/creature/permanent/land/…" to the same `~`, settle the punctuation, and separate keyword lines from abilities.
 
-Grammar coverage is measured continuously: `pnpm cards:coverage` runs the parser over the entire Scryfall database and writes a report (`supported / partial / unsupported`, top failing patterns by frequency). The roadmap targets coverage by *demand* (cards actually requested by runs) rather than by raw count; the top failing patterns list tells us what grammar to write next.
+   Two details matter more than they look. **The numbering is shared**: a line carries the sentence numbers `sentencesOf` gives them, which is the numbering `covers:` is validated against, and `sentencesOf` is *defined* as the flattening of the line structure so the two cannot drift. And **the punctuation is normalised** — a loyalty cost is printed with a real minus sign (U+2212), quotes are typographic, both dash characters turn up — because a grammar that had to know all of that is a grammar with a bug waiting.
+
+   A keyword line is one where *every* part is a keyword the script can say; "Flying, protection from red" is not partly a keyword line, it is an ability, and it goes on whole. Two of those keywords are **fields on the card rather than entries in `keywords:`** — `flash` and `splitSecond` — because they are about when a spell may be cast (CR 702.8, CR 702.19) and the engine keeps them where casting can see them; there is nothing for "target creature gains split second" to mean. They come back separately as `cardKeywords`, the emitter sets the field, and the validator lets the field claim the line — but only when the script actually sets it, since a card printed with flash whose script forgot it may be cast at the wrong time. Scryfall's `keywords` array is a cross-check in one direction only: a keyword read off a line that Scryfall does not list means the line was misread and is reported. The other direction is ordinary — a card that *grants* flying lists it and has no keyword line — and Scryfall's array mixes keyword abilities with action words, so Jace Beleren lists "Mill", which the engine has an op for, while an Equipment lists "Equip", which it has not. Those come back as `otherKeywords`: a list for the classifier to judge, not a verdict.
+
+   Nothing is ever guessed. What the normaliser could not do confidently — a face it did not read on a two-faced card, a keyword line it distrusts — comes back in `notes`, because a normaliser that quietly dropped a line would hand the classifier a card that does less than it says and nothing downstream would know.
+2. **Classify** each line (roadmap 3.2, `packages/cards/src/auto/classify.ts`) into **the engine's own ability kinds** — spell, activated, triggered, static, mana, loyalty, replacement — plus `keyword` for a keyword line and `unknown` for a line no rule reaches. The categories are the engine's rather than a list of this step's own so that the emitter maps a classification straight to a `kind:` instead of reading the same text a second time to find out what it really was; **ADR 0007** has the reasoning, and a test asserts the correspondence so a new ability kind in the engine cannot be added without a category for it.
+
+   Most of it is the Comprehensive Rules rather than heuristics, which is what makes it worth trusting: CR 603.1 for the trigger words ("when", "whenever", "at"), CR 602.1 for the cost-colon-effect shape, CR 605.1a for which of those are mana abilities (it could add mana, it targets nothing, it is not a loyalty ability), CR 606.1 for a loyalty cost, CR 614 for replacement templating ("as ~ enters", "~ enters tapped", "if … would …, instead"), and CR 112.3 for the residual — text on an instant or sorcery is a spell ability, and text on a permanent that is none of the others is static.
+
+   A cost is read all or nothing: every comma-separated piece of the left side has to be one (CR 601.2h), because a cost read wrongly is a card cheaper than the one that is printed. A line whose left side has a piece it cannot read is `unknown`, as are the shapes the rules do not reach — a modal spell and its bullets, a keyword ability with a cost (`Equip {2}`, `Ward {2}`, `Flashback {1}{R}`). Each says which, so the coverage report in 3.5 counts templates to teach rather than a pile of failures.
+
+   What the classifier does **not** claim is that a line can be parsed. "All creatures lose all abilities and have base power and toughness 1/1" is a static ability by rule; whether the grammar can read it is a different question with a different answer.
+3. **Parse** with a grammar over a controlled vocabulary of Magic templating (roadmap 3.3, `packages/cards/src/auto/`): costs, target phrases (`target creature you don't control`), quantities, durations (`until end of turn`), the object phrases, and the effect verbs. It has a PEG's shape — ordered choice, backtracking, a rule that either matches or leaves the cursor where it found it — but it is **written rather than generated**, because what a rule produces is a piece of script built from a closed vocabulary and that is worth type-checking; **ADR 0008** has the reasoning and the limit it leaves.
+
+   The **filter** is where most of Magic's variation lives, so it is the part worth widening first: a noun takes the adjectives in front of it ("attacking or blocking creature", "tapped", "untapped", "white or blue creature", "nonartifact") and the qualifiers after it ("with flying", "without first strike"), on either side of "you control". Every predicate behind those is one the engine already had (CR 115.1). A qualifier it has no predicate for — "that blocked this turn", "with a +1/+1 counter on it" — makes the whole filter unread rather than being dropped, because a filter with a qualifier quietly missing is a spell that may be pointed at things the card forbids.
+
+   The unit is the sentence, because the sentence is the unit `covers:` counts in. Targets a sentence declares are remembered for the ones after it, which is what lets "Gain control of target creature until end of turn. Untap that creature. It gains haste until end of turn." be three sentences about one target. A bare "it" with nothing before it to refer to is the card itself — "Sacrifice ~: It deals 1 damage to any target" — but only before any effect has been read, because after one it far more likely means whatever that effect produced.
+
+   **A parse may stop part-way and still be worth having**, as long as it stops at a sentence boundary: "Destroy all creatures. They can't be regenerated." reads the first sentence and not the second, which is exactly the shape of a *partial* script — the emitter claims what was read, the validator sees one sentence unclaimed, and the card is listed for somebody to finish rather than played as a card that does less than it says. Stopping mid-sentence is never allowed, because half a sentence is a different card.
+
+   What comes out is **script form**, not engine objects, so the loader and the validator stay the things that decide whether a parse is playable. Anything unread is reported with the furthest token any rule reached — "no effect this can read, at «regenerated»" — which is what makes the coverage report in 3.5 a list of templates to teach.
+4. **Emit** the script (roadmap 3.4, `packages/cards/src/auto/emit.ts`). Characteristics come off the printed card rather than out of the text, keywords come from the normaliser, and each classified line becomes one ability of the kind the classifier named — which is where ADR 0007 pays off, since there is nothing to work out a second time. A printed `*` is left out rather than guessed at, so the validator reports it as a disagreement, which is the truth.
+
+   `covers:` names **only the sentences the grammar actually read**. A card whose text was half understood produces a script that claims half of it, which the validator calls partial and which is therefore never played; claiming the whole line because most of it parsed is how a card ends up quietly playing as something it is not. One card gets one spell ability however many lines its spell text runs to (CR 112.3a) — emitting one per line leaves every line after the first unplayed, because the engine resolves the first spell ability it finds, and the loader now refuses a script with two.
+
+   Unparseable sentences are recorded with the failing token position.
+5. **Validate** as above. This is also the step that makes the auto-scripter safe to leave running: it may write a script that does *less* than the card says, and a partial script is never played, but a script that disagrees with the printed card is unsupported and nothing touches it.
+
+The **golden corpus** (`pnpm cards:corpus`, `pnpm cards:goldens`) is how a change to any of those steps is noticed: 370 real cards — two core sets, which is what "spanning the common templates" means in practice — with what the auto-scripter makes of each one committed alongside them. A rule change shows up as a diff somebody reads and accepts. As of 3.6 it reads **138 of the 370 as supported, 230 as partial and 2 as unsupported**, and the two are the cards with a printed `*` power. No card in the corpus is emitted with a characteristic that disagrees with the printed one, and none makes the engine fall over; a test asserts both, because those are the failures that would matter.
+
+Grammar coverage is measured continuously (roadmap 3.5): `pnpm cards:coverage` runs the whole pipeline over every card Scryfall has — one line at a time off the projection `pnpm fetch:scryfall` writes — and produces `reports/coverage.json` for machines and `reports/coverage.md` for people.
+
+**The score is not one number, and the report refuses to pretend it is.** A card with no rules text is supported without anything being read, so those are counted separately and the honest headline is the share of cards that *have* text and are supported. Sentences claimed out of all sentences is the other half, because a card is partial the moment one sentence is unread and the count of cards hides how close it was.
+
+**The useful half is the pattern table.** A list of twenty thousand distinct unread sentences is not a report, so each one is generalised — numbers and mana symbols are what differ between two printings of one template — and what is left is the opening few words, which is where Magic puts the verb. Each row is a template, how many sentences share its shape, how many *cards* it is the last thing standing in the way of, and an example card to go and look at.
+
+A sentence left unread because an *earlier* sentence of the same ability was is **fallout**, not a template: the emitter claims a run, so one sentence it cannot read leaves the rest of that ability unclaimed too. Those are counted apart, and only the first unread sentence of each ability is a failure. Counting them together put `draw a card` — read since 3.3 — fourteenth in the table.
+
+**Rank by `finishes`, not by `count`.** The two disagree, and the second is the one worth working from. `enchant creature` is the commonest unread shape in Magic at 893 sentences and it would finish **zero** cards on its own, because every Aura also prints "enchanted creature gets …" and the engine has no selector for the thing an Aura is attached to. `finishes` counts the cards with nothing else left unread, so it says which template is actually the last obstacle. It is an upper bound rather than a promise: a card can still be held back by something that is not a sentence at all, such as a dynamic power the script cannot say.
+
+The nightly workflow runs it against the day's Scryfall data and keeps one issue up to date with the table — updated in place rather than commented on, because what matters is what the parser cannot read *now*. It is a report and never a gate: a coverage number that drops is worth waking up to and is not a reason to stop a merge.
 
 Realistic expectations: vanilla/keyword creatures, burn, pump, simple removal, counters, cantrips, ETB/dies triggers, and simple static buffs are the first 30–40% of all cards and are cheap to reach. Long tail (modal complexity, unusual object references, "as long as" chains, cards that reference other cards by name) stays hand-scripted for a long time. The random-deck design tolerates this because unsupported draws are re-rolled.
 
+**What the measurement said about that estimate** (roadmap 3.6): the cheap part was cheaper than the estimate and much smaller. Over 34,733 cards the parser reads **10.9%** as supported, and the templates it cannot read are not mostly the long tail — they are five things that each need an *engine* change before any amount of grammar helps:
+
+- **Auras and Equipment** need an `attachedTo` effect selector, for "enchanted creature gets +1/+1" and "equipped creature has trample". Between them that is the four largest shapes in the table and around 2,400 sentences.
+- **"Whenever ~ deals combat damage to …"** needs a trigger the engine does not have.
+- **Modal spells** ("choose one —") need the effect list to pause for a choice mid-resolution, which is the same thing search, scry and "you may" are waiting for.
+- **Additional casting costs** and **cost reduction** ("as an additional cost to cast ~, …", "~ costs {2} less to cast") need casting to consult the card.
+- **The keywords that carry a cost** — cycling, kicker, crew, flashback, morph, ward — are each a small rule of their own, and `equip` is one of them.
+
+The grammar work worth doing before those is narrower than it looks: the filter vocabulary (an adjective or a qualifier on a noun) lifts every verb at once, and a second clause on a verb that already reads is usually a whole card.
+
 ## Hand-script workflow
 
-`pnpm cards:new "<name>"` scaffolds a YAML from Scryfall data with the text pre-split into sentences and a `covers` skeleton; `pnpm cards:test <name>` runs validation and any scenario tests. The UI's coverage page lists the most-requested unsupported cards so hand-scripting effort follows demand.
+`pnpm cards:new "<name>" ["<name>" ...]` fetches each card from Scryfall and writes two things: a YAML skeleton under `packages/cards/scripts/<letter>/<slug>.yaml`, with every characteristic filled from the printed card and the oracle text listed as numbered sentences to claim, and the card's projection into `packages/cards/fixtures/scryfall.json`. The fixture is committed because validation runs in CI, where there is no network and no 500 MB bulk file. An existing script is never overwritten — only its fixture entry is refreshed.
+
+Every script is then validated as a test (`packages/cards/src/scripts.test.ts`), which is what keeps the set honest: a script that stops agreeing with its card, or stops being playable because the engine changed underneath it, fails there rather than in a game a thousand cycles into a run. The UI's coverage page lists the most-requested unsupported cards so hand-scripting effort follows demand.
+
+Every script also carries its own tests under `tests:`, in the small declarative
+vocabulary docs/09 describes — a board, one action and an expectation. At least one is
+required: docs/09's definition of done for a hand script is that somebody has checked the
+card does what its text says, and validation cannot do that for you. Writing them is where
+the set earns its keep — the first run of the sixty found that a land played from hand
+never got its "enters tapped" replacement, and that the engine would let "destroy target
+artifact" be cast at a creature.
+
+One trap worth knowing: **a bare `~` is `null` in YAML**. Write `object: "~"` when an op acts on the card itself. The loader says so by name rather than making you work it out from a schema error.
+
+## The bootstrap set (roadmap 2.3)
+
+60 cards, chosen to exercise the engine rather than to make a deck: the five basics and a gate, one creature per evergreen keyword, enters and dies triggers, tokens, counters, a fight, an extra turn, regeneration, a planeswalker, and the layer-system cards. Between them they use **all seven ability kinds** and **26 of the 39 effect ops**.
+
+Three of them are **partial** — they do less than the card says, on purpose, and are never played. They are in the set because leaving them out would hide what the engine cannot do:
+
+| Card | What is missing |
+|---|---|
+| Wrath of God | "They can't be regenerated" has no op |
+| Swords to Plowshares | life equal to the exiled creature's power needs last known information |
+| Turn to Frog | "becomes a Frog" is a creature-type change layer 4 cannot make |
+
+### What the set leaves out, and why
+
+Cards deliberately not scripted, with the phase that would close each:
+
+- **Fetchlands and tutors** — `search` needs a choice during resolution, which needs the resumable effect pipeline (ADR 0006).
+- **Shocklands** ("unless you pay 2 life") and **checklands** ("unless you control a Swamp") — a replacement effect cannot ask for a payment or test a condition.
+- **Modal spells** ("Choose one —") — same pipeline.
+- **A discard the player chooses** — Hymn to Tourach is in the set because it discards *at random*, which needs nobody's input.
+- **Auras** (Pacifism, Rancor) — an aura spell has to attach to its target as it resolves, and nothing does that yet.
+- **Blood Moon and type-changing statics** — layer 4 can make something a creature; it cannot set land types or take a land's abilities away.
+- **Bad Moon** and other "creatures of a colour get +1/+1" — the effect selector has no colour filter.
+- **Hardened Scales** and counter-modifying replacements — the event matcher for counters cannot say "a creature you control".
+- **Triggered abilities that target** (Bond Beetle) — the engine puts a trigger on the stack without asking for targets, which needs a decision at that point.
+- **Dynamic power and toughness** (`*` / `*+1`) — quantity-valued layer changes.
 
 ## Images
 

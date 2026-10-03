@@ -1,0 +1,25 @@
+# Forest
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   (no rules text)
+
+oracleId: b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6
+name: "Forest"
+manaCost: ""
+types: [land]
+supertypes: [basic]
+subtypes: [forest]
+colours: []
+text: "({T}: Add {G}.)"
+
+abilities:
+  - kind: mana
+    id: tap-for-g
+    modes: [[{ type: G }]]
+
+tests:
+  - name: taps for one mana
+    activateMana: tap-for-g
+    expect:
+      manaPool: 1
+      tapped: { this: true }

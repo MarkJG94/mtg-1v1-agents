@@ -1,0 +1,25 @@
+# Plains
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   (no rules text)
+
+oracleId: bc71ebf6-2056-41f7-be35-b2e5c34afa99
+name: "Plains"
+manaCost: ""
+types: [land]
+supertypes: [basic]
+subtypes: [plains]
+colours: []
+text: "({T}: Add {W}.)"
+
+abilities:
+  - kind: mana
+    id: tap-for-w
+    modes: [[{ type: W }]]
+
+tests:
+  - name: taps for one mana
+    activateMana: tap-for-w
+    expect:
+      manaPool: 1
+      tapped: { this: true }

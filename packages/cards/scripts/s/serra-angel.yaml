@@ -1,0 +1,26 @@
+# Serra Angel
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Flying
+#   1. Vigilance
+
+oracleId: 4b7ac066-e5c7-43e6-9e7e-2739b24a905d
+name: "Serra Angel"
+manaCost: "{3}{W}{W}"
+types: [creature]
+subtypes: [angel]
+colours: [W]
+power: 4
+toughness: 4
+keywords: [flying, vigilance]
+text: "Flying Vigilance (Attacking doesn't cause this creature to tap.)"
+
+abilities: []
+
+tests:
+  - name: resolves as a 4/4 with its keywords
+    expect:
+      zone: { this: battlefield }
+      power: { this: 4 }
+      toughness: { this: 4 }
+      keywords: { this: [flying, vigilance] }

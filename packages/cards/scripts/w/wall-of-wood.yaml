@@ -1,0 +1,25 @@
+# Wall of Wood
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Defender
+
+oracleId: aa5e6894-8c97-46f8-a0fd-07c6db51e9a7
+name: "Wall of Wood"
+manaCost: "{G}"
+types: [creature]
+subtypes: [wall]
+colours: [G]
+power: 0
+toughness: 3
+keywords: [defender]
+text: "Defender (This creature can't attack.)"
+
+abilities: []
+
+tests:
+  - name: resolves as a 0/3 with its keywords
+    expect:
+      zone: { this: battlefield }
+      power: { this: 0 }
+      toughness: { this: 3 }
+      keywords: { this: [defender] }

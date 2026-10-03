@@ -1,0 +1,28 @@
+# Glorious Anthem
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Creatures you control get +1/+1.
+
+oracleId: e3886fe8-9b76-4613-8891-4ec74657c087
+name: "Glorious Anthem"
+manaCost: "{1}{W}{W}"
+types: [enchantment]
+colours: [W]
+text: "Creatures you control get +1/+1."
+
+abilities:
+  - kind: static
+    covers: [0]
+    affects: { kind: creaturesControlledBy, player: sourceController }
+    change: { kind: modifyPowerToughness, power: 1, toughness: 1 }
+
+tests:
+  - name: makes your creatures bigger, and not theirs
+    setup:
+      you:
+        creatures: [{ name: mine, power: 2, toughness: 2 }]
+      opponent:
+        creatures: [{ name: theirs, power: 2, toughness: 2 }]
+    expect:
+      power: { mine: 3, theirs: 2 }
+      toughness: { mine: 3, theirs: 2 }

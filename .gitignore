@@ -6,4 +6,11 @@ data/
 *.db-shm
 .env
 coverage/
+bench-results/
+bench-baseline/
+reports/
 .DS_Store
+*.tsbuildinfo
+.vite/
+playwright-report/
+test-results/

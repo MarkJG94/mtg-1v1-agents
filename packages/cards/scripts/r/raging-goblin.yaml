@@ -1,0 +1,25 @@
+# Raging Goblin
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Haste
+
+oracleId: 30997b43-fc13-41d3-8064-1ccc2cb6fd2b
+name: "Raging Goblin"
+manaCost: "{R}"
+types: [creature]
+subtypes: [goblin, berserker]
+colours: [R]
+power: 1
+toughness: 1
+keywords: [haste]
+text: "Haste (This creature can attack and {T} as soon as it comes under your control.)"
+
+abilities: []
+
+tests:
+  - name: resolves as a 1/1 with its keywords
+    expect:
+      zone: { this: battlefield }
+      power: { this: 1 }
+      toughness: { this: 1 }
+      keywords: { this: [haste] }

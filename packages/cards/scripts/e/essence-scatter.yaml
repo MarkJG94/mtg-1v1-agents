@@ -1,0 +1,25 @@
+# Essence Scatter
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Counter target creature spell.
+
+oracleId: 46665089-aa3d-44c3-964d-6638dfbb5782
+name: "Essence Scatter"
+manaCost: "{1}{U}"
+types: [instant]
+colours: [U]
+text: "Counter target creature spell."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets: [{ id: t, filter: { is: spell, type: creature } }]
+    effects: [{ op: counter, object: $t }]
+
+tests:
+  - name: counters a creature spell
+    setup:
+      opponentSpell: theirs
+    targets: [theirs]
+    expect:
+      zone: { theirs: "B:graveyard" }

@@ -1,0 +1,25 @@
+# Fencing Ace
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Double strike
+
+oracleId: 2f810936-2ba6-4c2b-84a0-ff4c1deb026b
+name: "Fencing Ace"
+manaCost: "{1}{W}"
+types: [creature]
+subtypes: [human, soldier]
+colours: [W]
+power: 1
+toughness: 1
+keywords: [doubleStrike]
+text: "Double strike (This creature deals both first-strike and regular combat damage.)"
+
+abilities: []
+
+tests:
+  - name: resolves as a 1/1 with its keywords
+    expect:
+      zone: { this: battlefield }
+      power: { this: 1 }
+      toughness: { this: 1 }
+      keywords: { this: [doubleStrike] }

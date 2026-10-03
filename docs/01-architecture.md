@@ -37,10 +37,12 @@ The server runs three kinds of work:
 2. **Simulation workers** (`worker_threads`): one per run in progress, up to `SIM_WORKERS` (default = CPU cores − 1). Each worker owns one run's loop: play cycle → aggregate stats → choose change → legalise → persist → next cycle. Workers communicate with the API process via structured messages; the API process is the only writer to SQLite (workers post batches of results to it) to avoid write contention.
 3. **Scripting worker**: one worker that services "script this card" requests (Scryfall lookup + auto-scripter + validation) so that card parsing never stalls a simulation worker. Results are cached in the `card_scripts` table.
 
+**As built (5.7)**, in `apps/server/src/workers`: the `Supervisor` in the API process owns the pool. It starts up to `SIM_WORKERS` simulation workers as runs need them and keeps them, gives each one job at a time — making a run (the seed deck is rolled on the worker) or driving one until it is paused or stopped, or for a set number of cycles — and queues a run that finds every worker busy, first come first served. A simulation worker has **no database connection**: its `RunStore` is the API process's `SqliteRunStore`, served over a `MessagePort`, so every checkpoint is written, in one transaction, by the API process, which also learns of each match, deck change and cycle as it is saved (the events phase 6.2 will broadcast). Its resolver asks the scripting worker **synchronously** (ADR 0016): the worker blocks on `Atomics.wait` until the answer is on its port, so nothing above the resolver had to become asynchronous. The scripting worker holds the one `ScriptResolver`, reads the cache through a read-only connection and posts its verdicts and unsupported requests to the API process to write. Pausing or stopping a run is a status the worker reads after every match; a ban asked for while a run is on a worker is sent to it and takes effect after the game in progress, and one asked for otherwise waits on the trail as pending. A job that fails pauses its run and reports why, so a restart does not fail it again; a worker that dies is replaced when next needed. The scripting worker is not replaced: without it nothing can be scripted, so once it stops (roadmap 6.3) every request waiting on it and every one after fails at once, as `503 scripting_unavailable`, and the runs on workers fail — and the server will not start without the hand scripts it loads, rather than start with a scripting worker that died on the way up. From TypeScript source a worker starts in `dev-entry.mjs`, which registers tsx in the new thread; the bundle builds each worker as an entry of its own.
+
 ## Data flow
 
 ```
-Scryfall bulk JSON ──(scripts/fetch-scryfall)──▶ data/scryfall/oracle-cards.json
+Scryfall bulk JSONL ─(scripts/fetch-scryfall)──▶ data/scryfall/cards.jsonl  (see ADR 0001)
                                                         │
                                                         ▼
                                              packages/cards: CardDatabase (in-memory index by
@@ -74,18 +76,18 @@ State is immutable-by-convention with structural sharing via a small persistent-
 
 ## Card lifecycle
 
-1. Scryfall bulk data is fetched once (`pnpm fetch:scryfall`) and reloaded on server start into `CardDatabase`.
+1. Scryfall bulk data is fetched once (`pnpm fetch:scryfall`) into `data/scryfall/cards.jsonl` and reloaded on server start into `CardDatabase`. The fetcher streams gzipped JSON Lines and skips non-card layouts; see ADR 0001.
 2. A card is **requested** when the seed-deck generator or the replacement search wants it.
 3. `ScriptResolver.resolve(oracleId)`: hand script → cached auto script → run auto-scripter → validation. Result is one of `supported`, `unsupported(reason)`, or `partial(reasons)` (partial scripts are never played; see 03).
 4. Only `supported` cards enter decks. Every `unsupported` request is written to `unsupported_requests` with the failure reason and shown in the UI's coverage page so hand scripts can be prioritised by demand.
 
 ## Persistence and resume
 
-Everything durable lives in one SQLite file (`data/mtg.db`, WAL mode). Runs are resumable: the worker checkpoints after every completed match (results + event logs), and after every cycle (decks, stats, change). On restart the server reloads every run with status `running` and resumes from the last completed match of the current cycle; a game interrupted mid-play is simply replayed from scratch with the same seed.
+Everything durable lives in one SQLite file (`data/mtg.db`, WAL mode). Runs are resumable: the worker checkpoints after every completed match (results + event logs), and after every cycle (decks, stats, change). On restart the server reloads every run with status `running` and resumes from the last completed match of the current cycle; a game interrupted mid-play is simply replayed from scratch with the same seed. The resumed cycle is rebuilt from its stored matches and their logs, so it ends where the one that never stopped would have (ADR 0015). At boot the server resumes every `running` run on the worker pool once it is listening, provided the Scryfall data is there; shutting down leaves runs `running` at their last checkpoint for exactly that. A test kills a server mid-run and starts another on the same file, and the run ends where the one that was never killed does.
 
 ## Deployment
 
-`docker-compose.yml` runs one container: Node 22, the built server serving the built web app as static files on one port, `data/` mounted as a volume. Environment: `PORT`, `SIM_WORKERS`, `DATA_DIR`, `SCRYFALL_IMAGE_CACHE=lazy|off`. Outbound network is only needed for image cache misses; the sim itself is fully offline once the bulk data is present.
+`docker-compose.yml` runs one container: Node 22, the built server serving the built web app as static files on one port, `data/` mounted as a volume. Environment: `PORT`, `SIM_WORKERS`, `DATA_DIR`, `SCRYFALL_IMAGE_CACHE=lazy|off`, `CARD_SCRIPTS_DIR` (the hand scripts; `packages/cards/scripts` by default, which the image provides) and `WEB_DIST`. A relative path is taken from the pnpm workspace when the server runs inside one — `pnpm dev` runs it in `apps/server`, and the data and scripts are the repository's — and from the working directory otherwise, as in the image (ADR 0018). Outbound network is only needed for image cache misses; the sim itself is fully offline once the bulk data is present.
 
 ## Key libraries
 

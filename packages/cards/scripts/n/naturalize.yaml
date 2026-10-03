@@ -1,0 +1,33 @@
+# Naturalize
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Destroy target artifact or enchantment.
+
+oracleId: bdb3ca68-ec1f-4e16-81cc-d23f8f52c728
+name: "Naturalize"
+manaCost: "{1}{G}"
+types: [instant]
+colours: [G]
+text: "Destroy target artifact or enchantment."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets: [{ id: t, filter: { or: [{ type: artifact }, { type: enchantment }] } }]
+    effects: [{ op: destroy, object: $t }]
+
+tests:
+  - name: destroys an artifact
+    setup:
+      opponent:
+        permanents: [{ name: relic, types: [artifact] }]
+    targets: [relic]
+    expect:
+      zone: { relic: "B:graveyard" }
+  - name: destroys an enchantment too
+    setup:
+      opponent:
+        permanents: [{ name: charm, types: [enchantment] }]
+    targets: [charm]
+    expect:
+      zone: { charm: "B:graveyard" }

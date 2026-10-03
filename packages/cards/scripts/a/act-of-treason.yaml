@@ -1,0 +1,33 @@
+# Act of Treason
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Gain control of target creature until end of turn.
+#   1. Untap that creature.
+#   2. It gains haste until end of turn.
+
+oracleId: 9d08af23-9f4a-4097-9abc-3b17475ab744
+name: "Act of Treason"
+manaCost: "{2}{R}"
+types: [sorcery]
+colours: [R]
+text: "Gain control of target creature until end of turn. Untap that creature. It gains haste until end of turn. (It can attack and {T} this turn.)"
+
+abilities:
+  - kind: spell
+    covers: [0, 1, 2]
+    targets: [{ id: t, filter: creature }]
+    effects:
+      - { op: gainControl, object: $t, player: you, duration: untilEndOfTurn }
+      - { op: untap, object: $t }
+      - { op: grantKeyword, object: $t, keyword: haste }
+
+tests:
+  - name: takes the creature, untaps it and gives it haste
+    setup:
+      opponent:
+        creatures: [{ name: bear, power: 2, toughness: 2, tapped: true }]
+    targets: [bear]
+    expect:
+      tapped: { bear: false }
+      keywords: { bear: [haste] }
+      permanents: { opponent: 0 }

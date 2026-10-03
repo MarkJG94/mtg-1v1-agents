@@ -1,0 +1,29 @@
+# Turn to Frog
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Until end of turn, target creature loses all abilities and becomes a blue Frog with base power and toughness 1/1.
+
+oracleId: 74c4c1e2-c50d-4c8f-889a-0d5674dc6d67
+name: "Turn to Frog"
+manaCost: "{1}{U}"
+types: [instant]
+colours: [U]
+text: "Until end of turn, target creature loses all abilities and becomes a blue Frog with base power and toughness 1/1."
+
+abilities:
+  - kind: spell
+    targets: [{ id: t, filter: creature }]
+    effects:
+      - { op: removeAbilities, object: $t }
+      - { op: setColours, object: $t, colours: [U] }
+      - { op: setPowerToughness, object: $t, power: 1, toughness: 1 }
+
+tests:
+  - name: makes a big creature a 1/1
+    setup:
+      opponent:
+        creatures: [{ name: giant, power: 6, toughness: 6, keywords: [trample] }]
+    targets: [giant]
+    expect:
+      power: { giant: 1 }
+      toughness: { giant: 1 }

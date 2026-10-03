@@ -1,0 +1,21 @@
+# Divination
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Draw two cards.
+
+oracleId: 273b339c-964b-4a18-8eb5-ceb8abcdfd9e
+name: "Divination"
+manaCost: "{2}{U}"
+types: [sorcery]
+colours: [U]
+text: "Draw two cards."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    effects: [{ op: draw, player: you, count: 2 }]
+
+tests:
+  - name: draws two cards
+    expect:
+      handSize: { you: 2 }

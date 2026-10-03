@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Card schema is up to date
+        run: pnpm cards:schema --check
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+  bench:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # A branch can read caches from the default branch, so this picks up whatever main
+      # last recorded without any cross-workflow plumbing; the prefix takes the newest.
+      - name: Restore the baseline recorded on main
+        uses: actions/cache/restore@v6
+        with:
+          path: bench-baseline
+          key: bench-baseline-${{ github.sha }}
+          restore-keys: bench-baseline-
+
+      # A shared runner is slower and noisier than the machine the 5 ms and 50 ms targets
+      # in docs/02 are written for, so the budgets here are only ceilings against
+      # something going badly wrong. The real gate is the comparison with main below.
+      - name: Run the engine benchmarks
+        run: pnpm bench --budget 12 --json bench-results/engine.json
+
+      - name: Run the search benchmarks
+        run: pnpm bench:search --budget 250 --json bench-results/search.json
+
+      - name: Compare with main
+        run: |
+          pnpm bench:compare bench-baseline/engine.json bench-results/engine.json
+          pnpm bench:compare bench-baseline/search.json bench-results/search.json
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: benchmarks
+          path: bench-results/
+
+      - name: Keep this run as the baseline
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p bench-baseline
+          cp bench-results/engine.json bench-results/search.json bench-baseline/
+
+      - uses: actions/cache/save@v6
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          path: bench-baseline
+          key: bench-baseline-${{ github.sha }}
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

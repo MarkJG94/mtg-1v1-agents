@@ -1,0 +1,26 @@
+# Murder
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Destroy target creature.
+
+oracleId: 938b4e2c-88d9-4637-bc00-e228920c9a78
+name: "Murder"
+manaCost: "{1}{B}{B}"
+types: [instant]
+colours: [B]
+text: "Destroy target creature."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets: [{ id: t, filter: creature }]
+    effects: [{ op: destroy, object: $t }]
+
+tests:
+  - name: destroys a creature
+    setup:
+      opponent:
+        creatures: [{ name: bear, power: 2, toughness: 2 }]
+    targets: [bear]
+    expect:
+      zone: { bear: "B:graveyard" }

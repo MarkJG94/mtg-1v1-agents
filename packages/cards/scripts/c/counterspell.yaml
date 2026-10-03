@@ -1,0 +1,25 @@
+# Counterspell
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Counter target spell.
+
+oracleId: cc187110-1148-4090-bbb8-e205694a39f5
+name: "Counterspell"
+manaCost: "{U}{U}"
+types: [instant]
+colours: [U]
+text: "Counter target spell."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets: [{ id: t, filter: spell }]
+    effects: [{ op: counter, object: $t }]
+
+tests:
+  - name: counters a spell on the stack
+    setup:
+      opponentSpell: theirs
+    targets: [theirs]
+    expect:
+      zone: { theirs: "B:graveyard" }

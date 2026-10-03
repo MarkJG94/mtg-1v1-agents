@@ -1,0 +1,26 @@
+# Sign in Blood
+#
+# Sentences to claim with `covers:`, numbered as the validator numbers them:
+#   0. Target player draws two cards and loses 2 life.
+
+oracleId: c6207f6a-a624-4754-88f5-dbe700c841ff
+name: "Sign in Blood"
+manaCost: "{B}{B}"
+types: [sorcery]
+colours: [B]
+text: "Target player draws two cards and loses 2 life."
+
+abilities:
+  - kind: spell
+    covers: [0]
+    targets: [{ id: p, filter: player }]
+    effects:
+      - { op: draw, player: $p, count: 2 }
+      - { op: loseLife, player: $p, amount: 2 }
+
+tests:
+  - name: the target draws two and loses two
+    targets: [opponent]
+    expect:
+      life: { opponent: 18 }
+      handSize: { opponent: 2 }
