@@ -1,6 +1,6 @@
 import { type EventLogObject, type ObjectId, Replay, type WsServerMessage } from '@mtg/shared';
 import { useQuery } from '@tanstack/react-query';
-import { useMemo, useReducer, useRef, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { useCardFacts } from '../cards.js';
 import { useSubscription } from '../live.js';
@@ -11,12 +11,14 @@ import { runKeys } from './RunPage.js';
 /**
  * A run's games as they are played (`/runs/:id/live`, docs/08 "Game viewer"): the same
  * viewer as a replay, fed by the run's live stream (docs/07 `gameStart`, `gameEvents`,
- * `gameEnd`). It follows each new game as it starts unless a game is pinned, and keeps the
- * last few, so a game that went by too fast can be pinned and played back at leisure.
+ * `gameEnd`). It keeps the last few games, so one can be pinned and played back at leisure.
  *
- * The simulation never waits for a viewer (docs/07): a game can be over before its first
- * events are read. What makes it watchable is that every event is kept here, and the
- * viewer plays them back at its own speed.
+ * The simulation never waits for a viewer (docs/07): at `greedy` a game is over in a
+ * fraction of a second, and several start in the time it takes to read one move. So the
+ * page does not jump to each game as it starts — it would only ever show the moment before
+ * one. It watches one game from its start at the viewer's speed, stays with it until it is
+ * over and played through, holds the result a moment, and then moves on to the newest game.
+ * What makes that possible is that every event is kept here.
  */
 
 type GameStart = Extract<WsServerMessage, { type: 'gameStart' }>;
@@ -34,12 +36,32 @@ interface LiveGame {
 /** How many games the page keeps: the one being watched and a few before it. */
 const KEPT = 8;
 
-export const LivePage = ({ runId }: { runId: string }) => {
+/** How long a finished game's result stays on the board before the newest game is shown. */
+export const MOVE_ON_AFTER = 3_000;
+
+export const LivePage = ({
+  runId,
+  moveOnAfter = MOVE_ON_AFTER,
+}: {
+  runId: string;
+  moveOnAfter?: number;
+}) => {
   const run = useQuery({ queryKey: runKeys.run(runId), queryFn: () => api.run(runId) });
   const games = useRef<LiveGame[]>([]);
   const started = useRef(0);
   const [version, changed] = useReducer((count: number) => count + 1, 0);
   const [pinned, setPinned] = useState<string | null>(null);
+  // The game being watched when none is pinned, kept until it is played through; and
+  // whether the next game to start should be watched at once, the last one being done.
+  const [watching, setWatching] = useState<string | null>(null);
+  const watched = useRef<string | null>(null);
+  const ready = useRef(true);
+  const [through, setThrough] = useState<string | null>(null);
+  const watch = (seed: string) => {
+    watched.current = seed;
+    ready.current = false;
+    setWatching(seed);
+  };
 
   useSubscription({ to: 'game', runId }, (message) => {
     const known = games.current;
@@ -59,11 +81,15 @@ export const LivePage = ({ runId }: { runId: string }) => {
             end: null,
           },
         ];
-        // The last few, and the pinned game however long ago it was: a run of quick games
-        // would otherwise take it away while it is being watched.
+        // The last few, and the pinned or watched game however long ago it started: a run
+        // of quick games would otherwise take it away while it is being watched.
         games.current = all.filter(
-          (game, index) => index >= all.length - KEPT || game.start.seed === pinned,
+          (game, index) =>
+            index >= all.length - KEPT ||
+            game.start.seed === pinned ||
+            game.start.seed === watched.current,
         );
+        if (ready.current) watch(message.seed);
         changed();
         return;
       }
@@ -90,7 +116,22 @@ export const LivePage = ({ runId }: { runId: string }) => {
   const all = games.current;
   const latest = all.at(-1);
   const shown =
-    (pinned === null ? undefined : all.find((game) => game.start.seed === pinned)) ?? latest;
+    (pinned === null ? undefined : all.find((game) => game.start.seed === pinned)) ??
+    all.find((game) => game.start.seed === watching) ??
+    latest;
+  const shownSeed = shown?.start.seed ?? null;
+
+  // Played through and not pinned: after a moment, on to the newest game, or to the next
+  // one to start if none has since.
+  useEffect(() => {
+    if (pinned !== null || shownSeed === null || through !== shownSeed) return;
+    const timer = setTimeout(() => {
+      const newest = games.current.at(-1);
+      if (newest !== undefined && newest.start.seed !== shownSeed) watch(newest.start.seed);
+      else ready.current = true;
+    }, moveOnAfter);
+    return () => clearTimeout(timer);
+  }, [pinned, shownSeed, through, moveOnAfter]);
   const newer = shown === undefined ? 0 : started.current - shown.number;
   const faces = useCardFacts(
     shown === undefined
@@ -134,13 +175,22 @@ export const LivePage = ({ runId }: { runId: string }) => {
           length={shown.replay.length}
           cards={cards}
           live={{ finished: shown.end !== null }}
+          onPlayedThrough={(done) => setThrough(done ? shown.start.seed : null)}
           controls={
             <>
               <label className="inline-flex items-center gap-1.5">
                 <input
                   type="checkbox"
                   checked={pinned !== null}
-                  onChange={(event) => setPinned(event.target.checked ? shown.start.seed : null)}
+                  onChange={(event) => {
+                    if (event.target.checked) setPinned(shown.start.seed);
+                    else {
+                      // Unpinned, the page watches on from the newest game.
+                      setPinned(null);
+                      const newest = games.current.at(-1);
+                      if (newest !== undefined) watch(newest.start.seed);
+                    }
+                  }}
                 />
                 Pin this game
               </label>

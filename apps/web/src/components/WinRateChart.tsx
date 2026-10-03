@@ -55,6 +55,7 @@ export const WinRateChart = ({
   const xTicks = ticks(first, last);
   const shown = active === null ? null : (cycles[active] ?? null);
   const final = cycles.at(-1);
+  const ends = endLabels(y(final?.winRate.A ?? 0), y(final?.winRate.B ?? 0));
 
   const nearest = (event: PointerEvent<SVGRectElement>) => {
     const box = plot.current?.getBoundingClientRect();
@@ -137,6 +138,7 @@ export const WinRateChart = ({
         {xTicks.map((cycle) => (
           <text
             key={cycle}
+            data-testid="cycle-tick"
             x={x(cycle)}
             y={H - 6}
             textAnchor="middle"
@@ -191,8 +193,9 @@ export const WinRateChart = ({
           (['A', 'B'] as const).map((agent) => (
             <text
               key={agent}
+              data-testid={`end-label-${agent}`}
               x={M.left + plotW + 6}
-              y={y(final.winRate[agent]) + 3 + (agent === 'A' ? -5 : 5)}
+              y={ends[agent] + 4}
               className="fill-slate-300 text-[11px]"
             >
               {agent} {percent(final.winRate[agent])}
@@ -278,15 +281,42 @@ const CycleTooltip = ({
   </div>
 );
 
-/** About six clean cycle numbers across the axis, the first and last among them. */
-const ticks = (first: number, last: number): number[] => {
+/**
+ * About six clean cycle numbers across the axis, the first and last among them. A cycle is
+ * a whole number, so the step is never less than one: two cycles are labelled 1 and 2, not
+ * 1, 1.2, 1.4 and so on.
+ */
+export const ticks = (first: number, last: number): number[] => {
   if (last === first) return [first];
   const raw = (last - first) / 5;
   const magnitude = 10 ** Math.floor(Math.log10(raw));
-  const stepSize = [1, 2, 5, 10].map((each) => each * magnitude).find((each) => each >= raw) ?? raw;
+  const stepSize = Math.max(
+    1,
+    [1, 2, 5, 10].map((each) => each * magnitude).find((each) => each >= raw) ?? raw,
+  );
   const found = new Set([first, last]);
   for (let tick = Math.ceil(first / stepSize) * stepSize; tick < last; tick += stepSize) {
     if (tick - first > stepSize / 3 && last - tick > stepSize / 3) found.add(tick);
   }
   return [...found].sort((a, b) => a - b);
+};
+
+/** The height of an end label, and so how far apart two must be not to overlap. */
+const labelGap = 12;
+
+/**
+ * Where the two end labels sit: each at its own line's end, unless that puts them on top of
+ * each other, when they move apart about their midpoint — the upper line's label staying
+ * above — and back inside the plot if that pushed one out of it.
+ */
+export const endLabels = (a: number, b: number): { A: number; B: number } => {
+  if (Math.abs(a - b) >= labelGap) return { A: a, B: b };
+  const aAbove = a <= b;
+  const middle = Math.min(
+    M.top + plotH - labelGap / 2,
+    Math.max(M.top + labelGap / 2, (a + b) / 2),
+  );
+  const above = middle - labelGap / 2;
+  const below = middle + labelGap / 2;
+  return aAbove ? { A: above, B: below } : { A: below, B: above };
 };
