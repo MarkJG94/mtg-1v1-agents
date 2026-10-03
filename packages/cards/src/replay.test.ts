@@ -41,5 +41,5 @@ describe('replay(log) == state, with real cards', () => {
       replayCheckedGame(`bootstrap-${i}`, board(`bootstrap-${i}`)),
     );
     expect(games.reduce((sum, game) => sum + game.turns, 0)).toBeGreaterThan(60 * 5);
-  });
+  }, 60_000);
 });

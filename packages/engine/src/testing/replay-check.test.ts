@@ -10,5 +10,6 @@ describe('replay(log) == state', () => {
     const games = Array.from({ length: 150 }, (_, i) => fuzzReplay(`replay-${i}`));
     // They were real games: long enough, and some of them over by damage.
     expect(games.reduce((sum, game) => sum + game.turns, 0)).toBeGreaterThan(150 * 5);
-  });
+    // A fold and a comparison after each of thousands of decisions: seconds, not the default 5.
+  }, 60_000);
 });
