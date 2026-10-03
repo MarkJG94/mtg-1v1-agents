@@ -499,6 +499,12 @@ export const cardDetailSchema = cardSummarySchema.extend({
   }),
   /** How often a run asked for it and could not have it. */
   unsupportedRequests: z.int().min(0),
+  /**
+   * Its rules text a sentence at a time, as the scripts number them, each with whether its
+   * script reads it — `null` when it has no script that loads (docs/08 "Cards & coverage":
+   * the failing sentence highlighted).
+   */
+  sentences: z.array(z.object({ text: z.string(), claimed: z.boolean().nullable() })),
 });
 
 export const scriptResultSchema = z.object({
@@ -521,9 +527,46 @@ export const coverageSchema = z.object({
       name: z.string().nullable(),
       requests: z.int().min(1),
       lastReason: z.string(),
+      /** The first sentence its script does not read, if that is what stops it. */
+      failing: z.string().nullable(),
     }),
   ),
+  /**
+   * The auto-scripter over the whole of Scryfall, as `pnpm cards:coverage` last measured it
+   * (`reports/coverage.json`): what the parser can read, and the templates to teach next.
+   * `null` when the server has no report.
+   */
+  parser: z
+    .object({
+      quick: z.boolean(),
+      /** When it was measured, if the report says; a file's own date says when it was copied. */
+      measuredAt: z.string().nullable(),
+      counts: z.object({
+        cards: z.int().min(0),
+        supported: z.int().min(0),
+        partial: z.int().min(0),
+        unsupported: z.int().min(0),
+        unscripted: z.int().min(0),
+        withoutRulesText: z.int().min(0),
+        supportedWithText: z.int().min(0),
+        sentences: z.int().min(0),
+        sentencesClaimed: z.int().min(0),
+        sentencesFallout: z.int().min(0),
+      }),
+      patterns: z.array(
+        z.object({
+          pattern: z.string(),
+          count: z.int().min(0),
+          finishes: z.int().min(0),
+          example: z.object({ card: z.string(), sentence: z.string() }),
+        }),
+      ),
+    })
+    .nullable(),
 });
+
+export type Coverage = z.infer<typeof coverageSchema>;
+export type CardDetail = z.infer<typeof cardDetailSchema>;
 
 // --- WebSocket (docs/07 "WebSocket `/ws`") ---
 

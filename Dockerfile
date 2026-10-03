@@ -51,6 +51,8 @@ COPY --from=build /app/apps/server/drizzle /app/apps/server/drizzle
 COPY --from=build /app/packages/cards/scripts /app/packages/cards/scripts
 COPY --from=build /app/apps/web/dist /app/web
 COPY --from=build /app/scripts /app/scripts
+# The last whole-Scryfall coverage report, for the cards page (COVERAGE_REPORT).
+COPY --from=build /app/reports /app/reports
 COPY --from=build /app/package.json /app/package.json
 RUN mkdir -p /data && chown -R node:node /data /app
 USER node

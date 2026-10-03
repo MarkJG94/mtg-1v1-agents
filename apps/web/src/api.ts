@@ -4,8 +4,10 @@ import {
   type CardFace,
   type CreateRunRequest,
   type CycleSummary,
+  cardDetailSchema,
   cardLookupSchema,
   cardSearchSchema,
+  coverageSchema,
   cycleDetailSchema,
   cyclePageSchema,
   gameDetailSchema,
@@ -16,6 +18,7 @@ import {
   runDetailSchema,
   runListSchema,
   runSummarySchema,
+  scriptResultSchema,
   seedDeckPreviewSchema,
   statsTableSchema,
 } from '@mtg/shared';
@@ -141,6 +144,12 @@ export const api = {
     }
     return found;
   },
+  card: (oracleId: string) =>
+    request(cardDetailSchema, `/api/cards/${encodeURIComponent(oracleId)}`),
+  /** Scripts a card afresh (docs/08 "try to script"). */
+  scriptCard: (oracleId: string) =>
+    post(scriptResultSchema, `/api/cards/${encodeURIComponent(oracleId)}/script`),
+  coverage: () => request(coverageSchema, '/api/coverage'),
   searchCards: (q: string, limit = 12) =>
     request(cardSearchSchema, `/api/cards?${new URLSearchParams({ q, limit: String(limit) })}`),
 };

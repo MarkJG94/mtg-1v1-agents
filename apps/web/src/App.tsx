@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from './api.js';
 import { useConnected } from './live.js';
+import { CardsPage } from './pages/CardsPage.js';
 import { CyclePage } from './pages/CyclePage.js';
 import { GamePage } from './pages/GamePage.js';
 import { LivePage } from './pages/LivePage.js';
@@ -11,7 +12,7 @@ import { Link, type Route, useRoute } from './router.js';
 
 /**
  * The app shell (docs/08): a header with the pages and the server's state, and the page
- * the path names. The coverage page to come is roadmap 6.6.
+ * the path names.
  */
 export const App = () => {
   const route = useRoute();
@@ -36,6 +37,9 @@ export const App = () => {
           </Link>
           <Link to="/runs/new" className={navClass(route.page === 'newRun')}>
             New run
+          </Link>
+          <Link to="/cards" className={navClass(route.page === 'cards')}>
+            Cards
           </Link>
           <span className="ml-auto">
             <ServerState />
@@ -66,6 +70,8 @@ const Page = ({ route }: { route: Route }) => {
       return <LivePage runId={route.runId} />;
     case 'game':
       return <GamePage gameId={route.gameId} />;
+    case 'cards':
+      return <CardsPage oracleId={route.oracleId} />;
     case 'notFound':
       return (
         <p>

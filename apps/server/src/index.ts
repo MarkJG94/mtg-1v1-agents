@@ -25,7 +25,9 @@ const supervisor = new Supervisor({
 });
 const hasCards = existsSync(config.cardsPath);
 const catalogue = hasCards ? loadCatalogue(database, config.cardsPath) : null;
-const queries = new Queries(database, supervisor.store);
+const queries = new Queries(database, supervisor.store, {
+  coverageReport: config.coverageReport,
+});
 const hub = new Hub(supervisor, queries, { version: packageVersion });
 const app = await buildApp(
   config,

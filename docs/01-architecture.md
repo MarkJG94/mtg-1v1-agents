@@ -87,7 +87,7 @@ Everything durable lives in one SQLite file (`data/mtg.db`, WAL mode). Runs are 
 
 ## Deployment
 
-`docker-compose.yml` runs one container: Node 22, the built server serving the built web app as static files on one port, `data/` mounted as a volume. Environment: `PORT`, `SIM_WORKERS`, `DATA_DIR`, `SCRYFALL_IMAGE_CACHE=lazy|off`, `CARD_SCRIPTS_DIR` (the hand scripts; `packages/cards/scripts` by default, which the image provides) and `WEB_DIST`. A relative path is taken from the pnpm workspace when the server runs inside one — `pnpm dev` runs it in `apps/server`, and the data and scripts are the repository's — and from the working directory otherwise, as in the image (ADR 0018). Outbound network is only needed for image cache misses; the sim itself is fully offline once the bulk data is present.
+`docker-compose.yml` runs one container: Node 22, the built server serving the built web app as static files on one port, `data/` mounted as a volume. Environment: `PORT`, `SIM_WORKERS`, `DATA_DIR`, `SCRYFALL_IMAGE_CACHE=lazy|off`, `CARD_SCRIPTS_DIR` (the hand scripts; `packages/cards/scripts` by default, which the image provides), `COVERAGE_REPORT` (the last `pnpm cards:coverage` report for the cards page; `reports/coverage.json` by default, which the image also provides) and `WEB_DIST`. A relative path is taken from the pnpm workspace when the server runs inside one — `pnpm dev` runs it in `apps/server`, and the data and scripts are the repository's — and from the working directory otherwise, as in the image (ADR 0018). Outbound network is only needed for image cache misses; the sim itself is fully offline once the bulk data is present.
 
 ## Key libraries
 

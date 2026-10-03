@@ -1,4 +1,5 @@
-import type { CardProjection } from '@mtg/cards';
+import { existsSync, readFileSync } from 'node:fs';
+import { type CardProjection, cardScriptSchema, checkCoverage, sentencesOf } from '@mtg/cards';
 import {
   type AgentCounts,
   type CycleDetail,
@@ -130,10 +131,16 @@ const toGame = (row: GameRow) => ({
 const GAME_COLUMNS = `id, match_id, number, seed, chooser, on_play, winner, reason, turns,
   decisions, event_log IS NOT NULL AS has_log`;
 
+export interface QueriesOptions {
+  /** The last `pnpm cards:coverage` report, read for the coverage page if it is there. */
+  readonly coverageReport?: string;
+}
+
 export class Queries {
   constructor(
     private readonly database: OpenDatabase,
     private readonly store: SqliteRunStore,
+    private readonly options: QueriesOptions = {},
   ) {}
 
   private get sqlite() {
@@ -485,12 +492,15 @@ export class Queries {
       .prepare('SELECT count(*) AS requests FROM unsupported_requests WHERE oracle_id = ?')
       .get(oracleId) as { requests: number };
     const script = this.sqlite
-      .prepare('SELECT status, source, reasons, updated_at FROM card_scripts WHERE oracle_id = ?')
+      .prepare(
+        'SELECT status, source, reasons, script, updated_at FROM card_scripts WHERE oracle_id = ?',
+      )
       .get(oracleId) as
       | {
           status: 'supported' | 'partial' | 'unsupported';
           source: 'hand' | 'auto';
           reasons: string;
+          script: string;
           updated_at: string;
         }
       | undefined;
@@ -512,7 +522,28 @@ export class Queries {
             },
       stats,
       unsupportedRequests: requests,
+      sentences: this.sentences(oracleId, row.oracle_text, script?.script),
     };
+  }
+
+  /**
+   * A card's rules text a sentence at a time, each with whether its cached script reads it
+   * (docs/03 "Coverage"): the same check the validator makes, so the page says exactly what
+   * the verdict was made of. A card with no script that loads says nothing either way.
+   */
+  private sentences(
+    oracleId: string,
+    oracleText: string,
+    stored: string | undefined,
+  ): { text: string; claimed: boolean | null }[] {
+    const projection = stored === undefined ? null : this.projection(oracleId);
+    const parsed = stored === undefined ? null : cardScriptSchema.safeParse(JSON.parse(stored));
+    if (projection === null || parsed === null || !parsed.success) {
+      return sentencesOf(oracleText).map((text) => ({ text, claimed: null }));
+    }
+    const { sentences, unclaimed } = checkCoverage(parsed.data, projection);
+    const open = new Set(unclaimed);
+    return sentences.map((text, index) => ({ text, claimed: !open.has(index) }));
   }
 
   /**
@@ -593,7 +624,54 @@ export class Queries {
       requests: number;
       lastReason: string;
     }[];
-    return { cards, scripted, mostRequested: requested };
+    return {
+      cards,
+      scripted,
+      mostRequested: requested.map((card) => ({
+        ...card,
+        failing: this.firstUnread(card.oracleId),
+      })),
+      parser: this.parserReport(),
+    };
+  }
+
+  /** The first sentence a card's script does not read, if any. */
+  private firstUnread(oracleId: string): string | null {
+    const row = this.sqlite
+      .prepare('SELECT script FROM card_scripts WHERE oracle_id = ?')
+      .get(oracleId) as { script: string } | undefined;
+    const text = this.sqlite
+      .prepare('SELECT oracle_text FROM cards WHERE oracle_id = ?')
+      .get(oracleId) as { oracle_text: string } | undefined;
+    if (row === undefined || text === undefined) return null;
+    return (
+      this.sentences(oracleId, text.oracle_text, row.script).find(
+        (sentence) => sentence.claimed === false,
+      )?.text ?? null
+    );
+  }
+
+  /** The whole-Scryfall report, as `pnpm cards:coverage` last wrote it; `null` without one. */
+  private parserReport() {
+    const path = this.options.coverageReport;
+    if (path === undefined || !existsSync(path)) return null;
+    try {
+      const report = JSON.parse(readFileSync(path, 'utf8')) as {
+        quick?: boolean;
+        measuredAt?: string;
+        counts: Record<string, number>;
+        patterns: unknown[];
+      };
+      return {
+        quick: report.quick === true,
+        measuredAt: typeof report.measuredAt === 'string' ? report.measuredAt : null,
+        counts: report.counts,
+        patterns: report.patterns,
+      };
+    } catch {
+      // A report half written, or from a format this server does not know: none.
+      return null;
+    }
   }
 }
 
