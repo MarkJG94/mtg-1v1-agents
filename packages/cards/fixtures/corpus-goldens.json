@@ -585,7 +585,6 @@
   "Armored Ascension": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant creature\"",
       "coverage: sentence 1 is not claimed by any ability: \"Enchanted creature gets +1/+1 for each Plains you control and has flying.\""
     ],
     "script": {
@@ -601,6 +600,7 @@
       "colours": [
         "W"
       ],
+      "enchant": "creature",
       "text": "Enchant creature\nEnchanted creature gets +1/+1 for each Plains you control and has flying.",
       "abilities": []
     }
@@ -1979,7 +1979,6 @@
   "Convincing Mirage": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant land\"",
       "coverage: sentence 1 is not claimed by any ability: \"As this Aura enters, choose a basic land type.\"",
       "coverage: sentence 2 is not claimed by any ability: \"Enchanted land is the chosen type.\""
     ],
@@ -1996,6 +1995,9 @@
       "colours": [
         "U"
       ],
+      "enchant": {
+        "type": "land"
+      },
       "text": "Enchant land\nAs this Aura enters, choose a basic land type.\nEnchanted land is the chosen type.",
       "abilities": []
     }
@@ -2888,7 +2890,6 @@
   "Dryad's Favor": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant creature\"",
       "coverage: sentence 1 is not claimed by any ability: \"Enchanted creature has forestwalk.\""
     ],
     "script": {
@@ -2904,6 +2905,7 @@
       "colours": [
         "G"
       ],
+      "enchant": "creature",
       "text": "Enchant creature\nEnchanted creature has forestwalk. (It can't be blocked as long as defending player controls a Forest.)",
       "abilities": []
     }
@@ -3262,7 +3264,6 @@
   "Entangling Vines": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant tapped creature\"",
       "coverage: sentence 1 is not claimed by any ability: \"Enchanted creature doesn't untap during its controller's untap step.\""
     ],
     "script": {
@@ -3278,6 +3279,14 @@
       "colours": [
         "G"
       ],
+      "enchant": {
+        "is": "creature",
+        "and": [
+          {
+            "tapped": true
+          }
+        ]
+      },
       "text": "Enchant tapped creature\nEnchanted creature doesn't untap during its controller's untap step.",
       "abilities": []
     }
@@ -3474,7 +3483,6 @@
   "Firebreathing": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant creature\"",
       "coverage: sentence 1 is not claimed by any ability: \"{R}: Enchanted creature gets +1/+0 until end of turn.\""
     ],
     "script": {
@@ -3490,6 +3498,7 @@
       "colours": [
         "R"
       ],
+      "enchant": "creature",
       "text": "Enchant creature\n{R}: Enchanted creature gets +1/+0 until end of turn.",
       "abilities": []
     }
@@ -3620,7 +3629,20 @@
       ],
       "colours": [],
       "text": "({T}: Add {G}.)",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "mana",
+          "id": "intrinsic",
+          "requiresTap": true,
+          "modes": [
+            [
+              {
+                "type": "G"
+              }
+            ]
+          ]
+        }
+      ]
     }
   },
   "Frost Titan": {
@@ -4163,11 +4185,8 @@
     }
   },
   "Gorgon Flail": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Equipped creature gets +1/+1 and has deathtouch.\"",
-      "coverage: sentence 1 is not claimed by any ability: \"Equip {2}\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "91dab3e2-039e-4db9-94e3-1146bced18ed",
       "name": "Gorgon Flail",
@@ -4180,7 +4199,59 @@
       ],
       "colours": [],
       "text": "Equipped creature gets +1/+1 and has deathtouch. (Any amount of damage it deals to a creature is enough to destroy that creature.)\nEquip {2} ({2}: Attach to target creature you control. Equip only as a sorcery.)",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "static",
+          "covers": [
+            0
+          ],
+          "affects": {
+            "kind": "attachedTo"
+          },
+          "change": {
+            "kind": "modifyPowerToughness",
+            "power": 1,
+            "toughness": 1
+          }
+        },
+        {
+          "kind": "static",
+          "affects": {
+            "kind": "attachedTo"
+          },
+          "change": {
+            "kind": "addKeyword",
+            "keyword": "deathtouch"
+          }
+        },
+        {
+          "kind": "activated",
+          "id": "auto-activated-1",
+          "covers": [
+            1
+          ],
+          "cost": {
+            "mana": "{2}"
+          },
+          "sorceryOnly": true,
+          "targets": [
+            {
+              "id": "t",
+              "filter": {
+                "is": "creature",
+                "controller": "you"
+              }
+            }
+          ],
+          "effects": [
+            {
+              "op": "attach",
+              "attachment": "~",
+              "to": "$t"
+            }
+          ]
+        }
+      ]
     }
   },
   "Grave Titan": {
@@ -4451,11 +4522,8 @@
     }
   },
   "Holy Strength": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant creature\"",
-      "coverage: sentence 1 is not claimed by any ability: \"Enchanted creature gets +1/+2.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "9357de36-f8be-4f49-b2c8-9fe9eaf82b07",
       "name": "Holy Strength",
@@ -4469,8 +4537,24 @@
       "colours": [
         "W"
       ],
+      "enchant": "creature",
       "text": "Enchant creature\nEnchanted creature gets +1/+2.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "static",
+          "covers": [
+            1
+          ],
+          "affects": {
+            "kind": "attachedTo"
+          },
+          "change": {
+            "kind": "modifyPowerToughness",
+            "power": 1,
+            "toughness": 2
+          }
+        }
+      ]
     }
   },
   "Honor of the Pure": {
@@ -4693,7 +4777,6 @@
   "Ice Cage": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant creature\"",
       "coverage: sentence 1 is not claimed by any ability: \"Enchanted creature can't attack or block, and its activated abilities can't be activated.\"",
       "coverage: sentence 2 is not claimed by any ability: \"When enchanted creature becomes the target of a spell or ability, destroy this Aura.\""
     ],
@@ -4710,6 +4793,7 @@
       "colours": [
         "U"
       ],
+      "enchant": "creature",
       "text": "Enchant creature\nEnchanted creature can't attack or block, and its activated abilities can't be activated.\nWhen enchanted creature becomes the target of a spell or ability, destroy this Aura.",
       "abilities": []
     }
@@ -4782,7 +4866,6 @@
   "Indestructibility": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant permanent\"",
       "coverage: sentence 1 is not claimed by any ability: \"Enchanted permanent has indestructible.\""
     ],
     "script": {
@@ -4798,6 +4881,7 @@
       "colours": [
         "W"
       ],
+      "enchant": "permanent",
       "text": "Enchant permanent\nEnchanted permanent has indestructible. (Effects that say \"destroy\" don't destroy that permanent. A creature with indestructible can't be destroyed by damage.)",
       "abilities": []
     }
@@ -4961,7 +5045,20 @@
       ],
       "colours": [],
       "text": "({T}: Add {U}.)",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "mana",
+          "id": "intrinsic",
+          "requiresTap": true,
+          "modes": [
+            [
+              {
+                "type": "U"
+              }
+            ]
+          ]
+        }
+      ]
     }
   },
   "Jace Beleren": {
@@ -5400,10 +5497,8 @@
     }
   },
   "Levitation": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Creatures you control have flying.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "94b703c4-5584-4913-8365-7e9f2f535c2d",
       "name": "Levitation",
@@ -5415,7 +5510,22 @@
         "U"
       ],
       "text": "Creatures you control have flying.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "static",
+          "covers": [
+            0
+          ],
+          "affects": {
+            "kind": "creaturesControlledBy",
+            "player": "sourceController"
+          },
+          "change": {
+            "kind": "addKeyword",
+            "keyword": "flying"
+          }
+        }
+      ]
     }
   },
   "Leyline of Anticipation": {
@@ -5536,11 +5646,8 @@
     }
   },
   "Lifelink": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant creature\"",
-      "coverage: sentence 1 is not claimed by any ability: \"Enchanted creature has lifelink.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "4fe8316a-9cff-43e9-a1d5-993a0c9daf3a",
       "name": "Lifelink",
@@ -5554,8 +5661,23 @@
       "colours": [
         "W"
       ],
+      "enchant": "creature",
       "text": "Enchant creature\nEnchanted creature has lifelink. (Damage dealt by the creature also causes its controller to gain that much life.)",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "static",
+          "covers": [
+            1
+          ],
+          "affects": {
+            "kind": "attachedTo"
+          },
+          "change": {
+            "kind": "addKeyword",
+            "keyword": "lifelink"
+          }
+        }
+      ]
     }
   },
   "Lightning Bolt": {
@@ -5829,8 +5951,7 @@
     "status": "partial",
     "reasons": [
       "coverage: sentence 0 is not claimed by any ability: \"Equipped creature gets +2/+4 and loses flying.\"",
-      "coverage: sentence 1 is not claimed by any ability: \"Prevent all noncombat damage that would be dealt to equipped creature.\"",
-      "coverage: sentence 2 is not claimed by any ability: \"Equip {2}\""
+      "coverage: sentence 1 is not claimed by any ability: \"Prevent all noncombat damage that would be dealt to equipped creature.\""
     ],
     "script": {
       "oracleId": "fc24af7b-f3d0-41d0-aaac-d83424455717",
@@ -5844,7 +5965,35 @@
       ],
       "colours": [],
       "text": "Equipped creature gets +2/+4 and loses flying.\nPrevent all noncombat damage that would be dealt to equipped creature.\nEquip {2} ({2}: Attach to target creature you control. Equip only as a sorcery.)",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "activated",
+          "id": "auto-activated-2",
+          "covers": [
+            2
+          ],
+          "cost": {
+            "mana": "{2}"
+          },
+          "sorceryOnly": true,
+          "targets": [
+            {
+              "id": "t",
+              "filter": {
+                "is": "creature",
+                "controller": "you"
+              }
+            }
+          ],
+          "effects": [
+            {
+              "op": "attach",
+              "attachment": "~",
+              "to": "$t"
+            }
+          ]
+        }
+      ]
     }
   },
   "Magma Phoenix": {
@@ -6299,7 +6448,6 @@
   "Mind Control": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant creature\"",
       "coverage: sentence 1 is not claimed by any ability: \"You control enchanted creature.\""
     ],
     "script": {
@@ -6315,6 +6463,7 @@
       "colours": [
         "U"
       ],
+      "enchant": "creature",
       "text": "Enchant creature\nYou control enchanted creature.",
       "abilities": []
     }
@@ -6521,7 +6670,20 @@
       ],
       "colours": [],
       "text": "({T}: Add {R}.)",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "mana",
+          "id": "intrinsic",
+          "requiresTap": true,
+          "modes": [
+            [
+              {
+                "type": "R"
+              }
+            ]
+          ]
+        }
+      ]
     }
   },
   "Mystifying Maze": {
@@ -6669,7 +6831,6 @@
   "Necrotic Plague": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant creature\"",
       "coverage: sentence 1 is not claimed by any ability: \"Enchanted creature has \"At the beginning of your upkeep, sacrifice this creature.\"\"",
       "coverage: sentence 2 is not claimed by any ability: \"When enchanted creature dies, its controller chooses target creature one of their opponents controls.\"",
       "coverage: sentence 3 is not claimed by any ability: \"Return this card from its owner's graveyard to the battlefield attached to that creature.\""
@@ -6687,6 +6848,7 @@
       "colours": [
         "B"
       ],
+      "enchant": "creature",
       "text": "Enchant creature\nEnchanted creature has \"At the beginning of your upkeep, sacrifice this creature.\"\nWhen enchanted creature dies, its controller chooses target creature one of their opponents controls. Return this card from its owner's graveyard to the battlefield attached to that creature.",
       "abilities": []
     }
@@ -6828,11 +6990,8 @@
     }
   },
   "Oakenform": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant creature\"",
-      "coverage: sentence 1 is not claimed by any ability: \"Enchanted creature gets +3/+3.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "b254fefb-11d2-4369-ae5c-0c3bd48ae580",
       "name": "Oakenform",
@@ -6846,8 +7005,24 @@
       "colours": [
         "G"
       ],
+      "enchant": "creature",
       "text": "Enchant creature\nEnchanted creature gets +3/+3.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "static",
+          "covers": [
+            1
+          ],
+          "affects": {
+            "kind": "attachedTo"
+          },
+          "change": {
+            "kind": "modifyPowerToughness",
+            "power": 3,
+            "toughness": 3
+          }
+        }
+      ]
     }
   },
   "Obstinate Baloth": {
@@ -6976,7 +7151,6 @@
   "Pacifism": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant creature\"",
       "coverage: sentence 1 is not claimed by any ability: \"Enchanted creature can't attack or block.\""
     ],
     "script": {
@@ -6992,6 +7166,7 @@
       "colours": [
         "W"
       ],
+      "enchant": "creature",
       "text": "Enchant creature\nEnchanted creature can't attack or block.",
       "abilities": []
     }
@@ -7154,7 +7329,20 @@
       ],
       "colours": [],
       "text": "({T}: Add {W}.)",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "mana",
+          "id": "intrinsic",
+          "requiresTap": true,
+          "modes": [
+            [
+              {
+                "type": "W"
+              }
+            ]
+          ]
+        }
+      ]
     }
   },
   "Planar Cleansing": {
@@ -7350,7 +7538,6 @@
   "Primal Cocoon": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant creature\"",
       "coverage: sentence 1 is not claimed by any ability: \"At the beginning of your upkeep, put a +1/+1 counter on enchanted creature.\"",
       "coverage: sentence 2 is not claimed by any ability: \"When enchanted creature attacks or blocks, sacrifice this Aura.\""
     ],
@@ -7367,6 +7554,7 @@
       "colours": [
         "G"
       ],
+      "enchant": "creature",
       "text": "Enchant creature\nAt the beginning of your upkeep, put a +1/+1 counter on enchanted creature.\nWhen enchanted creature attacks or blocks, sacrifice this Aura.",
       "abilities": []
     }
@@ -7571,7 +7759,6 @@
   "Quag Sickness": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant creature\"",
       "coverage: sentence 1 is not claimed by any ability: \"Enchanted creature gets -1/-1 for each Swamp you control.\""
     ],
     "script": {
@@ -7587,6 +7774,7 @@
       "colours": [
         "B"
       ],
+      "enchant": "creature",
       "text": "Enchant creature\nEnchanted creature gets -1/-1 for each Swamp you control.",
       "abilities": []
     }
@@ -8370,8 +8558,6 @@
   "Shiv's Embrace": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant creature\"",
-      "coverage: sentence 1 is not claimed by any ability: \"Enchanted creature gets +2/+2 and has flying.\"",
       "coverage: sentence 2 is not claimed by any ability: \"{R}: Enchanted creature gets +1/+0 until end of turn.\""
     ],
     "script": {
@@ -8387,8 +8573,34 @@
       "colours": [
         "R"
       ],
+      "enchant": "creature",
       "text": "Enchant creature\nEnchanted creature gets +2/+2 and has flying.\n{R}: Enchanted creature gets +1/+0 until end of turn.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "static",
+          "covers": [
+            1
+          ],
+          "affects": {
+            "kind": "attachedTo"
+          },
+          "change": {
+            "kind": "modifyPowerToughness",
+            "power": 2,
+            "toughness": 2
+          }
+        },
+        {
+          "kind": "static",
+          "affects": {
+            "kind": "attachedTo"
+          },
+          "change": {
+            "kind": "addKeyword",
+            "keyword": "flying"
+          }
+        }
+      ]
     }
   },
   "Shivan Dragon": {
@@ -8683,7 +8895,6 @@
   "Soul Bleed": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant creature\"",
       "coverage: sentence 1 is not claimed by any ability: \"At the beginning of the upkeep of enchanted creature's controller, that player loses 1 life.\""
     ],
     "script": {
@@ -8699,6 +8910,7 @@
       "colours": [
         "B"
       ],
+      "enchant": "creature",
       "text": "Enchant creature\nAt the beginning of the upkeep of enchanted creature's controller, that player loses 1 life.",
       "abilities": []
     }
@@ -9197,15 +9409,25 @@
       ],
       "colours": [],
       "text": "({T}: Add {B}.)",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "mana",
+          "id": "intrinsic",
+          "requiresTap": true,
+          "modes": [
+            [
+              {
+                "type": "B"
+              }
+            ]
+          ]
+        }
+      ]
     }
   },
   "Sword of Vengeance": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Equipped creature gets +2/+0 and has first strike, vigilance, trample, and haste.\"",
-      "coverage: sentence 1 is not claimed by any ability: \"Equip {3}\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "e366afb3-c447-4bde-b358-41c8568142d5",
       "name": "Sword of Vengeance",
@@ -9218,7 +9440,89 @@
       ],
       "colours": [],
       "text": "Equipped creature gets +2/+0 and has first strike, vigilance, trample, and haste.\nEquip {3}",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "static",
+          "covers": [
+            0
+          ],
+          "affects": {
+            "kind": "attachedTo"
+          },
+          "change": {
+            "kind": "modifyPowerToughness",
+            "power": 2,
+            "toughness": 0
+          }
+        },
+        {
+          "kind": "static",
+          "affects": {
+            "kind": "attachedTo"
+          },
+          "change": {
+            "kind": "addKeyword",
+            "keyword": "firstStrike"
+          }
+        },
+        {
+          "kind": "static",
+          "affects": {
+            "kind": "attachedTo"
+          },
+          "change": {
+            "kind": "addKeyword",
+            "keyword": "vigilance"
+          }
+        },
+        {
+          "kind": "static",
+          "affects": {
+            "kind": "attachedTo"
+          },
+          "change": {
+            "kind": "addKeyword",
+            "keyword": "trample"
+          }
+        },
+        {
+          "kind": "static",
+          "affects": {
+            "kind": "attachedTo"
+          },
+          "change": {
+            "kind": "addKeyword",
+            "keyword": "haste"
+          }
+        },
+        {
+          "kind": "activated",
+          "id": "auto-activated-1",
+          "covers": [
+            1
+          ],
+          "cost": {
+            "mana": "{3}"
+          },
+          "sorceryOnly": true,
+          "targets": [
+            {
+              "id": "t",
+              "filter": {
+                "is": "creature",
+                "controller": "you"
+              }
+            }
+          ],
+          "effects": [
+            {
+              "op": "attach",
+              "attachment": "~",
+              "to": "$t"
+            }
+          ]
+        }
+      ]
     }
   },
   "Sylvan Ranger": {
@@ -9676,11 +9980,8 @@
     }
   },
   "Unholy Strength": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant creature\"",
-      "coverage: sentence 1 is not claimed by any ability: \"Enchanted creature gets +2/+1.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "090d88a9-7f2d-4bd1-a30a-7c48d05068be",
       "name": "Unholy Strength",
@@ -9694,8 +9995,24 @@
       "colours": [
         "B"
       ],
+      "enchant": "creature",
       "text": "Enchant creature\nEnchanted creature gets +2/+1.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "static",
+          "covers": [
+            1
+          ],
+          "affects": {
+            "kind": "attachedTo"
+          },
+          "change": {
+            "kind": "modifyPowerToughness",
+            "power": 2,
+            "toughness": 1
+          }
+        }
+      ]
     }
   },
   "Unsummon": {
@@ -9917,7 +10234,6 @@
   "Volcanic Strength": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant creature\"",
       "coverage: sentence 1 is not claimed by any ability: \"Enchanted creature gets +2/+2 and has mountainwalk.\""
     ],
     "script": {
@@ -9933,6 +10249,7 @@
       "colours": [
         "R"
       ],
+      "enchant": "creature",
       "text": "Enchant creature\nEnchanted creature gets +2/+2 and has mountainwalk. (It can't be blocked as long as defending player controls a Mountain.)",
       "abilities": []
     }
@@ -10217,11 +10534,8 @@
     }
   },
   "Warlord's Axe": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Equipped creature gets +3/+1.\"",
-      "coverage: sentence 1 is not claimed by any ability: \"Equip {4}\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "ebe43cc6-42fe-44f6-b198-ef0212bf82cb",
       "name": "Warlord's Axe",
@@ -10234,7 +10548,49 @@
       ],
       "colours": [],
       "text": "Equipped creature gets +3/+1.\nEquip {4} ({4}: Attach to target creature you control. Equip only as a sorcery.)",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "static",
+          "covers": [
+            0
+          ],
+          "affects": {
+            "kind": "attachedTo"
+          },
+          "change": {
+            "kind": "modifyPowerToughness",
+            "power": 3,
+            "toughness": 1
+          }
+        },
+        {
+          "kind": "activated",
+          "id": "auto-activated-1",
+          "covers": [
+            1
+          ],
+          "cost": {
+            "mana": "{4}"
+          },
+          "sorceryOnly": true,
+          "targets": [
+            {
+              "id": "t",
+              "filter": {
+                "is": "creature",
+                "controller": "you"
+              }
+            }
+          ],
+          "effects": [
+            {
+              "op": "attach",
+              "attachment": "~",
+              "to": "$t"
+            }
+          ]
+        }
+      ]
     }
   },
   "Warp World": {
@@ -10341,11 +10697,8 @@
     }
   },
   "Weakness": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Enchant creature\"",
-      "coverage: sentence 1 is not claimed by any ability: \"Enchanted creature gets -2/-1.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "f07a24c0-bf3c-4733-9473-c6be3b16950e",
       "name": "Weakness",
@@ -10359,15 +10712,30 @@
       "colours": [
         "B"
       ],
+      "enchant": "creature",
       "text": "Enchant creature\nEnchanted creature gets -2/-1.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "static",
+          "covers": [
+            1
+          ],
+          "affects": {
+            "kind": "attachedTo"
+          },
+          "change": {
+            "kind": "modifyPowerToughness",
+            "power": -2,
+            "toughness": -1
+          }
+        }
+      ]
     }
   },
   "Whispersilk Cloak": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Equipped creature can't be blocked and has shroud.\"",
-      "coverage: sentence 1 is not claimed by any ability: \"Equip {2}\""
+      "coverage: sentence 0 is not claimed by any ability: \"Equipped creature can't be blocked and has shroud.\""
     ],
     "script": {
       "oracleId": "9ad4f730-a18e-4a7c-a468-a926c718c741",
@@ -10381,7 +10749,35 @@
       ],
       "colours": [],
       "text": "Equipped creature can't be blocked and has shroud. (It can't be the target of spells or abilities.)\nEquip {2}",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "activated",
+          "id": "auto-activated-1",
+          "covers": [
+            1
+          ],
+          "cost": {
+            "mana": "{2}"
+          },
+          "sorceryOnly": true,
+          "targets": [
+            {
+              "id": "t",
+              "filter": {
+                "is": "creature",
+                "controller": "you"
+              }
+            }
+          ],
+          "effects": [
+            {
+              "op": "attach",
+              "attachment": "~",
+              "to": "$t"
+            }
+          ]
+        }
+      ]
     }
   },
   "White Knight": {

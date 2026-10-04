@@ -100,10 +100,46 @@ jobs:
           path: bench-baseline
           key: bench-baseline-${{ github.sha }}
 
-  docker:
-    name: Docker image builds
+  smoke:
+    name: Browser smoke
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium for Playwright
+        run: pnpm --filter @mtg/smoke exec playwright install --with-deps chromium
+
+      - name: Build
+        run: pnpm build
+
+      # docs/09 §7: a run made with a fixed seed, a game of it watched, a card banned and the
+      # legalisation seen, against the built server on the repository's own cards.
+      - name: Smoke the built server
+        run: pnpm smoke
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: smoke-report
+          path: apps/smoke/playwright-report/
+
+  docker:
+    # The name is the one the repository ruleset requires: it builds the image, runs it,
+    # and smokes it (docs/09 "CI").
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
@@ -111,5 +147,51 @@ jobs:
         with:
           context: .
           push: false
+          load: true
+          tags: mtg-1v1-agents:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium for Playwright
+        run: pnpm --filter @mtg/smoke exec playwright install --with-deps chromium
+
+      # The image as it would be run: its own data volume, here holding the repository's own
+      # cards, which the container's user must be able to write beside.
+      - name: Run the image
+        run: |
+          node apps/smoke/prepare-data.mjs "$RUNNER_TEMP/smoke-data"
+          chmod -R a+rwX "$RUNNER_TEMP/smoke-data"
+          docker run -d --name mtg -p 8080:8080 \
+            -e SCRYFALL_IMAGE_CACHE=off -e SIM_WORKERS=1 \
+            -v "$RUNNER_TEMP/smoke-data:/data" mtg-1v1-agents:ci
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8080/api/health; then exit 0; fi
+            sleep 2
+          done
+          docker logs mtg
+          exit 1
+
+      - name: Smoke the image
+        run: pnpm smoke
+        env:
+          SMOKE_BASE_URL: http://127.0.0.1:8080
+
+      - name: The container's log
+        if: always()
+        run: docker logs mtg || true
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: docker-smoke-report
+          path: apps/smoke/playwright-report/

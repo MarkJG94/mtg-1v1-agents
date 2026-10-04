@@ -460,6 +460,13 @@ export const cardScriptSchema = z.object({
   keywords: z.array(keywordSchema).default([]),
   flash: z.boolean().optional(),
   splitSecond: z.boolean().optional(),
+  /**
+   * An Aura's enchant ability (CR 702.5): what it can enchant, as a filter — `creature`,
+   * `{ type: land }`, `{ is: creature, controller: you }`. It is what the Aura spell
+   * targets, what it enters attached to, and what it must stay on. Its printed line
+   * ("Enchant creature") is claimed by this field, as a keyword line is by `keywords:`.
+   */
+  enchant: filterSchema.optional(),
   abilities: z.array(abilitySchema).default([]),
   /** The oracle text this script was written against, for the validator to check. */
   text: z.string().optional(),

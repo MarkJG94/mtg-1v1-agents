@@ -121,6 +121,15 @@ const selectorMatches = (
       return target.zone === 'battlefield';
     case 'allCreatures':
       return target.zone === 'battlefield' && isCreature;
+    case 'attachedTo':
+      // The host's own list, which a host that left and came back as a new object no longer
+      // has the source on (CR 400.7), and which `attachObject` keeps in step with the
+      // source's `attachedTo`.
+      return (
+        target.zone === 'battlefield' &&
+        state.objects.get(effect.source)?.zone === 'battlefield' &&
+        target.attachments.includes(effect.source)
+      );
     case 'creaturesControlledBy': {
       if (target.zone !== 'battlefield' || !isCreature) return false;
       const wanted =
@@ -185,13 +194,19 @@ const applyOne = (working: Working, effect: ContinuousEffect): Working => {
     case 'removeAllAbilities':
       // Humility's half: everything printed goes, and only later effects can add back.
       return { ...working, keywords: noKeywords };
+    // A noncreature permanent has no power or toughness (CR 208.3), and changing values it
+    // does not have gives it none: "enchanted creature gets +1/+2" left on a land, or an
+    // Equipment's bonus on an artifact, makes nothing a creature. Becoming one is layer 4's
+    // `becomesCreature`, which is what gives an object power and toughness to change.
     case 'setPowerToughness':
+      if (working.power === null || working.toughness === null) return working;
       return { ...working, power: change.power, toughness: change.toughness };
     case 'modifyPowerToughness':
+      if (working.power === null || working.toughness === null) return working;
       return {
         ...working,
-        power: (working.power ?? 0) + change.power,
-        toughness: (working.toughness ?? 0) + change.toughness,
+        power: working.power + change.power,
+        toughness: working.toughness + change.toughness,
       };
     case 'switchPowerToughness':
       return { ...working, power: working.toughness, toughness: working.power };

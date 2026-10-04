@@ -6,6 +6,7 @@ import {
   type SbaKind,
   type ZoneId,
 } from '@mtg/shared';
+import { canAttach } from './cards/attach.js';
 import {
   characteristicsOf,
   counterCount,
@@ -105,9 +106,14 @@ const gather = (state: GameState): PendingActions => {
     }
 
     // CR 704.5m/n: an aura attached to nothing legal dies; equipment merely falls off.
+    // Legal means still on the battlefield, still the object it was attached to — the host
+    // lists it, which a host that left and came back as a new object (CR 400.7) does not —
+    // and something it may be attached to: what an Aura's enchant ability allows
+    // (CR 303.4d), a creature for an Equipment (CR 301.5c).
     if (object.attachment !== null) {
-      const target = object.attachedTo === null ? null : state.objects.get(object.attachedTo);
-      const illegal = target === undefined || target === null || target.zone !== 'battlefield';
+      const host = object.attachedTo === null ? undefined : state.objects.get(object.attachedTo);
+      const illegal =
+        host === undefined || !host.attachments.includes(id) || !canAttach(state, object, host);
       if (illegal) {
         if (object.attachment === 'aura') destroyed.push({ id, kind: 'auraIllegallyAttached' });
         else if (object.attachedTo !== null) unattaching.push(id);

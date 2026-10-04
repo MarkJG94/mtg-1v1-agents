@@ -38,6 +38,7 @@ export const GameViewer = ({
   cards,
   live,
   controls,
+  onPlayedThrough,
 }: {
   replay: Replay;
   /** How many events the replay holds now; a new value re-renders as a live game grows. */
@@ -46,8 +47,13 @@ export const GameViewer = ({
   live?: LiveState;
   /** More controls for the toolbar: the live page's pin. */
   controls?: ReactNode;
+  /** Told, as it changes, whether a live game is over and played back to its end. */
+  onPlayedThrough?: (through: boolean) => void;
 }) => {
-  const [store] = useState<ViewerStore>(() => createViewerStore({ following: live !== undefined }));
+  // A live game plays from its start at the viewer's speed, as a replay does once asked:
+  // a game the simulation finishes in a fraction of a second is still watched move by move,
+  // and a slower one is caught up with and then waited on at its edge.
+  const [store] = useState<ViewerStore>(() => createViewerStore({ playing: live !== undefined }));
   const state = useStore(store);
   const at = state.following ? length : Math.min(state.position, length);
   const lines = useNarration(replay, length, cards, state.reveal);
@@ -68,6 +74,8 @@ export const GameViewer = ({
   };
 
   usePlayback(store, lines, at, length, live);
+  const through = live?.finished === true && at >= length;
+  useEffect(() => onPlayedThrough?.(through), [through, onPlayedThrough]);
   useKeys({
     playPause: toggle,
     nextEvent: () => go(nextLine(lines, at, length)),

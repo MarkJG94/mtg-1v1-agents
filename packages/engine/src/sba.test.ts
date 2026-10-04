@@ -7,6 +7,7 @@ import { applyLegendRule, checkStateBasedActions, legendGroups } from './sba.js'
 import { createGameState, type GameState } from './state/game-state.js';
 import { withCounters } from './state/object.js';
 import {
+  attachObject,
   createObject,
   findObject,
   getObject,
@@ -62,8 +63,11 @@ const build = () => {
       damage: spec.damage ?? 0,
       deathtouched: spec.deathtouched ?? false,
       counters: object.counters,
-      ...(spec.attachedTo !== undefined ? { attachedTo: spec.attachedTo } : {}),
     });
+    // Attached the way the game attaches, so the host knows it too.
+    if (spec.attachedTo !== undefined && spec.attachedTo !== null) {
+      state = attachObject(state, created.object.id, spec.attachedTo);
+    }
     return created.object.id;
   };
 

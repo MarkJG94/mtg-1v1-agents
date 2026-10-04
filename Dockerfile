@@ -33,6 +33,7 @@ COPY packages/agents/package.json packages/agents/
 COPY packages/sim/package.json packages/sim/
 COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/
+COPY apps/smoke/package.json apps/smoke/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --prod --filter "@mtg/server..."
 

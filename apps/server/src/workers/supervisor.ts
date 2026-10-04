@@ -155,6 +155,12 @@ export class Supervisor {
   private readonly watched = new Set<string>();
   /** Each run's ban edits already in effect, to tell which a write has just applied. */
   private readonly applied = new Map<string, Set<string>>();
+  /**
+   * The ban edits handed to each run's worker this job, until the job ends and the trail
+   * is checked for them: one the worker never saved — sent as its job closed its control
+   * port, or taken by a worker that then died — is kept as pending (`keepForwarded`).
+   */
+  private readonly forwarded = new Map<string, BanRequest[]>();
   private nextJob = 0;
   private nextScript = 0;
   private closed = false;
@@ -300,22 +306,40 @@ export class Supervisor {
   async requestBan(runId: string, request: BanRequest): Promise<void> {
     const active = this.active.get(runId);
     if (active !== undefined) {
+      this.forwarded.set(runId, [...(this.forwarded.get(runId) ?? []), request]);
       active.control.postMessage({ ban: request } satisfies ControlMessage);
       return;
     }
     const snapshot = await this.store.load(runId);
     if (snapshot === null) throw new SupervisorError(`no run ${runId}`);
-    await this.store.saveBans(runId, [
-      ...snapshot.bans,
-      {
-        oracleId: request.oracleId,
-        action: request.action,
-        note: request.note ?? '',
-        by: request.by,
-        at: request.at,
-        appliedAfterGameId: null,
-      },
-    ]);
+    await this.store.saveBans(runId, [...snapshot.bans, pendingEdit(request)]);
+  }
+
+  /**
+   * A job has ended: every edit handed to its worker is on the trail by now — applied, or
+   * kept as pending by the worker's own last act — unless the worker never had it or died
+   * holding it. Those are kept as pending here, so an edit the API accepted is never lost.
+   */
+  private keepForwarded(runId: string): Promise<void> | null {
+    const forwarded = this.forwarded.get(runId) ?? [];
+    this.forwarded.delete(runId);
+    if (forwarded.length === 0) return null;
+    // Read at once, so a job that saved everything it was sent ends as it did before.
+    const trail = this.store.trail(runId);
+    const onTrail = new Map<string, number>();
+    for (const event of trail) {
+      const key = requestKey(event);
+      onTrail.set(key, (onTrail.get(key) ?? 0) + 1);
+    }
+    const missing = forwarded.filter((request) => {
+      const key = requestKey(pendingEdit(request));
+      const left = onTrail.get(key) ?? 0;
+      if (left > 0) onTrail.set(key, left - 1);
+      return left === 0;
+    });
+    return missing.length === 0
+      ? null
+      : this.store.saveBans(runId, [...trail, ...missing.map(pendingEdit)]);
   }
 
   /**
@@ -578,6 +602,8 @@ export class Supervisor {
     const active = this.active.get(runId);
     this.active.delete(runId);
     active?.control.close();
+    const keeping = this.keepForwarded(runId);
+    if (keeping !== null) await keeping;
     if ('failed' in result) {
       await this.failed(runId, result.failed.message);
     } else if ('drove' in result) {
@@ -615,11 +641,27 @@ export class Supervisor {
     else if (job?.kind === 'drive') {
       const active = this.active.get(job.runId);
       this.active.delete(job.runId);
-      void this.failed(job.runId, error.message).then(() => active?.settle());
+      void Promise.resolve(this.keepForwarded(job.runId))
+        .then(() => this.failed(job.runId, error.message))
+        .then(() => active?.settle());
     }
     this.pump();
   }
 }
+
+/** A request as the trail keeps it before it takes effect. */
+const pendingEdit = (request: BanRequest): BanEvent => ({
+  oracleId: request.oracleId,
+  action: request.action,
+  note: request.note ?? '',
+  by: request.by,
+  at: request.at,
+  appliedAfterGameId: null,
+});
+
+/** A request told apart from every other, applied yet or not: what, who, when asked. */
+const requestKey = (event: BanEvent): string =>
+  JSON.stringify([event.oracleId, event.action, event.by, event.at, event.note]);
 
 /** An edit on the trail, told apart from every other: what, who, when asked, when applied. */
 const keyOf = (event: BanEvent): string =>

@@ -58,6 +58,8 @@ export interface EntersBattlefieldEvent {
   readonly from: ZoneId;
   readonly tapped: boolean;
   readonly counters: Readonly<Record<string, number>>;
+  /** What it enters attached to: an Aura spell's target (CR 303.4f). */
+  readonly attachTo?: ObjectId;
 }
 
 export interface LifeEvent {

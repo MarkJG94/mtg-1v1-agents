@@ -110,7 +110,10 @@ const main = async (): Promise<void> => {
   const seconds = ((Date.now() - started) / 1000).toFixed(0);
 
   mkdirSync(dirname(JSON_OUT), { recursive: true });
-  writeFileSync(JSON_OUT, `${JSON.stringify({ quick, ...report }, null, 2)}\n`);
+  writeFileSync(
+    JSON_OUT,
+    `${JSON.stringify({ quick, measuredAt: new Date().toISOString(), ...report }, null, 2)}\n`,
+  );
   writeFileSync(MARKDOWN_OUT, markdown(report));
 
   const { counts } = report;

@@ -1,5 +1,5 @@
 import type { GameEvent } from '@mtg/shared';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { gameEvents, gameLog, gameObjects, lookup, RUN, runDetail } from '../test/fixtures.js';
 import { fakeLive, fakeServer, inAct, renderWith } from '../test/harness.js';
@@ -47,10 +47,10 @@ const end = (seed: string) => ({
   turns: 3,
 });
 
-const watch = async () => {
+const watch = async (moveOnAfter = 0) => {
   server();
   const handle = fakeLive();
-  renderWith(<LivePage runId={RUN} />, handle.live);
+  renderWith(<LivePage runId={RUN} moveOnAfter={moveOnAfter} />, handle.live);
   inAct(() => handle.socket.open());
   await screen.findByText(/Waiting for the run’s next game/);
   return handle;
@@ -68,11 +68,24 @@ describe('watching a run live', () => {
     expect(handle.socket.sent).toContainEqual({ subscribe: 'game', runId: RUN });
   });
 
-  it('follows the game as its events arrive, naming its cards from the stream', async () => {
+  it('plays a game from its start at the viewer’s speed, however far ahead the stream is', async () => {
+    const handle = await watch();
+    inAct(() => handle.socket.deliver(start('g1', 1)));
+    inAct(() => handle.socket.deliver(batch('g1', gameEvents)));
+    inAct(() => handle.socket.deliver(end('g1')));
+    // The whole game is here, and the board is at its start, playing.
+    expect(position()).toContain(`event 0 of ${gameEvents.length}`);
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy();
+    await waitFor(() => expect(position()).not.toContain(`event 0 of`), { timeout: 2_000 });
+    expect(position()).not.toContain(`event ${gameEvents.length} of`);
+  });
+
+  it('follows the game’s edge on asking, naming its cards from the stream', async () => {
     const handle = await watch();
     const named = new Set<number>();
     inAct(() => handle.socket.deliver(start('g1', 1)));
     expect(screen.getByTestId('live-game').textContent).toContain('cycle 2 · match 1 · game 1');
+    fireEvent.click(screen.getByRole('button', { name: 'Go live' }));
     inAct(() => handle.socket.deliver(batch('g1', gameEvents.slice(0, turn2), named)));
     expect(position()).toContain(`event ${turn2} of ${turn2} · in play`);
     expect(turnStep()).toContain('Turn 1 · A');
@@ -89,6 +102,7 @@ describe('watching a run live', () => {
     const named = new Set<number>();
     inAct(() => handle.socket.deliver(start('g1', 1)));
     inAct(() => handle.socket.deliver(batch('g1', gameEvents.slice(0, turn2), named)));
+    fireEvent.click(screen.getByRole('button', { name: 'Go live' }));
     fireEvent.click(screen.getByRole('button', { name: 'Previous turn' }));
     const held = position();
     inAct(() => handle.socket.deliver(batch('g1', gameEvents.slice(turn2), named)));
@@ -101,13 +115,61 @@ describe('watching a run live', () => {
     );
   });
 
-  it('moves on to each new game, unless one is pinned', async () => {
+  it('stays with a game until it is played through, then holds its result before moving on', async () => {
+    const handle = await watch(300);
+    inAct(() => handle.socket.deliver(start('g1', 1)));
+    inAct(() => handle.socket.deliver(batch('g1', gameEvents.slice(0, 5))));
+    inAct(() => handle.socket.deliver(end('g1')));
+    // More games start, more than the page keeps, while the first is still being watched.
+    for (let game = 2; game <= 11; game += 1) {
+      inAct(() => handle.socket.deliver(start(`g${game}`, game)));
+      inAct(() => handle.socket.deliver(batch(`g${game}`, gameEvents.slice(0, 3))));
+    }
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(screen.getByTestId('live-game').textContent).toContain('game 1');
+    expect(position()).toContain('of 5');
+
+    // Played through, its result stays a moment, and then the newest game is shown.
+    fireEvent.click(screen.getByRole('button', { name: 'End' }));
+    expect(screen.getByTestId('live-game').textContent).toContain('game 1 · A won');
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(screen.getByTestId('live-game').textContent).toContain('game 1 · A won');
+    await waitFor(() => expect(screen.getByTestId('live-game').textContent).toContain('game 11'));
+    expect(position()).toContain('event 0 of 3');
+  });
+
+  it('does not move on from a game taken back before its end', async () => {
+    const handle = await watch(100);
+    inAct(() => handle.socket.deliver(start('g1', 1)));
+    inAct(() => handle.socket.deliver(batch('g1', gameEvents.slice(0, 5))));
+    inAct(() => handle.socket.deliver(end('g1')));
+    inAct(() => handle.socket.deliver(start('g2', 2)));
+    fireEvent.click(screen.getByRole('button', { name: 'End' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(screen.getByTestId('live-game').textContent).toContain('game 1');
+  });
+
+  it('waits on a finished game for the next to start, and watches that at once', async () => {
+    const handle = await watch();
+    inAct(() => handle.socket.deliver(start('g1', 1)));
+    inAct(() => handle.socket.deliver(batch('g1', gameEvents.slice(0, 5))));
+    inAct(() => handle.socket.deliver(end('g1')));
+    fireEvent.click(screen.getByRole('button', { name: 'End' }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByTestId('live-game').textContent).toContain('game 1');
+    inAct(() => handle.socket.deliver(start('g2', 2)));
+    expect(screen.getByTestId('live-game').textContent).toContain('game 2');
+  });
+
+  it('moves on to the newest game once one is watched through, unless one is pinned', async () => {
     const handle = await watch();
     inAct(() => handle.socket.deliver(start('g1', 1)));
     inAct(() => handle.socket.deliver(batch('g1', gameEvents.slice(0, 5))));
     inAct(() => handle.socket.deliver(end('g1')));
     inAct(() => handle.socket.deliver(start('g2', 2)));
-    expect(screen.getByTestId('live-game').textContent).toContain('game 2');
+    fireEvent.click(screen.getByRole('button', { name: 'End' }));
+    await waitFor(() => expect(screen.getByTestId('live-game').textContent).toContain('game 2'));
 
     fireEvent.click(screen.getByLabelText('Pin this game'));
     inAct(() => handle.socket.deliver(start('g3', 3)));
@@ -145,7 +207,7 @@ describe('watching a run live', () => {
     // Reconnected: the hub sends the start and everything so far again.
     inAct(() => handle.socket.deliver(start('g1', 1, true)));
     inAct(() => handle.socket.deliver(batch('g1', gameEvents.slice(0, 8))));
-    expect(position()).toContain('event 8 of 8');
+    expect(position()).toContain('of 8');
     expect(
       within(screen.getByRole('region', { name: 'Ticker' })).getAllByTestId('ticker-line')[0]
         ?.textContent,

@@ -13,4 +13,6 @@ reports/
 *.tsbuildinfo
 .vite/
 playwright-report/
+# The smoke's data directory (apps/smoke/prepare-data.mjs).
+.data/
 test-results/

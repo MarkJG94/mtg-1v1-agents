@@ -254,7 +254,10 @@ const noun = (reader: Reader): ScriptFilter | null => {
     }
     if (reader.word('creatures')) {
       found = true;
-      parts['type'] = 'creature';
+      // "artifact creatures" is both, as "artifact creature" is above: overwriting the type
+      // read "Destroy all artifact creatures" as "Destroy all creatures".
+      if (parts['type'] === undefined) parts['type'] = 'creature';
+      else parts['and'] = [{ type: parts['type'] }, { type: 'creature' }];
       continue;
     }
     break;

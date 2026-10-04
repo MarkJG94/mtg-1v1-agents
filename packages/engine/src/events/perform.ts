@@ -1,4 +1,5 @@
 import { kindOfZone, type ObjectId, type PlayerId, playerZone } from '@mtg/shared';
+import { canAttach } from '../cards/attach.js';
 import { counterCount, isCreature, isPlaneswalker } from '../characteristics.js';
 import {
   type EventBatch,
@@ -9,6 +10,7 @@ import {
 import type { GameState } from '../state/game-state.js';
 import { type GameObject, withCounters } from '../state/object.js';
 import {
+  attachObject,
   getObject,
   moveObject,
   objectsIn,
@@ -282,11 +284,20 @@ const applyEnters = (
     if (amount > 0) counters = withCounters({ ...object, counters }, counter, amount).counters;
   }
 
-  const entered = updateObject(moved, event.object, {
+  let entered = updateObject(moved, event.object, {
     summoningSick: true,
     tapped: event.tapped,
     counters,
   });
+  // An Aura spell enters attached to the object it targeted (CR 303.4f), when that can
+  // still legally be enchanted; otherwise it enters attached to nothing, and the
+  // state-based actions put it into its owner's graveyard (CR 704.5m).
+  if (event.attachTo !== undefined) {
+    const host = entered.objects.get(event.attachTo);
+    if (host !== undefined && canAttach(entered, getObject(entered, event.object), host)) {
+      entered = attachObject(entered, event.object, event.attachTo);
+    }
+  }
 
   if (event.tapped) emitter.emit(entered, { type: 'tap', object: event.object });
   for (const [counter, amount] of Object.entries(event.counters)) {

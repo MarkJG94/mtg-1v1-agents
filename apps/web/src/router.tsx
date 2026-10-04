@@ -1,7 +1,7 @@
 import { type AnchorHTMLAttributes, type MouseEvent, useSyncExternalStore } from 'react';
 
 /**
- * A history router the size of this app: seven kinds of page, matched by hand. The server
+ * A history router the size of this app: eight kinds of page, matched by hand. The server
  * answers `index.html` for any path that is not the API's (apps/server app.ts), so a
  * reload or a pasted link lands on the right page.
  */
@@ -13,12 +13,22 @@ export type Route =
   | { readonly page: 'cycle'; readonly runId: string; readonly cycle: number }
   | { readonly page: 'live'; readonly runId: string }
   | { readonly page: 'game'; readonly gameId: string }
+  | { readonly page: 'cards'; readonly oracleId: string | null }
   | { readonly page: 'notFound'; readonly path: string };
 
 export const matchRoute = (pathname: string): Route => {
   const path = pathname.replace(/\/+$/, '') || '/';
   if (path === '/' || path === '/runs') return { page: 'runs' };
   if (path === '/runs/new') return { page: 'newRun' };
+  if (path === '/cards') return { page: 'cards', oracleId: null };
+  const card = /^\/cards\/([^/]+)$/.exec(path);
+  if (card?.[1] !== undefined) {
+    try {
+      return { page: 'cards', oracleId: decodeURIComponent(card[1]) };
+    } catch {
+      // A malformed escape is no card's id.
+    }
+  }
   const cycle = /^\/runs\/([^/]+)\/cycles\/([1-9]\d*)$/.exec(path);
   if (cycle?.[1] !== undefined && cycle[2] !== undefined) {
     try {
@@ -58,6 +68,7 @@ export const runPath = (runId: string) => `/runs/${encodeURIComponent(runId)}`;
 export const cyclePath = (runId: string, cycle: number) => `${runPath(runId)}/cycles/${cycle}`;
 export const livePath = (runId: string) => `${runPath(runId)}/live`;
 export const gamePath = (gameId: string) => `/games/${encodeURIComponent(gameId)}`;
+export const cardPath = (oracleId: string) => `/cards/${encodeURIComponent(oracleId)}`;
 
 const listeners = new Set<() => void>();
 const notify = () => {

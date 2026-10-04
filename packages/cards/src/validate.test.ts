@@ -163,6 +163,46 @@ describe('validating a script against its card', () => {
     expect(forgotten.reasons[0]?.message).toMatch(/sentence 0 is not claimed/);
   });
 
+  /** "Enchant creature" is claimed by `enchant:`, as flash is by `flash:`; and only then. */
+  describe('an Aura', () => {
+    const aura = printed({
+      typeLine: 'Enchantment — Aura',
+      oracleText: 'Enchant creature\nEnchanted creature gets +1/+1.',
+    });
+    const blessing = (over: Record<string, unknown> = {}) =>
+      script({
+        types: ['enchantment'],
+        subtypes: ['aura'],
+        abilities: [
+          {
+            kind: 'static',
+            covers: [1],
+            affects: { kind: 'attachedTo' },
+            change: { kind: 'modifyPowerToughness', power: 1, toughness: 1 },
+          },
+        ],
+        ...over,
+      });
+
+    it('has its enchant line claimed by the field', () => {
+      expect(validateScript(blessing({ enchant: 'creature' }), aura).status).toBe('supported');
+    });
+
+    it('is partial without one, and so never played as an Aura that targets nothing', () => {
+      const result = validateScript(blessing(), aura);
+      expect(result.status).toBe('partial');
+      expect(result.reasons.map((reason) => reason.message).join()).toMatch(
+        /sentence 0 is not claimed/,
+      );
+    });
+
+    it('is the only thing that has one', () => {
+      const result = validateScript(script({ enchant: 'creature' }), printed());
+      expect(result.status).toBe('unsupported');
+      expect(result.reasons.map((reason) => reason.message).join()).toMatch(/only an Aura/);
+    });
+  });
+
   it('refuses a script where two abilities claim the same sentence', () => {
     const result = validateScript(
       script({

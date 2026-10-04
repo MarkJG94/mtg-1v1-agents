@@ -93,4 +93,10 @@ Live streaming is best-effort: the simulation never waits for viewers. The viewe
 - `POST /api/cards/lookup` answers each card's face as well as its summary — `oracleText`, `power`, `toughness`, `loyalty` — for the viewer's hover card.
 - `GET /api/games/:id/log` is parsed by the client: its `objects`, `events`, `players` and `result` are typed in `gameLogSchema`.
 
+**As built (6.6)**, for the cards page (docs/08):
+
+- `GET /api/cards/:oracleId` answers `sentences`: the card's rules text a sentence at a time, numbered as scripts number them, each with `claimed` — whether its cached script reads it, by the validator's own coverage check — or `null` for a card with no script that loads.
+- `GET /api/coverage` answers, for each of the most-requested cards, `failing`: the first sentence its script does not read, when that is what stopped it; and `parser`: the whole-Scryfall report `pnpm cards:coverage` last wrote (`COVERAGE_REPORT`, `reports/coverage.json` by default) — its counts, its failing patterns and `measuredAt` — or `null` when the server has none, or one it cannot read.
+- A ban asked for while a run is on a worker is remembered until that worker's job ends; any the trail does not then hold — sent as the job closed its control port, or taken by a worker that died — is kept as pending, so an edit the API accepted is never lost.
+
 **Images (6.2)**: `/img/:oracleId?size=small|normal` answers the card's image from `DATA_DIR/images/<size>/<oracle id>.jpg`, fetching it from Scryfall by the catalogue's printing the first time (`x-image-cache: miss`, then `hit`), one request at a time 100 ms apart, with requests for the same image sharing one fetch, and written whole or not at all; it is cached by the browser for a year. `SCRYFALL_IMAGE_CACHE=off` answers `404 images_off`; Scryfall failing answers `502 image_unavailable` and caches nothing, so the next request tries again. Only UUIDs from the catalogue ever become a file name or a URL.

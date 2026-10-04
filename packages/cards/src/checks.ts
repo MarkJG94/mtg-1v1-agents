@@ -117,6 +117,8 @@ export const checkCharacteristics = (
  * worth reporting rather than a line to wave through.
  */
 const isClaimedByKeywords = (sentence: string, script: CardScript): boolean => {
+  // "Enchant creature" is an Aura's enchant ability, which the script's `enchant:` says.
+  if (/^enchant\b/i.test(sentence)) return script.enchant !== undefined;
   const parts = sentence
     .toLowerCase()
     .replace(/\.$/, '')

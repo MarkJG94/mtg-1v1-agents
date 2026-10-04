@@ -84,10 +84,10 @@ export interface ViewerState {
 }
 
 /** One viewer's state; each viewer makes its own, so two on a page do not share a transport. */
-export const createViewerStore = (options: { following?: boolean } = {}) =>
+export const createViewerStore = (options: { following?: boolean; playing?: boolean } = {}) =>
   createStore<ViewerState>()((set) => ({
     position: 0,
-    playing: false,
+    playing: options.playing ?? false,
     speed: 1,
     reveal: false,
     images: true,

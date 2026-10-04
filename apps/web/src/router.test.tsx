@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  cardPath,
   cyclePath,
   gamePath,
   Link,
@@ -38,6 +39,13 @@ describe('matching a path', () => {
     expect(matchRoute('/games/').page).toBe('notFound');
   });
 
+  it('knows the cards page, with a card open or none', () => {
+    expect(matchRoute('/cards')).toEqual({ page: 'cards', oracleId: null });
+    expect(matchRoute('/cards/')).toEqual({ page: 'cards', oracleId: null });
+    expect(matchRoute(cardPath('a/b c'))).toEqual({ page: 'cards', oracleId: 'a/b c' });
+    expect(matchRoute('/cards/a/b').page).toBe('notFound');
+  });
+
   it('round-trips a run id that needs escaping', () => {
     const id = 'a b/c';
     expect(matchRoute(runPath(id))).toEqual({ page: 'run', runId: id });
@@ -45,7 +53,7 @@ describe('matching a path', () => {
 
   it('sends anything else, a malformed escape too, to not found', () => {
     expect(matchRoute('/runs/a/b').page).toBe('notFound');
-    expect(matchRoute('/cards').page).toBe('notFound');
+    expect(matchRoute('/coverage').page).toBe('notFound');
     expect(matchRoute('/runs/%E0%A4%A').page).toBe('notFound');
   });
 });

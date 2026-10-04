@@ -106,6 +106,96 @@ describe('what the emitter writes down', () => {
   });
 });
 
+describe('a land with a basic land type (CR 305.6)', () => {
+  /**
+   * Its mana ability comes from the type, and the text that says so is reminder text, which
+   * the normaliser drops. Before this, Tundra was a supported land that tapped for nothing.
+   */
+  it('taps for each of its types, though the text that says so is only a reminder', () => {
+    const tundra = {
+      ...card('Island'),
+      name: 'Tundra',
+      typeLine: 'Land — Plains Island',
+      oracleText: '({T}: Add {W} or {U}.)',
+    };
+    const emitted = emitScript(tundra);
+    expect(emitted.script?.['abilities']).toEqual([
+      {
+        kind: 'mana',
+        id: 'intrinsic',
+        requiresTap: true,
+        modes: [[{ type: 'W' }], [{ type: 'U' }]],
+      },
+    ]);
+    expect(validateScript(emitted.script, tundra).status).toBe('supported');
+  });
+
+  it('is not given a second when its text prints the ability itself', () => {
+    const printedForest = {
+      ...card('Island'),
+      name: 'Printed Forest',
+      typeLine: 'Land — Forest',
+      oracleText: '{T}: Add {G}.',
+    };
+    const mana = (
+      (emitScript(printedForest).script?.['abilities'] ?? []) as Record<string, unknown>[]
+    ).filter((each) => each['kind'] === 'mana');
+    expect(mana.map((each) => each['id'])).toEqual(['auto-mana-0']);
+  });
+});
+
+describe('auras and equipment', () => {
+  it('writes an Aura’s enchant ability as the field that claims its line', () => {
+    const emitted = emitScript(card('Holy Strength'));
+    expect(emitted.script).toMatchObject({ enchant: 'creature', subtypes: ['aura'] });
+    expect(emitted.script?.['abilities']).toEqual([
+      {
+        kind: 'static',
+        covers: [1],
+        affects: { kind: 'attachedTo' },
+        change: { kind: 'modifyPowerToughness', power: 1, toughness: 2 },
+      },
+    ]);
+    expect(validateScript(emitted.script, card('Holy Strength')).status).toBe('supported');
+  });
+
+  it('writes equip as the activated ability it is short for', () => {
+    const emitted = emitScript(card("Warlord's Axe"));
+    expect(abilitiesOf("Warlord's Axe")).toContainEqual({
+      kind: 'activated',
+      id: 'auto-activated-1',
+      covers: [1],
+      cost: { mana: '{4}' },
+      sorceryOnly: true,
+      targets: [{ id: 't', filter: { is: 'creature', controller: 'you' } }],
+      effects: [{ op: 'attach', attachment: '~', to: '$t' }],
+    });
+    expect(validateScript(emitted.script, card("Warlord's Axe")).status).toBe('supported');
+  });
+
+  it('claims a sentence that gives two things once, with the first of its abilities', () => {
+    const statics = abilitiesOf('Sword of Vengeance').filter((each) => each['kind'] === 'static');
+    expect(statics).toHaveLength(5);
+    expect(statics.filter((each) => each['covers'] !== undefined)).toHaveLength(1);
+    expect(
+      validateScript(emitScript(card('Sword of Vengeance')).script, card('Sword of Vengeance'))
+        .status,
+    ).toBe('supported');
+  });
+
+  it('leaves an Aura whose enchant line it cannot read without one, and partial', () => {
+    // Utopia Sprawl's line: a land type the filter grammar does not read as one.
+    const sprawl = {
+      ...card('Holy Strength'),
+      oracleText: 'Enchant Forest\nEnchanted creature gets +1/+2.',
+    };
+    const emitted = emitScript(sprawl);
+    expect(emitted.script?.['enchant']).toBeUndefined();
+    expect(emitted.problems.join()).toContain('Enchant Forest');
+    expect(validateScript(emitted.script, sprawl).status).toBe('partial');
+  });
+});
+
 describe('the resolver’s third link', () => {
   it('is an auto-scripter the resolver can use', () => {
     expect(autoScripter.version).toBeGreaterThan(0);

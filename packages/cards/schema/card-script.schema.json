@@ -107,6 +107,9 @@
     "splitSecond": {
       "type": "boolean"
     },
+    "enchant": {
+      "$ref": "#/$defs/__schema0"
+    },
     "abilities": {
       "type": "array",
       "items": {

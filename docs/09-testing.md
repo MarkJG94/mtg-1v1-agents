@@ -108,6 +108,8 @@ What this catches is **illegal states**, not wrong-but-legal outcomes. A rule th
 - Vitest + Testing Library for the viewer's view model (apply events forward/backward yields consistent boards).
 - Playwright smoke: create a run with a fixed seed, watch a game, ban a card, see the legalisation. Runs against a server started with a tiny bootstrap card pool so it finishes in under a minute.
 
+As built (6.7): the smoke is `apps/smoke` (`pnpm smoke`, after `pnpm build`). Playwright starts the built server, with the built web app on `WEB_DIST`, over a data directory `prepare-data.mjs` writes from the cards the repository already holds — the bootstrap set and the golden corpus, a few hundred cards — so it needs neither the bulk data nor the network. One test drives the real app the way a person would: it fills the new-run form (seed 7, `greedy`, two matches a cycle), starts the run, watches a game live until the board and the ticker show, picks a nonland card agent A's deck holds, bans it from the dashboard's ban console — which must first say what the ban will cost — and waits for the legalisation that removes it after the game in progress. It fails on any uncaught page error. Locally it takes a few seconds; its timeouts allow a slow runner a minute and a half for the legalisation. `SMOKE_BASE_URL` points it at a server that is already running instead, which is how CI smokes the Docker image, and `SMOKE_CHROMIUM` at a browser that is already installed.
+
 ### 8. Benchmarks
 
 `packages/engine/bench` measures ms/game, games/sec and decisions/sec over fixed-seed random games, in four cases: a baseline board, a wide board where blocks and damage assignment do real work, a long game, and the baseline with loop detection switched off so its cost is visible rather than inferred. `pnpm bench` prints the table; `--json` writes it for CI.
@@ -122,7 +124,7 @@ A benchmark is also a test that reads a whole system at once. This one found tha
 
 ## CI (GitHub Actions)
 
-`ci.yml`: pnpm install (cached) → biome lint → typecheck → card-schema and goldens freshness → unit + card + sim + server tests (the fuzzer among them, at its ordinary forty games) → benchmarks against the baseline recorded on `main` → build → a Docker image build.
+`ci.yml`: pnpm install (cached) → biome lint → typecheck → card-schema and goldens freshness → unit + card + sim + server tests (the fuzzer among them, at its ordinary forty games) → benchmarks against the baseline recorded on `main` → build. Two more jobs run beside it: **Browser smoke** builds the workspace and runs the Playwright smoke against the built server, and **Docker image builds** — the check the repository ruleset requires, under its old name — builds the image, starts it on a data directory made by the smoke's own script, waits for `/api/health`, and runs the same smoke against the container — so what is shipped is what is tested, user, paths and all.
 
 `nightly.yml` runs the two things that are too slow or too networked for a pull request. The **long fuzz** plays `FUZZ_GAMES` games rather than the forty a suite somebody runs on every save can afford — the budget is read off the environment so the same test serves both. And the **full-Scryfall coverage report** fetches the day's bulk projection, runs the auto-scripter over every card, uploads the report and keeps one issue up to date with the top failing patterns. Neither gates anything: they are what tells us the parser reads less of Magic than it did yesterday, which is worth knowing and is never a reason to stop a merge.
 

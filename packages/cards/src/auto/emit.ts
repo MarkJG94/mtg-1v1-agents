@@ -5,6 +5,7 @@ import {
   type ParsedAbility,
   parseCost,
   parseEffects,
+  parseEnchant,
   parseManaModes,
   parseReplacement,
   parseRiders,
@@ -50,19 +51,42 @@ export const emitScript = (card: CardProjection): EmittedScript => {
     if (first !== undefined) problems.push(`${first.why} — "${first.line.text}"`);
   }
 
+  // An Aura's "Enchant creature" is a field on the card rather than an ability (CR 702.5a),
+  // and the field is what claims its line.
+  let enchant: unknown = null;
   for (const line of classified.lines) {
     if (line.kind === 'keyword' || line.kind === 'spell') continue;
-    const emitted = abilityFor(line);
+    if (line.kind === 'static' && /^enchant\b/i.test(line.line.text)) {
+      enchant = parseEnchant(line.line.text);
+      if (enchant === null)
+        problems.push(`an enchant ability this cannot read — "${line.line.text}"`);
+      continue;
+    }
+    const emitted = abilitiesFor(line);
     if (emitted === null) {
       problems.push(`${line.why} — "${line.line.text}"`);
       continue;
     }
-    abilities.push(emitted);
+    abilities.push(...emitted);
   }
 
   const printed = parseTypeLine(card.typeLine);
   if (printed.types.length === 0) {
     return { script: null, problems: [...problems, `no card type in "${card.typeLine}"`] };
+  }
+
+  // A land with a basic land type taps for that type's mana because of the type, not the
+  // text (CR 305.6): Tundra's "({T}: Add {W} or {U}.)" is reminder text, which the
+  // normaliser rightly drops, so without this Tundra was a supported land that tapped for
+  // nothing. One mode per basic land type it has.
+  const intrinsic = printed.types.includes('land')
+    ? printed.subtypes.flatMap((subtype) => {
+        const type = basicLandMana[subtype];
+        return type === undefined ? [] : [[{ type }]];
+      })
+    : [];
+  if (intrinsic.length > 0 && !abilities.some((ability) => ability['kind'] === 'mana')) {
+    abilities.unshift({ kind: 'mana', id: 'intrinsic', requiresTap: true, modes: intrinsic });
   }
 
   return {
@@ -80,11 +104,21 @@ export const emitScript = (card: CardProjection): EmittedScript => {
       // they are about when the card may be cast (CR 702.8, CR 702.19) and the engine
       // keeps them where casting can see them.
       ...Object.fromEntries(classified.cardKeywords.map((keyword) => [keyword, true])),
+      ...(enchant !== null ? { enchant } : {}),
       text: card.oracleText,
       abilities,
     },
     problems,
   };
+};
+
+/** The basic land types and the mana each one's intrinsic ability makes (CR 305.6). */
+const basicLandMana: Readonly<Record<string, string>> = {
+  plains: 'W',
+  island: 'U',
+  swamp: 'B',
+  mountain: 'R',
+  forest: 'G',
 };
 
 /**
@@ -108,6 +142,26 @@ const printedNumbers = (card: CardProjection): Readonly<Record<string, number>> 
   return numbers;
 };
 
+/**
+ * One classified line as script abilities, or `null` if it could not be read. One, except
+ * for a static line that says two things — "gets +2/+0 and has trample" — where the first
+ * claims the sentence and the rest claim nothing, so it is still claimed exactly once.
+ */
+const abilitiesFor = (line: ClassifiedLine): readonly Record<string, unknown>[] | null => {
+  if (line.kind === 'static') {
+    const parsed = parseStatic(line.line.text);
+    return parsed === null || parsed.length === 0
+      ? null
+      : parsed.map((each, index) => ({
+          kind: 'static',
+          ...(index === 0 ? { covers: covered(line) } : {}),
+          ...each,
+        }));
+  }
+  const one = abilityFor(line);
+  return one === null ? null : [one];
+};
+
 /** One classified line as one script ability, or `null` if it could not be read. */
 const abilityFor = (line: ClassifiedLine): Record<string, unknown> | null => {
   const id = `auto-${line.kind}-${line.line.line}`;
@@ -124,11 +178,6 @@ const abilityFor = (line: ClassifiedLine): Record<string, unknown> | null => {
             ...(line.cost?.toUpperCase().includes('{T}') === true ? { requiresTap: true } : {}),
             modes,
           };
-    }
-
-    case 'static': {
-      const parsed = parseStatic(line.line.text);
-      return parsed === null ? null : { kind: 'static', covers: covered(line), ...parsed };
     }
 
     case 'replacement': {
@@ -225,7 +274,7 @@ const body = (ability: ParsedAbility): Readonly<Record<string, unknown>> => ({
  * what makes a cached "unsupported" from an older parser be re-earned rather than believed
  * — which is the whole reason the row stores a version at all.
  */
-export const AUTO_SCRIPTER_VERSION = 1;
+export const AUTO_SCRIPTER_VERSION = 2;
 
 export const autoScripter = {
   version: AUTO_SCRIPTER_VERSION,

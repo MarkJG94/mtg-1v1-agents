@@ -8,6 +8,7 @@ import { classifyCard } from './classify.js';
 import {
   parseCost,
   parseEffects,
+  parseEnchant,
   parseManaModes,
   parseReplacement,
   parseRiders,
@@ -430,10 +431,12 @@ describe('the parts that are not effects', () => {
   });
 
   it('reads an anthem', () => {
-    expect(parseStatic('Creatures you control get +1/+1.')).toEqual({
-      affects: { kind: 'creaturesControlledBy', player: 'sourceController' },
-      change: { kind: 'modifyPowerToughness', power: 1, toughness: 1 },
-    });
+    expect(parseStatic('Creatures you control get +1/+1.')).toEqual([
+      {
+        affects: { kind: 'creaturesControlledBy', player: 'sourceController' },
+        change: { kind: 'modifyPowerToughness', power: 1, toughness: 1 },
+      },
+    ]);
   });
 
   it('does not read an anthem that helps everybody', () => {
@@ -464,6 +467,82 @@ describe('the parts that are not effects', () => {
   });
 });
 
+describe('auras and equipment', () => {
+  it('reads what an Aura enchants (CR 702.5a)', () => {
+    expect(parseEnchant('Enchant creature')).toBe('creature');
+    expect(parseEnchant('Enchant permanent')).toBe('permanent');
+    expect(parseEnchant('Enchant creature you control')).toEqual({
+      is: 'creature',
+      controller: 'you',
+    });
+  });
+
+  it('does not read an Aura that enchants a player, which the engine cannot attach to', () => {
+    expect(parseEnchant('Enchant player')).toBeNull();
+    expect(parseEnchant('Enchant opponent')).toBeNull();
+  });
+
+  it('reads what an Aura or Equipment gives the creature it is on', () => {
+    expect(parseStatic('Enchanted creature gets +1/+2.')).toEqual([
+      {
+        affects: { kind: 'attachedTo' },
+        change: { kind: 'modifyPowerToughness', power: 1, toughness: 2 },
+      },
+    ]);
+    expect(parseStatic('Enchanted creature gets -2/-1.')).toEqual([
+      {
+        affects: { kind: 'attachedTo' },
+        change: { kind: 'modifyPowerToughness', power: -2, toughness: -1 },
+      },
+    ]);
+    expect(parseStatic('Equipped creature has lifelink.')).toEqual([
+      { affects: { kind: 'attachedTo' }, change: { kind: 'addKeyword', keyword: 'lifelink' } },
+    ]);
+  });
+
+  /** Every part of the sentence, so a card that gives two things never gives one. */
+  it('reads a bonus and every keyword after it', () => {
+    expect(
+      parseStatic(
+        'Equipped creature gets +2/+0 and has first strike, vigilance, trample, and haste.',
+      )?.map((each) => each.change),
+    ).toEqual([
+      { kind: 'modifyPowerToughness', power: 2, toughness: 0 },
+      { kind: 'addKeyword', keyword: 'firstStrike' },
+      { kind: 'addKeyword', keyword: 'vigilance' },
+      { kind: 'addKeyword', keyword: 'trample' },
+      { kind: 'addKeyword', keyword: 'haste' },
+    ]);
+  });
+
+  it('does not read a bonus that depends on the board, or a restriction', () => {
+    expect(parseStatic('Enchanted creature gets +1/+1 for each Plains you control.')).toBeNull();
+    expect(parseStatic("Enchanted creature can't attack or block.")).toBeNull();
+    expect(parseStatic('Equipped creature gets +2/+4 and loses flying.')).toBeNull();
+  });
+
+  it('does not read an anthem for something other than creatures', () => {
+    expect(parseStatic('Permanents you control have hexproof.')).toBeNull();
+  });
+
+  /** "artifact creatures" is both types, not whichever was read last. */
+  it('keeps both types of a plural like "artifact creatures"', () => {
+    const parsed = parseEffects(['Destroy all artifact creatures.']);
+    expect(parsed.ok && JSON.stringify(parsed.ability.effects)).toContain('"type":"artifact"');
+    expect(parseStatic('Artifact creatures you control get +1/+1.')).toBeNull();
+  });
+
+  it('reads what equip does (CR 702.6a)', () => {
+    const parsed = parseEffects(['Attach ~ to target creature you control.']);
+    expect(parsed.ok && parsed.ability.effects).toEqual([
+      { op: 'attach', attachment: '~', to: '$t' },
+    ]);
+    expect(parsed.ok && parsed.ability.targets).toEqual([
+      { id: 't', filter: { is: 'creature', controller: 'you' } },
+    ]);
+  });
+});
+
 describe('over the bootstrap set', () => {
   /** Every line of the set, with what the parser made of it. */
   const attempts = Object.values(fixture).flatMap((card) =>
@@ -475,7 +554,9 @@ describe('over the bootstrap set', () => {
   const read = ({ card, line }: (typeof attempts)[number]): unknown => {
     const text = line.line.text;
     if (line.kind === 'mana') return parseManaModes(line.effect ?? text);
-    if (line.kind === 'static') return parseStatic(text);
+    // One static ability per change: the loader test below takes the first, which is the
+    // one that claims the sentence.
+    if (line.kind === 'static') return parseStatic(text)?.[0] ?? null;
     if (line.kind === 'replacement') return parseReplacement(text);
     if (line.kind === 'triggered') {
       const parsed = parseTrigger(text);

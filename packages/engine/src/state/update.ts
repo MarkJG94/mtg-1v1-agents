@@ -278,8 +278,9 @@ export const moveObject = (
   // An object that changes zones becomes a new object with no memory of its previous
   // existence (CR 400.7): it arrives untapped, with no counters and no damage marked,
   // and with a timestamp of its own (CR 613.7d) — which is also how a spell can tell the
-  // object it targeted from the one that came back.
-  const objects = state.objects.withObject(id, {
+  // object it targeted from the one that came back. Nor is it attached to anything, or
+  // anything to it: an Aura on a creature that leaves and returns is on nothing (CR 303.4d).
+  let objects = state.objects.withObject(id, {
     ...object,
     zone: to,
     timestamp: state.nextTimestamp,
@@ -287,8 +288,46 @@ export const moveObject = (
     counters: {},
     damage: 0,
     deathtouched: false,
+    attachedTo: null,
+    attachments: [],
   });
+  const host = object.attachedTo === null ? undefined : objects.get(object.attachedTo);
+  if (host !== undefined) {
+    objects = objects.withObject(host.id, {
+      ...host,
+      attachments: host.attachments.filter((each) => each !== id),
+    });
+  }
   return updateState(state, { objects, zones, nextTimestamp: state.nextTimestamp + 1 });
+};
+
+/**
+ * Attach one permanent to another (CR 701.3a), unattaching it from wherever it was. The
+ * link is kept on both sides — the attachment's `attachedTo` and the host's `attachments` —
+ * and the state-based actions read both, so a host that has since left and come back as a
+ * new object (CR 400.7) is never mistaken for the one the attachment was put on.
+ *
+ * Deliberately no new timestamp (CR 701.3c asks for one for the layer system): a timestamp
+ * here is also how a spell tells the object it targeted from a new one, and an Equipment
+ * moved from one creature to another is still the Equipment a spell targeted.
+ */
+export const attachObject = (state: GameState, attachment: ObjectId, to: ObjectId): GameState => {
+  const object = state.objects.get(attachment);
+  const host = state.objects.get(to);
+  if (object === undefined || host === undefined || attachment === to) return state;
+  if (object.attachedTo === to && host.attachments.includes(attachment)) return state;
+  let current = state;
+  const previous = object.attachedTo === null ? undefined : current.objects.get(object.attachedTo);
+  if (previous !== undefined) {
+    current = updateObject(current, previous.id, {
+      attachments: previous.attachments.filter((each) => each !== attachment),
+    });
+  }
+  const now = getObject(current, to);
+  current = updateObject(current, attachment, { attachedTo: to });
+  return updateObject(current, to, {
+    attachments: [...now.attachments.filter((each) => each !== attachment), attachment],
+  });
 };
 
 /**

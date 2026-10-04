@@ -21,6 +21,8 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   /** Directory of the built web app; served as static files when it exists. */
   WEB_DIST: z.string().optional(),
+  /** The last `pnpm cards:coverage` report, for the coverage page; the repository's by default. */
+  COVERAGE_REPORT: z.string().default('reports/coverage.json'),
 });
 
 export interface ServerConfig {
@@ -38,6 +40,7 @@ export interface ServerConfig {
   logLevel: z.infer<typeof envSchema>['LOG_LEVEL'];
   nodeEnv: z.infer<typeof envSchema>['NODE_ENV'];
   webDist: string | undefined;
+  coverageReport: string;
 }
 
 export const defaultSimWorkers = (): number => Math.max(1, cpus().length - 1);
@@ -84,5 +87,6 @@ export const loadConfig = (
     logLevel: parsed.LOG_LEVEL,
     nodeEnv: parsed.NODE_ENV,
     webDist: parsed.WEB_DIST ? resolve(base, parsed.WEB_DIST) : undefined,
+    coverageReport: resolve(base, parsed.COVERAGE_REPORT),
   };
 };

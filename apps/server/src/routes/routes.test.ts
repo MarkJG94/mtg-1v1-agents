@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   apiErrorSchema,
@@ -49,7 +49,8 @@ const box = sandbox();
 // `mtg.db` in the sandbox, where the config puts the database, so health can measure it.
 const { database, supervisor } = box.supervise('mtg.db');
 const catalogue = loadCatalogue(database, box.cardsPath);
-const queries = new Queries(database, supervisor.store);
+const coverageReport = `${box.directory}/coverage.json`;
+const queries = new Queries(database, supervisor.store, { coverageReport });
 /** Scryfall, as the tests see it: a JPEG's first bytes, and a count of what was asked. */
 const scryfall: string[] = [];
 const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
@@ -497,6 +498,117 @@ describe('cards and coverage', async () => {
     const counts = coverage.mostRequested.map((row) => row.requests);
     expect(counts).toEqual([...counts].sort((a, b) => b - a));
   });
+
+  it('says which sentence a card’s script does not read, on the card and in the most-requested', async () => {
+    // A card whose script claims every sentence but its first, as a partial auto script does.
+    const texted = pool.find(
+      (each) =>
+        each.oracleText.includes('.') &&
+        supervisor.scripts.get(each.oracleId)?.status === 'supported' &&
+        (
+          supervisor.scripts.get(each.oracleId)?.script as { abilities: { covers?: number[] }[] }
+        )?.abilities.some((ability) => (ability.covers ?? []).includes(0)),
+    );
+    if (texted === undefined) throw new Error('no scripted card with a claimed first sentence');
+    const row = database.sqlite
+      .prepare('SELECT script FROM card_scripts WHERE oracle_id = ?')
+      .get(texted.oracleId) as { script: string };
+    const script = JSON.parse(row.script) as { abilities: { covers?: number[] }[] };
+    const partial = {
+      ...script,
+      abilities: script.abilities.map((ability) => ({
+        ...ability,
+        ...(ability.covers === undefined
+          ? {}
+          : { covers: ability.covers.filter((sentence) => sentence !== 0) }),
+      })),
+    };
+    const set = database.sqlite.prepare('UPDATE card_scripts SET script = ? WHERE oracle_id = ?');
+    set.run(JSON.stringify(partial), texted.oracleId);
+    // Asked for more often than any other, so it heads the most-requested.
+    const before = await call(coverageSchema, { method: 'GET', url: '/api/coverage' });
+    const ask = database.sqlite.prepare(
+      `INSERT INTO unsupported_requests (oracle_id, run_id, context, reason, requested_at)
+       VALUES (?, NULL, 'api', 'auto script is partial', ?)`,
+    );
+    for (let i = 0; i <= (before.mostRequested[0]?.requests ?? 0); i += 1) {
+      ask.run(texted.oracleId, now());
+    }
+    try {
+      const shown = await call(cardDetailSchema, {
+        method: 'GET',
+        url: `/api/cards/${texted.oracleId}`,
+      });
+      expect(shown.sentences[0]?.claimed).toBe(false);
+      expect(shown.sentences.slice(1).every((sentence) => sentence.claimed === true)).toBe(true);
+      const coverage = await call(coverageSchema, { method: 'GET', url: '/api/coverage' });
+      const listed = coverage.mostRequested.find((each) => each.oracleId === texted.oracleId);
+      expect(listed?.failing).toBe(shown.sentences[0]?.text);
+    } finally {
+      set.run(row.script, texted.oracleId);
+    }
+    // Read whole, its sentences are its rules text and every one is read.
+    const whole = await call(cardDetailSchema, {
+      method: 'GET',
+      url: `/api/cards/${texted.oracleId}`,
+    });
+    expect(whole.sentences.every((sentence) => sentence.claimed === true)).toBe(true);
+    expect(whole.sentences.length).toBeGreaterThan(0);
+  });
+
+  it('shows a card with no script as unread either way', async () => {
+    const unscripted = pool.find(
+      (each) => each.oracleText.length > 0 && supervisor.scripts.get(each.oracleId) === null,
+    );
+    if (unscripted === undefined) return;
+    const shown = await call(cardDetailSchema, {
+      method: 'GET',
+      url: `/api/cards/${unscripted.oracleId}`,
+    });
+    expect(shown.script).toBeNull();
+    expect(shown.sentences.every((sentence) => sentence.claimed === null)).toBe(true);
+  });
+
+  it('answers the last whole-Scryfall coverage report, and none without one', async () => {
+    rmSync(coverageReport, { force: true });
+    expect((await call(coverageSchema, { method: 'GET', url: '/api/coverage' })).parser).toBeNull();
+    const report = {
+      quick: false,
+      counts: {
+        cards: 10,
+        supported: 3,
+        partial: 5,
+        unsupported: 1,
+        unscripted: 1,
+        withoutRulesText: 1,
+        supportedWithText: 2,
+        sentences: 20,
+        sentencesClaimed: 8,
+        sentencesFallout: 4,
+      },
+      patterns: [
+        {
+          pattern: 'equip {M}',
+          count: 4,
+          finishes: 2,
+          example: { card: 'X', sentence: 'Equip {3}' },
+        },
+      ],
+    };
+    writeFileSync(coverageReport, JSON.stringify(report));
+    const { parser } = await call(coverageSchema, { method: 'GET', url: '/api/coverage' });
+    expect(parser).toEqual({ ...report, measuredAt: null });
+    // When it was measured is what the report says, not when the file was last copied.
+    writeFileSync(
+      coverageReport,
+      JSON.stringify({ ...report, measuredAt: '2026-10-01T03:00:00Z' }),
+    );
+    expect(
+      (await call(coverageSchema, { method: 'GET', url: '/api/coverage' })).parser?.measuredAt,
+    ).toBe('2026-10-01T03:00:00Z');
+    writeFileSync(coverageReport, '{ half written');
+    expect((await call(coverageSchema, { method: 'GET', url: '/api/coverage' })).parser).toBeNull();
+  });
 });
 
 describe('the new-run form', async () => {
@@ -605,8 +717,12 @@ describe('the new-run form', async () => {
 
 describe('card images', async () => {
   const detail = await call(runDetailSchema, { method: 'GET', url: run });
-  const played = detail.decks.A.deck.main[0]?.oracleId ?? '';
-  const printing = pool.find((card) => card.oracleId === played)?.id;
+  // A card with one printing in the pool, so which printing the image is fetched by is not
+  // a question this test has to answer: basic lands are in both fixture files.
+  const printings = (oracleId: string) => pool.filter((card) => card.oracleId === oracleId);
+  const played =
+    detail.decks.A.deck.main.find((slot) => printings(slot.oracleId).length === 1)?.oracleId ?? '';
+  const printing = printings(played)[0]?.id;
 
   it('fetches a card’s image from Scryfall once, by its printing, then serves it from disk', async () => {
     const first = await app.inject({ method: 'GET', url: `/img/${played}` });
