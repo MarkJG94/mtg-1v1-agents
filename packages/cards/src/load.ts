@@ -14,6 +14,7 @@ import {
   type Quantity,
   replacementChangeKinds,
   type TargetSpec,
+  type TriggerWhen,
   triggerWhenKinds,
 } from '@mtg/engine';
 import { asOracleId } from '@mtg/shared';
@@ -153,7 +154,7 @@ const abilityFrom = (
         return {
           kind: 'triggered',
           id: ability.id,
-          when: ability.when as never,
+          when: whenFrom(script, `${path}.when`, ability.when),
           ...(ability.interveningIf !== undefined
             ? { interveningIf: ability.interveningIf as never }
             : {}),
@@ -249,19 +250,36 @@ const abilityFrom = (
  * which was meant. The `when` in a script is a loose object so the schema cannot catch
  * it, which leaves it here.
  */
-const stepTriggers = ['beginningOfUpkeep', 'beginningOfEndStep'];
+const stepTriggers = ['beginningOfUpkeep', 'beginningOfCombat', 'beginningOfEndStep'];
 
 const checkWhose = (script: CardScript, path: string, when: { readonly kind: string }): void => {
   if (!stepTriggers.includes(when.kind)) return;
   const whose = (when as Record<string, unknown>)['whose'];
-  if (whose === 'self' || whose === 'any') return;
+  if (whose === 'self' || whose === 'opponent' || whose === 'any') return;
   throw new ScriptError(
     script.name,
     path,
-    `a "${when.kind}" trigger needs "whose": "self" or "any", and this says ` +
+    `a "${when.kind}" trigger needs "whose": "self", "opponent" or "any", and this says ` +
       `${JSON.stringify(whose)} — without it the engine fires on the active player's step ` +
       'whatever the card was meant to say',
   );
+};
+
+/**
+ * A trigger condition, with any filter in it ("whenever you cast an instant or sorcery
+ * spell") written in the short forms every other filter is, and converted the same way.
+ */
+const whenFrom = (
+  script: CardScript,
+  path: string,
+  when: Readonly<Record<string, unknown>> & { readonly kind: string },
+): TriggerWhen => {
+  if (when['filter'] === undefined) return when as unknown as TriggerWhen;
+  const parsed = filterSchema.safeParse(when['filter']);
+  if (!parsed.success) {
+    throw new ScriptError(script.name, `${path}.filter`, `not a filter: ${parsed.error.message}`);
+  }
+  return { ...when, filter: parsed.data } as unknown as TriggerWhen;
 };
 
 const opFrom = (

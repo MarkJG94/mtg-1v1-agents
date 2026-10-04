@@ -12,7 +12,7 @@
 - Lands: basics, duals, shocks, fetches, checklands, fastlands, painlands, Wasteland-style effects; land drops per turn; sacrifice-and-search.
 - Combat (CR 506–511): attack/block declaration, menace, multiple blockers, damage assignment order, first/double strike, trample, deathtouch, lifelink, flying/reach, vigilance, haste, defender, indestructible, hexproof/shroud/protection, ward.
 - State-based actions (CR 704) and the legend rule.
-- Triggered abilities (CR 603) with APNAP ordering, intervening-if, ETB/LTB/dies/attacks/blocks/upkeep/end-step/cast triggers, and delayed triggers.
+- Triggered abilities (CR 603) with APNAP ordering, intervening-if, ETB/LTB/dies/attacks/blocks/upkeep/end-step/cast triggers, and delayed triggers. *(As built in 7.1: also the beginning of combat, a step of the opponent's, becoming blocked — once however many block (CR 509.3c) — gaining life, once per life-gain event (CR 119.10, which is why lifelink gains one event per source), and casting a spell, as it becomes cast and with a filter on the spell (CR 601.2i).)*
 - Static abilities and continuous effects with the **layer system** (CR 613): copy, control, text-changing, type, colour, ability add/remove, P/T (set / modify / counters / switch), timestamps and dependency.
 - Planeswalkers (CR 306, 606): they enter with loyalty counters equal to their printed loyalty, damage to them removes that many counters, they can be attacked directly (CR 508.1a), the pre-2018 redirect rule is gone, loyalty abilities cost counters and are sorcery-speed and once per permanent per turn, and zero loyalty is a state-based action.
 - Counters (+1/+1, −1/−1, loyalty, charge, generic), tokens, copies of permanents.
@@ -45,6 +45,7 @@ interface GameState {
   replacements: ReplacementEffect[];        // replacement and prevention effects (CR 614-616)
   nextEffectId: number;                     // shared by both, so log ids never clash
   pendingReplacement: ReplacementProgress | null;   // a batch paused for a CR 616.1 choice
+  resolution: Resolution | null;            // the spell or ability resolving, as a program (ADR 0021)
   delayedTriggers: DelayedTrigger[];        // set up to fire at a later step (CR 603.7)
   pendingTriggers: TriggerInstance[];       // fired, waiting to go on the stack
   triggersFiredThisTurn: string[];          // for once-each-turn abilities
@@ -96,6 +97,8 @@ Nothing in the engine deals damage, draws a card or moves a permanent directly. 
 Applicable effects are collected; self-replacement applies first (CR 616.1a), an effect never applies twice to the same event (CR 614.5), and when more than one still applies the affected player chooses — a `chooseReplacement` decision, which the AI answers with a heuristic and fuzzers randomly. The order is not cosmetic: prevent 2 and then double leaves 2 damage where doubling and then preventing 2 leaves 4.
 
 Because that choice is a decision, a batch can stop half-way. The work in progress — events already resolved, events still queued, effect ids already applied to the current one — is written to `state.pendingReplacement` and picked back up by `resumeBatch`. What to do once the batch finishes is a closed union (`{ kind: 'plain' }`, `{ kind: 'combatDamage', firstStrike }`) rather than a callback, so a paused batch is plain data that replays and clones like the rest of the state. See ADR 0004.
+
+A spell or ability resolving can stop half-way for the same reason, and is kept the same way (ADR 0021). `state.resolution` holds its effects as a stack of frames — the list, how far through it, the context it runs in — so a `yesNo` for "you may" (CR 608.2d), a `discard` the player discarding chooses (CR 701.9b), or a replacement choice part-way through an op pauses the program, and answering it carries on from the next op. Whether the spell fizzled is decided once, as it begins to resolve (CR 608.2b); when the program runs out it leaves the stack without being asked again.
 
 Prevention effects (CR 615) are replacement effects, not a separate system: a shield replaces some or all of a damage event with nothing and shrinks by what it absorbed (CR 615.7). Regeneration (CR 701.15) is a one-use shield over *destruction* specifically, which is why a `moveZone` event records whether it is destruction — a creature with zero toughness is put into its graveyard rather than destroyed (CR 704.5f), and no shield saves it.
 

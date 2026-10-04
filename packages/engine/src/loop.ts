@@ -182,6 +182,14 @@ export const hashState = (state: GameState): number => {
     num(state.pendingReplacement.options.length);
     player(state.pendingReplacement.player);
   }
+  // Likewise a resolution stopped part-way: the same board with more of a spell still to
+  // run is not the same position (ADR 0021).
+  if (state.resolution === null) {
+    num(-1);
+  } else {
+    num(state.resolution.object);
+    for (const frame of state.resolution.frames) num(frame.next);
+  }
   mix(state.pendingDecision?.kind ?? '-');
 
   // Two 32-bit words into one exact integer: the low 21 bits of `b` on top of all of `a`.

@@ -9,6 +9,7 @@ import {
   steps,
 } from '@mtg/shared';
 import { castSpell } from '../cards/cast.js';
+import { answerMay, runResolution } from '../cards/program.js';
 import { resolveTop } from '../cards/resolve.js';
 import { expireEndOfTurnEffects } from '../characteristics.js';
 import {
@@ -508,7 +509,12 @@ export const applyDecision = (
   let next: GameState;
 
   if (decision.kind === 'discard' && response.kind === 'discard') {
+    // A discard an effect asked for is part of a resolution, which carries on afterwards;
+    // the cleanup step's is not (CR 514.1).
     next = applyDiscard(cleared, emitter, decision, response.cards);
+    if (next.resolution !== null) next = runResolution(next, emitter);
+  } else if (decision.kind === 'yesNo' && response.kind === 'yesNo') {
+    next = answerMay(cleared, emitter, response.answer);
   } else if (decision.kind === 'declareAttackers' && response.kind === 'declareAttackers') {
     next = declareAttackers(cleared, emitter, response.attackers);
   } else if (decision.kind === 'declareBlockers' && response.kind === 'declareBlockers') {
@@ -521,6 +527,8 @@ export const applyDecision = (
     next = askForBlockerOrder(orderBlockers(cleared, decision.attacker, response.order));
   } else if (decision.kind === 'chooseReplacement' && response.kind === 'chooseReplacement') {
     next = resumeBatch(cleared, emitter, response.effect);
+    // The batch may have been an op part-way through a resolution, whose other ops wait.
+    if (next.resolution !== null) next = runResolution(next, emitter);
   } else if (decision.kind === 'playOrDraw' && response.kind === 'playOrDraw') {
     next = afterSetup(applyPlayOrDraw(cleared, emitter, decision.player, response.choice), emitter);
   } else if (decision.kind === 'mulligan' && response.kind === 'mulligan') {
@@ -725,6 +733,8 @@ const defaultAnswer = (decision: Decision, options: AutoPlayOptions): DecisionRe
     }
     case 'playOrDraw':
       return { kind: 'playOrDraw', choice: 'play' };
+    case 'yesNo':
+      return { kind: 'yesNo', answer: true };
     case 'mulligan':
       return { kind: 'mulligan', action: options.mulligan?.(decision) ?? 'keep' };
     case 'bottomCards':

@@ -47,6 +47,7 @@ export const opSpecs: Readonly<Record<OpName, OpSpec>> = {
   // Cards and zones
   draw: { args: { player: 'player', count: 'quantity' }, required: ['player', 'count'] },
   mill: { args: { player: 'player', count: 'quantity' }, required: ['player', 'count'] },
+  discard: { args: { player: 'player', count: 'quantity' }, required: ['player', 'count'] },
   discardAtRandom: {
     args: { player: 'player', count: 'quantity' },
     required: ['player', 'count'],
@@ -123,6 +124,7 @@ export const opSpecs: Readonly<Record<OpName, OpSpec>> = {
 
   // Control flow
   sequence: { args: { effects: 'effects' }, required: ['effects'] },
+  may: { args: { player: 'player', effects: 'effects' }, required: ['player', 'effects'] },
   forEach: { args: { of: 'filter', effects: 'effects' }, required: ['of', 'effects'] },
   if: {
     args: { condition: 'condition', thenDo: 'effects', otherwise: 'effects' },

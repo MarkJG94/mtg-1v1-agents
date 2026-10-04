@@ -1,4 +1,4 @@
-import { Bindings, duration, filter, player, quantity } from './phrases.js';
+import { Bindings, duration, filter, player, quantity, type ScriptFilter } from './phrases.js';
 import { type ParseFailure, Reader } from './reader.js';
 import { readKeywords, type ScriptEffect, verbs } from './verbs.js';
 
@@ -45,8 +45,11 @@ export interface ParsedCost {
   readonly sacrificeSelf?: boolean;
 }
 
-export const parseEffects = (sentences: readonly string[]): ParseResult => {
-  const bindings = new Bindings();
+export const parseEffects = (
+  sentences: readonly string[],
+  options: { readonly thatPlayer?: string } = {},
+): ParseResult => {
+  const bindings = new Bindings(options.thatPlayer ?? null);
   const effects: ScriptEffect[] = [];
   let read = 0;
   let failure: ParseFailure | null = null;
@@ -56,7 +59,27 @@ export const parseEffects = (sentences: readonly string[]): ParseResult => {
     // player discards a card. Draw a card." is two sentences, and the second one is about
     // you however the first one began.
     bindings.subject = null;
-    const parsed = readSentence(sentence, bindings);
+
+    // "You may sacrifice it. If you do, …": the second sentence happens exactly when the
+    // first does, so it goes inside the same `may` (CR 608.2d).
+    const ifYouDo = /^if (you|they) do, (.*)$/i.exec(sentence.trim());
+    const last = effects.at(-1);
+    if (ifYouDo !== null) {
+      const rest = last?.op === 'may' ? readSentence(ifYouDo[2] ?? '', bindings) : null;
+      if (rest === null || last === undefined) {
+        failure =
+          last?.op === 'may' ? lastFailure : { reason: '"if you do" after no "may"', token: null };
+        break;
+      }
+      effects[effects.length - 1] = {
+        ...last,
+        effects: [...(last['effects'] as ScriptEffect[]), ...rest],
+      };
+      read += 1;
+      continue;
+    }
+
+    const parsed = readMay(sentence, bindings) ?? readSentence(sentence, bindings);
     if (parsed === null) {
       failure = lastFailure;
       break;
@@ -82,6 +105,27 @@ export const parseEffects = (sentences: readonly string[]): ParseResult => {
       ...(failure === null ? {} : { unread: failure }),
     },
   };
+};
+
+/**
+ * "You may draw a card." — "may" and the player it asks, then an ordinary sentence of what
+ * they may do (CR 608.2d). Null when the sentence is not one, so it is read as usual.
+ */
+const readMay = (sentence: string, bindings: Bindings): readonly ScriptEffect[] | null => {
+  const reader = Reader.of(sentence);
+  const mark = bindings.mark();
+  const who = reader.try(() => {
+    const found = player(reader, bindings);
+    return found !== null && reader.word('may') ? found : null;
+  });
+  if (who === null) {
+    bindings.reset(mark);
+    return null;
+  }
+  bindings.subject = who;
+  const effects = readSentence(sentence.slice(reader.offset).trim(), bindings);
+  if (effects === null) return null;
+  return [{ op: 'may', player: who, effects }];
 };
 
 /** Where the most recent sentence gave up, kept for the result above. */
@@ -136,6 +180,9 @@ export interface ParsedTrigger {
  * The comma is the join: everything before it says when the ability triggers (CR 603.1),
  * everything after it is what it does, and that second half is an ordinary sentence.
  */
+/** Why a trigger failed when it is the condition, not the body, that is unread. */
+export const triggerConditionUnread = 'a trigger condition this cannot read';
+
 export const parseTrigger = (
   sentence: string,
 ): ParsedTrigger | { readonly failure: ParseFailure } => {
@@ -147,16 +194,52 @@ export const parseTrigger = (
   const reader = Reader.of(sentence.slice(0, comma));
   const when = triggerCondition(reader);
   if (when === null || !reader.done) {
-    reader.stopped('a trigger condition this cannot read');
+    reader.stopped(triggerConditionUnread);
     return { failure: reader.failure() };
   }
 
-  const rest = parseEffects([sentence.slice(comma + 1).trim()]);
+  const that = thatPlayerOf(when);
+  const rest = parseEffects(
+    [sentence.slice(comma + 1).trim()],
+    that === null ? {} : { thatPlayer: that },
+  );
   return rest.ok ? { when, ability: rest.ability } : { failure: rest.failure };
+};
+
+/**
+ * Who "that player" is in the body of a trigger, when the condition names one: the player
+ * dealt combat damage, who in a two-player game is always the opponent (CR 510.3a); the
+ * player whose step it is; the player who cast the spell or gained the life. Null when the
+ * condition names nobody in particular — "each player's upkeep" is either player — so a
+ * body that says "that player" there stays unread rather than picking one.
+ */
+const thatPlayerOf = (when: Readonly<Record<string, unknown>>): string | null => {
+  switch (when['kind']) {
+    case 'selfDealsCombatDamageToPlayer':
+      return 'opponent';
+    case 'beginningOfUpkeep':
+    case 'beginningOfCombat':
+    case 'beginningOfEndStep':
+      return when['whose'] === 'opponent' ? 'opponent' : when['whose'] === 'self' ? 'you' : null;
+    case 'spellCast':
+      return when['caster'] === 'any' ? null : (when['caster'] as string);
+    case 'lifeGained':
+      return when['player'] === 'any' ? null : (when['player'] as string);
+    default:
+      return null;
+  }
 };
 
 const triggerCondition = (reader: Reader): Readonly<Record<string, unknown>> | null =>
   reader.first<Readonly<Record<string, unknown>>>(
+    // The older wording, still printed on some cards, is the same trigger (CR 603.6a). It
+    // goes first because "when ~ enters" would take its first three words and leave the
+    // rest over.
+    () =>
+      reader.words('when', '~', 'enters', 'the', 'battlefield') ||
+      reader.words('whenever', '~', 'enters', 'the', 'battlefield')
+        ? { kind: 'selfEntersBattlefield' }
+        : null,
     () =>
       reader.words('when', '~', 'enters') || reader.words('whenever', '~', 'enters')
         ? { kind: 'selfEntersBattlefield' }
@@ -165,8 +248,35 @@ const triggerCondition = (reader: Reader): Readonly<Record<string, unknown>> | n
       reader.words('when', '~', 'dies') || reader.words('whenever', '~', 'dies')
         ? { kind: 'selfDies' }
         : null,
+    // "Dies" means exactly this (CR 700.4), and older cards print it out in full.
+    () =>
+      reader.words('when', '~', 'is', 'put', 'into') &&
+      reader.anyWord('a', 'your') !== null &&
+      reader.words('graveyard', 'from', 'the', 'battlefield')
+        ? { kind: 'selfDies' }
+        : null,
+    () =>
+      reader.words('whenever', '~', 'becomes', 'blocked') ? { kind: 'selfBecomesBlocked' } : null,
+    () => {
+      const who = castOrGain(reader);
+      if (who === null) return null;
+      if (reader.anyWord('gain', 'gains') !== null) {
+        return reader.word('life') ? { kind: 'lifeGained', player: who } : null;
+      }
+      if (reader.anyWord('cast', 'casts') === null) return null;
+      const spell = spellFilter(reader);
+      if (spell === null) return null;
+      return { kind: 'spellCast', caster: who, ...(spell === 'any' ? {} : { filter: spell }) };
+    },
     () => (reader.words('whenever', '~', 'attacks') ? { kind: 'selfAttacks' } : null),
     () => (reader.words('whenever', '~', 'blocks') ? { kind: 'selfBlocks' } : null),
+    // "to a player" and "to an opponent" are one trigger with two players in the game; "to
+    // a player or planeswalker" is not, and its "or" is left over for the caller to refuse.
+    () =>
+      reader.words('whenever', '~', 'deals', 'combat', 'damage', 'to') &&
+      (reader.words('a', 'player') || reader.words('an', 'opponent'))
+        ? { kind: 'selfDealsCombatDamageToPlayer' }
+        : null,
     () => {
       if (!reader.words('whenever', 'another')) return null;
       const what = filter(reader);
@@ -196,8 +306,16 @@ const triggerCondition = (reader: Reader): Readonly<Record<string, unknown>> | n
 const stepTrigger = (reader: Reader): Readonly<Record<string, unknown>> | null => {
   if (!reader.words('at', 'the', 'beginning', 'of')) return null;
 
+  // Combat names its turn after the step rather than before it (CR 507.1).
+  if (reader.words('combat', 'on', 'your', 'turn'))
+    return { kind: 'beginningOfCombat', whose: 'self' };
+  if (reader.words('each', 'combat')) return { kind: 'beginningOfCombat', whose: 'any' };
+  // "The end step" is every end step, whoever's turn it is.
+  if (reader.words('the', 'end', 'step')) return { kind: 'beginningOfEndStep', whose: 'any' };
+
   const whose = reader.first(
     () => (reader.word('your') ? 'self' : null),
+    () => (reader.words('each', 'opponent', "'s") ? 'opponent' : null),
     () => (reader.words('each', 'player', "'s") ? 'any' : null),
     () => (reader.word('each') ? 'any' : null),
   );
@@ -206,6 +324,62 @@ const stepTrigger = (reader: Reader): Readonly<Record<string, unknown>> | null =
   if (reader.word('upkeep')) return { kind: 'beginningOfUpkeep', whose };
   if (reader.words('end', 'step')) return { kind: 'beginningOfEndStep', whose };
   return null;
+};
+
+/** "Whenever you …", "whenever an opponent …", "whenever a player …". */
+const castOrGain = (reader: Reader): 'you' | 'opponent' | 'any' | null => {
+  if (!reader.word('whenever')) return null;
+  return reader.first<'you' | 'opponent' | 'any'>(
+    () => (reader.word('you') ? 'you' : null),
+    () => (reader.words('an', 'opponent') ? 'opponent' : null),
+    () => (reader.words('a', 'player') ? 'any' : null),
+  );
+};
+
+/**
+ * "a spell", "an instant or sorcery spell", "a noncreature spell", "a white spell" — what
+ * a cast trigger watches for, as a filter on the spell, or `'any'` for every spell.
+ *
+ * Not the ordinary noun phrase: that reads "creature" as a creature on the battlefield,
+ * which a spell never is, and has no "instant or sorcery". Each word here is a card type
+ * (`type`, which a spell on the stack has) or a colour, and "or" offers another.
+ */
+const spellFilter = (reader: Reader): ScriptFilter | 'any' | null => {
+  reader.anyWord('a', 'an');
+  if (reader.word('spell')) return 'any';
+  const kinds: ScriptFilter[] = [];
+  for (;;) {
+    const kind = spellWord(reader);
+    if (kind === null) return null;
+    kinds.push(kind);
+    if (!reader.word('or')) break;
+  }
+  if (!reader.word('spell')) return null;
+  return kinds.length === 1 ? (kinds[0] as ScriptFilter) : { or: kinds };
+};
+
+const spellWords: Readonly<Record<string, ScriptFilter>> = {
+  artifact: { type: 'artifact' },
+  creature: { type: 'creature' },
+  enchantment: { type: 'enchantment' },
+  instant: { type: 'instant' },
+  sorcery: { type: 'sorcery' },
+  planeswalker: { type: 'planeswalker' },
+  noncreature: { not: { type: 'creature' } },
+  nonartifact: { not: { type: 'artifact' } },
+  white: { colour: 'W' },
+  blue: { colour: 'U' },
+  black: { colour: 'B' },
+  red: { colour: 'R' },
+  green: { colour: 'G' },
+};
+
+const spellWord = (reader: Reader): ScriptFilter | null => {
+  const word = reader.peek()?.word;
+  const kind = word === undefined ? undefined : spellWords[word];
+  if (kind === undefined) return null;
+  reader.next();
+  return kind;
 };
 
 /** "another creature you control" carries a controller the trigger has to repeat. */

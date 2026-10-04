@@ -158,8 +158,21 @@ export interface ChooseReplacementDecision {
   readonly event: RulesEvent;
 }
 
+/**
+ * "You may …" as an ability resolves (CR 608.2d): yes or no, asked of the player the
+ * ability says, about the effects of the ability whose `source` is named.
+ */
+export interface YesNoDecision {
+  readonly kind: 'yesNo';
+  readonly player: PlayerId;
+  /** The object whose ability is asking. */
+  readonly source: ObjectId;
+  readonly options: readonly [true, false];
+}
+
 export type Decision =
   | MulliganDecision
+  | YesNoDecision
   | PlayOrDrawDecision
   | BottomCardsDecision
   | ChooseOptionDecision
@@ -195,7 +208,8 @@ export type DecisionResponse =
   | { readonly kind: 'orderBlockers'; readonly order: readonly ObjectId[] }
   | { readonly kind: 'chooseOption'; readonly chosen: ObjectId }
   | { readonly kind: 'chooseReplacement'; readonly effect: number }
-  | { readonly kind: 'orderTriggers'; readonly order: readonly string[] };
+  | { readonly kind: 'orderTriggers'; readonly order: readonly string[] }
+  | { readonly kind: 'yesNo'; readonly answer: boolean };
 
 export class UnexpectedDecisionError extends Error {
   constructor(message: string) {

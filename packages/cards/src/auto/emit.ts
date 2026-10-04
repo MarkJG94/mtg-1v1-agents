@@ -274,7 +274,7 @@ const body = (ability: ParsedAbility): Readonly<Record<string, unknown>> => ({
  * what makes a cached "unsupported" from an older parser be re-earned rather than believed
  * — which is the whole reason the row stores a version at all.
  */
-export const AUTO_SCRIPTER_VERSION = 2;
+export const AUTO_SCRIPTER_VERSION = 5;
 
 export const autoScripter = {
   version: AUTO_SCRIPTER_VERSION,

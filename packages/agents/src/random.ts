@@ -46,6 +46,8 @@ export const randomAgent: PlayAgent = {
         return { kind: 'chooseOption', chosen: rng.pick(decision.options) };
       case 'chooseReplacement':
         return { kind: 'chooseReplacement', effect: rng.pick(decision.options) };
+      case 'yesNo':
+        return { kind: 'yesNo', answer: rng.pick(decision.options) };
     }
   },
 };
