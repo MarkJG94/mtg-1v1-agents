@@ -130,6 +130,13 @@ export interface CardDefinition {
   readonly flash?: boolean;
   /** CR 702.61: while this is on the stack, nothing else can be cast or activated. */
   readonly splitSecond?: boolean;
+  /**
+   * An Aura's enchant ability (CR 702.5a): what it can be attached to. It is what an Aura
+   * spell targets (CR 303.4a) — the target `spellAbilityOf` gives it, ahead of any other —
+   * what it enters attached to (CR 303.4f), and what it must stay attached to, or be put
+   * into its owner's graveyard (CR 303.4d, 704.5m).
+   */
+  readonly enchant?: Filter;
   readonly abilities: readonly CardAbility[];
 }
 
@@ -152,8 +159,31 @@ export const isLegendary = (definition: CardDefinition): boolean =>
 export const isSorcerySpeed = (definition: CardDefinition): boolean =>
   !hasType(definition, 'instant') && definition.flash !== true;
 
-export const spellAbilityOf = (definition: CardDefinition): SpellAbility | undefined =>
-  definition.abilities.find((ability): ability is SpellAbility => ability.kind === 'spell');
+/** The name an Aura spell's own target goes by: what it enchants. */
+export const ENCHANT_TARGET = 'enchanted';
+
+const auraSpells = new WeakMap<CardDefinition, SpellAbility>();
+
+/**
+ * The card's spell ability. An Aura's comes with its enchant target first (CR 303.4a):
+ * casting one is targeting what it will enchant, so the cast checks it, the spell fizzles
+ * if it has become illegal (CR 608.2b), and the Aura enters attached to it.
+ */
+export const spellAbilityOf = (definition: CardDefinition): SpellAbility | undefined => {
+  const written = definition.abilities.find(
+    (ability): ability is SpellAbility => ability.kind === 'spell',
+  );
+  if (definition.enchant === undefined) return written;
+  const known = auraSpells.get(definition);
+  if (known !== undefined) return known;
+  const aura: SpellAbility = {
+    kind: 'spell',
+    targets: [{ id: ENCHANT_TARGET, filter: definition.enchant }, ...(written?.targets ?? [])],
+    effects: written?.effects ?? [],
+  };
+  auraSpells.set(definition, aura);
+  return aura;
+};
 
 export const abilitiesOfKind = <K extends CardAbility['kind']>(
   definition: CardDefinition,

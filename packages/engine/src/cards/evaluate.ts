@@ -208,7 +208,9 @@ export const matchesFilter = (
     case 'colour':
       return traits.colours.includes(filter.colour);
     case 'controlledBy':
-      return playerMatches(context, filter.player, object.controller);
+      // Its controller as the layers make it (CR 613.1b): a creature an opponent has taken
+      // is no longer one "you control".
+      return playerMatches(context, filter.player, traits.controller);
     case 'inZone':
       return object.zone === filter.zone;
     case 'tapped':

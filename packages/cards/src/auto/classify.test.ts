@@ -100,8 +100,8 @@ describe('what it will not guess at', () => {
   });
 
   it('names a keyword ability with a cost rather than reading it', () => {
-    expect(kindOf('Equip {2}', 'artifact')).toBe('unknown');
     expect(kindOf('Ward {2}', 'creature')).toBe('unknown');
+    expect(kindOf('Ninjutsu {1}{U}', 'creature')).toBe('unknown');
     expect(kindOf('Flashback {1}{R}', 'sorcery')).toBe('unknown');
   });
 
@@ -115,9 +115,26 @@ describe('what it will not guess at', () => {
   });
 
   it('says what stopped it, every time', () => {
+    const line = linesOf('Ward {2}')[0];
+    if (line === undefined) throw new Error('no line');
+    expect(classifyLine(line, ['creature']).why).toContain('keyword ability with a cost');
+  });
+});
+
+describe('equip (CR 702.6a)', () => {
+  it('is the activated ability the rules say it is short for', () => {
     const line = linesOf('Equip {2}')[0];
     if (line === undefined) throw new Error('no line');
-    expect(classifyLine(line, ['artifact']).why).toContain('keyword ability with a cost');
+    const classified = classifyLine(line, ['artifact']);
+    expect(classified.kind).toBe('activated');
+    expect(classified.cost).toBe('{2}');
+    expect(classified.effect).toBe(
+      'Attach ~ to target creature you control. Activate only as a sorcery.',
+    );
+  });
+
+  it('only with a mana cost and nothing else', () => {
+    expect(kindOf('Equip legendary creature {1}', 'artifact')).not.toBe('activated');
   });
 });
 

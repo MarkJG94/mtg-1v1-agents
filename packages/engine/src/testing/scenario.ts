@@ -27,7 +27,14 @@ import {
   createGameState,
   type GameState,
 } from '../state/game-state.js';
-import { createObject, getObject, moveObject, objectsIn, updateObject } from '../state/update.js';
+import {
+  attachObject,
+  createObject,
+  getObject,
+  moveObject,
+  objectsIn,
+  updateObject,
+} from '../state/update.js';
 import { type Keywords, keywords } from '../targeting.js';
 import type { TriggeredAbility } from '../triggers.js';
 import { playLand } from '../turn/land.js';
@@ -404,8 +411,11 @@ export class Scenario {
       damage: spec.damage ?? 0,
       deathtouched: spec.deathtouched ?? false,
       counters,
-      ...(spec.attachedTo !== undefined ? { attachedTo: this.ref(spec.attachedTo) } : {}),
     });
+    // Attached the way the game attaches, so the host lists it too (see `attachObject`).
+    if (spec.attachedTo !== undefined) {
+      this.state = attachObject(this.state, created.object.id, this.ref(spec.attachedTo));
+    }
 
     if (spec.name !== undefined) {
       if (this.labels.has(spec.name)) {

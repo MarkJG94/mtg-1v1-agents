@@ -168,6 +168,9 @@ describe('a run in SQLite', async () => {
 
 describe('a process that dies mid-run, and the one that resumes it', async () => {
   const { snapshot } = await reference;
+  // How many matches cycle 1 took, its tiebreak among them if it needed one: read off the run
+  // that never died rather than assumed, since which cycles tie depends on the decks.
+  const inCycleOne = snapshot?.cycles[0]?.matches ?? 0;
 
   /** Plays until the store's `method` has been called `call` times, then dies. */
   const dieAt = async (name: string, method: 'saveMatch' | 'finishCycle', call: number) => {
@@ -197,8 +200,8 @@ describe('a process that dies mid-run, and the one that resumes it', async () =>
   };
 
   it('dying mid-cycle leaves the matches before it, and the resume plays on to the same end', async () => {
-    // The fourth write is cycle 2's second match: the first of that cycle was saved.
-    const { between, after, store } = await dieAt('mid-cycle.db', 'saveMatch', 4);
+    // Dies writing cycle 2's second match: the first of that cycle was saved.
+    const { between, after, store } = await dieAt('mid-cycle.db', 'saveMatch', inCycleOne + 2);
     expect(between?.cycles).toHaveLength(1);
     expect(between?.current?.number).toBe(2);
     expect(between?.current?.matches).toHaveLength(1);
@@ -232,7 +235,7 @@ describe('a process that dies mid-run, and the one that resumes it', async () =>
   it('dying before a cycle is finished replays the deck change to the same change', async () => {
     const { between, after } = await dieAt('before-finish.db', 'finishCycle', 1);
     expect(between?.cycles).toEqual([]);
-    expect(between?.current?.matches).toHaveLength(settings.matchesPerCycle);
+    expect(between?.current?.matches).toHaveLength(inCycleOne);
     expect(essence(after)).toEqual(essence(snapshot));
   });
 });

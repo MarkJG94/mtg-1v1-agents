@@ -19,6 +19,7 @@ import { counterObject } from '../stack.js';
 import type { GameState } from '../state/game-state.js';
 import { withCounters } from '../state/object.js';
 import {
+  attachObject,
   createObject,
   objectsIn,
   setZone,
@@ -28,6 +29,7 @@ import {
 } from '../state/update.js';
 import { keywords as keywordSet } from '../targeting.js';
 import { addDelayedTrigger } from '../triggers.js';
+import { canAttach } from './attach.js';
 import { abilityById } from './definition.js';
 import {
   definitionFor,
@@ -354,7 +356,15 @@ const applyOp = (
       const attachment = resolveObjects(state, context, effect.attachment)[0];
       const to = resolveObjects(state, context, effect.to)[0];
       if (attachment === undefined || to === undefined) return state;
-      return attachTo(state, attachment, to);
+      const object = state.objects.get(attachment);
+      const host = state.objects.get(to);
+      // CR 701.3b: an attempt to attach to something it could not legally be attached to
+      // does nothing, and it stays where it was.
+      if (object === undefined || host === undefined || object.zone !== 'battlefield') {
+        return state;
+      }
+      if (!canAttach(state, object, host)) return state;
+      return attachObject(state, attachment, to);
     }
 
     // --- Continuous effects ---
@@ -659,24 +669,6 @@ const withEffectOnEach = (
     }).state;
   }
   return current;
-};
-
-const attachTo = (state: GameState, attachment: ObjectId, to: ObjectId): GameState => {
-  const previous = state.objects.get(attachment)?.attachedTo ?? null;
-  let current = state;
-  if (previous !== null && current.objects.has(previous)) {
-    const host = current.objects.get(previous);
-    if (host !== undefined) {
-      current = updateObject(current, previous, {
-        attachments: host.attachments.filter((each) => each !== attachment),
-      });
-    }
-  }
-  const host = current.objects.get(to);
-  if (host === undefined) return current;
-  return updateObject(updateObject(current, attachment, { attachedTo: to }), to, {
-    attachments: [...host.attachments, attachment],
-  });
 };
 
 /**

@@ -717,8 +717,12 @@ describe('the new-run form', async () => {
 
 describe('card images', async () => {
   const detail = await call(runDetailSchema, { method: 'GET', url: run });
-  const played = detail.decks.A.deck.main[0]?.oracleId ?? '';
-  const printing = pool.find((card) => card.oracleId === played)?.id;
+  // A card with one printing in the pool, so which printing the image is fetched by is not
+  // a question this test has to answer: basic lands are in both fixture files.
+  const printings = (oracleId: string) => pool.filter((card) => card.oracleId === oracleId);
+  const played =
+    detail.decks.A.deck.main.find((slot) => printings(slot.oracleId).length === 1)?.oracleId ?? '';
+  const printing = printings(played)[0]?.id;
 
   it('fetches a card’s image from Scryfall once, by its printing, then serves it from disk', async () => {
     const first = await app.inject({ method: 'GET', url: `/img/${played}` });

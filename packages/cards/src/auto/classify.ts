@@ -118,6 +118,19 @@ export const classifyLine = (line: OracleLine, types: readonly CardType[]): Clas
     return say('replacement', 'it says how something happens instead (CR 614)');
   }
 
+  // "Equip {2}" is shorthand for an activated ability, and CR 702.6a says which: the cost,
+  // then "Attach this permanent to target creature you control. Activate only as a
+  // sorcery." So it is classified as that, with that as its effect, and the grammar reads
+  // it like any other activated ability. Only a mana cost: "Equip—Sacrifice a creature"
+  // and "Equip legendary creature {1}" are other shapes.
+  const equip = /^equip ((?:\{[^}]+\})+)$/i.exec(text);
+  if (equip !== null) {
+    return say('activated', 'equip is an activated ability (CR 702.6a)', {
+      cost: equip[1] ?? '',
+      effect: 'Attach ~ to target creature you control. Activate only as a sorcery.',
+    });
+  }
+
   const shape = unreadableShape(text);
   if (shape !== null) return say('unknown', shape);
 

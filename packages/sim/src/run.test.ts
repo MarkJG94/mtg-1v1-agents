@@ -184,6 +184,9 @@ describe('a run', async () => {
 
 describe('a crash, and the resume after it (docs/06 "Resume protocol")', async () => {
   const { snapshot } = await reference;
+  // How many matches cycle 1 took, its tiebreak among them if it needed one: read off the run
+  // that never crashed rather than assumed, since which cycles tie depends on the decks.
+  const inCycleOne = snapshot?.cycles[0]?.matches ?? 0;
   const resumeAfter = async (at: Parameters<typeof crashing>[1]) => {
     const inner = await fresh();
     await expect(
@@ -197,10 +200,10 @@ describe('a crash, and the resume after it (docs/06 "Resume protocol")', async (
   };
 
   it('resumes after a checkpoint to exactly the run that never crashed', async () => {
-    // The third match is the first of cycle 2; the crash follows its write.
+    // The first match of cycle 2; the crash follows its write.
     const { between, resumed, after } = await resumeAfter({
       method: 'saveMatch',
-      call: 3,
+      call: inCycleOne + 1,
       after: true,
     });
     expect(between?.cycles).toHaveLength(1);
@@ -219,7 +222,7 @@ describe('a crash, and the resume after it (docs/06 "Resume protocol")', async (
   it('replays a deck change a crash interrupted, to the same change', async () => {
     const { between, after } = await resumeAfter({ method: 'finishCycle', call: 1, after: false });
     expect(between?.cycles).toEqual([]);
-    expect(between?.current?.matches).toHaveLength(settings.matchesPerCycle);
+    expect(between?.current?.matches).toHaveLength(inCycleOne);
     expect(essence(after)).toEqual(essence(snapshot));
   });
 
@@ -231,7 +234,7 @@ describe('a crash, and the resume after it (docs/06 "Resume protocol")', async (
       saveMatch: async (...args) => {
         await inner.saveMatch(...args);
         saved += 1;
-        if (saved === 3) await inner.setStatus('run-1', 'paused');
+        if (saved === inCycleOne + 1) await inner.setStatus('run-1', 'paused');
       },
     };
     const first = await driveRun({ store: pausing, cards, runId: 'run-1', cycles: CYCLES });

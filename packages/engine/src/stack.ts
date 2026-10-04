@@ -250,6 +250,16 @@ export const resolveTopOfStack = (state: GameState, emitter: EventEmitter): Game
   const cleared = updateObject(state, id, { stack: undefined });
 
   if (destination === 'battlefield') {
+    // An Aura spell's first target is what it enchants (CR 303.4a), and it enters attached
+    // to that, if that is still the object it targeted (CR 303.4f, 400.7).
+    const enchanted =
+      state.definitions.get(object.definitionId)?.enchant === undefined
+        ? undefined
+        : object.stack?.targets[0];
+    const attachTo =
+      enchanted?.kind === 'object' && stillTargeted(state, object.stack, enchanted)
+        ? enchanted.object
+        : undefined;
     return runEvent(cleared, emitter, {
       kind: 'entersBattlefield',
       object: id,
@@ -259,6 +269,7 @@ export const resolveTopOfStack = (state: GameState, emitter: EventEmitter): Game
       // (CR 306.5b). Seeding them into the event rather than setting them afterwards is
       // what lets a Doubling Season see them, since that is a replacement effect.
       counters: object.loyalty === null ? {} : { loyalty: object.loyalty },
+      ...(attachTo !== undefined ? { attachTo } : {}),
     });
   }
 

@@ -59,6 +59,12 @@ export type EffectSelector =
   | { readonly kind: 'object'; readonly object: ObjectId }
   | { readonly kind: 'allCreatures' }
   | { readonly kind: 'allPermanents' }
+  /**
+   * The permanent the source is attached to: "enchanted creature", "equipped creature"
+   * (CR 303.4, 301.5). Whatever it is attached to now, so an Equipment moved to another
+   * creature takes its bonus with it.
+   */
+  | { readonly kind: 'attachedTo' }
   | {
       readonly kind: 'creaturesControlledBy';
       /** `'sourceController'` follows the source if control of it changes. */
@@ -91,6 +97,7 @@ export const effectSelectorKinds = [
   'object',
   'allCreatures',
   'allPermanents',
+  'attachedTo',
   'creaturesControlledBy',
 ] as const satisfies readonly EffectSelector['kind'][];
 

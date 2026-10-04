@@ -1,6 +1,6 @@
 import { Bindings, duration, filter, player, quantity } from './phrases.js';
 import { type ParseFailure, Reader } from './reader.js';
-import { type ScriptEffect, verbs } from './verbs.js';
+import { readKeywords, type ScriptEffect, verbs } from './verbs.js';
 
 /**
  * Parsing a classified line into the pieces a script is made of (docs/03, step 3).
@@ -215,6 +215,15 @@ const controllerOf = (what: unknown): string | null => {
   return typeof who === 'string' ? who : null;
 };
 
+/** The kind of thing a filter names: "creature" for "creatures you control". */
+const nounIs = (what: unknown): string | null => {
+  if (typeof what === 'string') return what;
+  if (typeof what !== 'object' || what === null) return null;
+  const record = what as Record<string, unknown>;
+  const name = record['is'] ?? record['type'];
+  return typeof name === 'string' ? name : null;
+};
+
 // --- Mana abilities ---
 
 /**
@@ -284,39 +293,79 @@ export interface ParsedStatic {
 }
 
 /**
- * "Creatures you control get +1/+1" — an anthem, which is a continuous effect rather than
- * anything that happens (CR 604.1).
+ * A static ability that changes what a creature is (CR 604.1): an anthem — "Creatures you
+ * control get +1/+1" — or what an Aura or Equipment gives the creature it is on —
+ * "Enchanted creature gets +2/+0 and has trample", "Equipped creature has flying"
+ * (CR 303.4, 301.5).
  *
- * A static ability is `affects` and `change` rather than effects, so it has its own rule.
- * Only the anthem shape is here: it is the one docs/03 names as an early target, and the
- * rest of the static templates ("as long as", "can't", "costs {1} less") each want a
- * different part of the layer system.
+ * A static ability is `affects` and `change` rather than effects, and a change is one
+ * thing, so "gets +2/+0 and has trample" is two of them: the first claims the sentence
+ * and the second rides along, because the validator counts a sentence claimed once. The
+ * rest of the static templates ("as long as", "can't", "costs {1} less", "for each") each
+ * want a different part of the layer system and are left unread.
  */
-export const parseStatic = (sentence: string): ParsedStatic | null => {
+export const parseStatic = (sentence: string): readonly ParsedStatic[] | null => {
   const reader = Reader.of(sentence);
 
-  // "Creatures you control" with no determiner in front of it: a bare plural means all of
-  // them, which is how every anthem is written.
-  const what = filter(reader);
-  if (what === null) return null;
-  if (reader.anyWord('get', 'gets') === null) return null;
+  const affects = staticSubject(reader);
+  if (affects === null) return null;
 
-  const change = reader.match(/([+-]\d+)\/([+-]\d+)/);
-  if (change === null) return null;
+  const statics: ParsedStatic[] = [];
+  if (reader.anyWord('get', 'gets') !== null) {
+    const change = reader.match(/([+-]\d+)\/([+-]\d+)/);
+    if (change === null) return null;
+    statics.push({
+      affects,
+      change: {
+        kind: 'modifyPowerToughness',
+        power: Number(change[1]) || 0,
+        toughness: Number(change[2]) || 0,
+      },
+    });
+    if (!reader.try(() => (reader.word('and') ? true : null))) {
+      reader.punctuation();
+      return reader.done ? statics : null;
+    }
+  }
+
+  if (reader.anyWord('has', 'have') === null) return null;
+  const keywords = readKeywords(reader);
+  if (keywords.length === 0) return null;
   reader.punctuation();
   if (!reader.done) return null;
+  return [
+    ...statics,
+    ...keywords.map((keyword) => ({ affects, change: { kind: 'addKeyword', keyword } })),
+  ];
+};
 
-  const who = controllerOf(what);
-  if (who !== 'you') return null;
+/** Who a static ability is about: the creature this is attached to, or your creatures. */
+const staticSubject = (reader: Reader): Readonly<Record<string, unknown>> | null => {
+  const attached = reader.try(() =>
+    reader.anyWord('enchanted', 'equipped') !== null && reader.word('creature') ? true : null,
+  );
+  if (attached !== null) return { kind: 'attachedTo' };
 
-  return {
-    affects: { kind: 'creaturesControlledBy', player: 'sourceController' },
-    change: {
-      kind: 'modifyPowerToughness',
-      power: Number(change[1]) || 0,
-      toughness: Number(change[2]) || 0,
-    },
-  };
+  // "Creatures you control" with no determiner in front of it: a bare plural means all of
+  // them, which is how every anthem is written. One that helps everybody's is not read.
+  const what = filter(reader);
+  if (what === null || controllerOf(what) !== 'you') return null;
+  if (nounIs(what) !== 'creature') return null;
+  return { kind: 'creaturesControlledBy', player: 'sourceController' };
+};
+
+/**
+ * "Enchant creature", "Enchant land you control" — an Aura's enchant ability (CR 702.5a),
+ * as the filter the script's `enchant:` takes. Only objects: "Enchant player" is an Aura
+ * attached to a player, which the engine does not do.
+ */
+export const parseEnchant = (sentence: string): unknown | null => {
+  const reader = Reader.of(sentence);
+  if (!reader.word('enchant')) return null;
+  const what = filter(reader);
+  if (what === null || JSON.stringify(what).includes('player')) return null;
+  reader.punctuation();
+  return reader.done ? what : null;
 };
 
 // --- Replacements ---

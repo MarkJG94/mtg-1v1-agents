@@ -259,6 +259,23 @@ const keywordGrant = (reader: Reader, what: ObjectPhrase): readonly ScriptEffect
   );
 };
 
+/** "flying", "flying and vigilance", "flying, first strike, and lifelink". */
+export const readKeywords = (reader: Reader): readonly GrantableKeyword[] => {
+  const keywords: GrantableKeyword[] = [];
+  for (;;) {
+    const keyword = readKeyword(reader);
+    if (keyword === null) break;
+    keywords.push(keyword);
+    const joined = reader.try(() => {
+      const comma = reader.word(',');
+      const and = reader.word('and');
+      return comma || and ? true : null;
+    });
+    if (joined === null) break;
+  }
+  return keywords;
+};
+
 /** A keyword as a card prints it, which may be two words ("first strike"). */
 const readKeyword = (reader: Reader): GrantableKeyword | null =>
   reader.try(() => {
@@ -316,6 +333,22 @@ const counters: Verb = (reader, bindings) => {
     counter: kind[0],
     amount,
   }));
+};
+
+/**
+ * "Attach ~ to target creature you control." — what equip means (CR 702.6a), and the verb
+ * an Aura or Equipment moving itself uses (CR 701.3a). One thing attached to one thing:
+ * "attach all Equipment you control" is a different shape this does not read.
+ */
+const attach: Verb = (reader, bindings) => {
+  if (!reader.word('attach')) return null;
+  const what = object(reader, bindings);
+  if (what === null || what.kind !== 'ref') return reader.stopped('an attachment this cannot name');
+  if (!reader.word('to')) return reader.stopped('"attach" is not followed by "to"');
+  const to = object(reader, bindings);
+  if (to === null || to.kind !== 'ref')
+    return reader.stopped('attached to something this cannot read');
+  return [{ op: 'attach', attachment: what.ref, to: to.ref }];
 };
 
 /** "Gain control of target creature until end of turn." */
@@ -437,6 +470,7 @@ export const verbs: readonly Verb[] = [
   tapping,
   counters,
   control,
+  attach,
   mana,
   token,
   cards,

@@ -92,6 +92,14 @@ const definitionFrom = (script: CardScript): CardDefinition => {
     );
   }
 
+  // `enchant` on anything but an Aura is a card the rules never read it on (CR 702.5a).
+  // An Aura *without* one is not refused here: its "Enchant …" line is then unclaimed, so
+  // the validator calls it partial and it is never played — unfinished, rather than wrong.
+  const aura = script.subtypes?.includes('aura') ?? false;
+  if (!aura && script.enchant !== undefined) {
+    throw new ScriptError(script.name, 'enchant', 'only an Aura has an enchant ability');
+  }
+
   return {
     oracleId: asOracleId(script.oracleId),
     name: script.name,
@@ -106,6 +114,7 @@ const definitionFrom = (script: CardScript): CardDefinition => {
     keywords: keywordSet(Object.fromEntries(script.keywords.map((each) => [each, true]))),
     ...(script.flash !== undefined ? { flash: script.flash } : {}),
     ...(script.splitSecond !== undefined ? { splitSecond: script.splitSecond } : {}),
+    ...(script.enchant !== undefined ? { enchant: script.enchant } : {}),
     abilities: script.abilities.map((ability, index) =>
       abilityFrom(script, ability, `abilities[${index}]`),
     ),
