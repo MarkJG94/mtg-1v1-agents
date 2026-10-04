@@ -135,7 +135,9 @@ jobs:
           path: apps/smoke/playwright-report/
 
   docker:
-    name: Docker image builds and runs
+    # The name is the one the repository ruleset requires: it builds the image, runs it,
+    # and smokes it (docs/09 "CI").
+    name: Docker image builds
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
