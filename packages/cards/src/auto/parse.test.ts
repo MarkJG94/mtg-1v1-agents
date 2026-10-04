@@ -384,7 +384,7 @@ describe('the parts that are not effects', () => {
     expect(parseTrigger('At the beginning of your first main phase, draw a card.')).toHaveProperty(
       'failure',
     );
-    expect(parseTrigger('At the beginning of combat on your turn, draw a card.')).toHaveProperty(
+    expect(parseTrigger('At the beginning of your draw step, draw a card.')).toHaveProperty(
       'failure',
     );
   });
@@ -495,6 +495,112 @@ describe('the parts that are not effects', () => {
   it('refuses a cost it can only read half of', () => {
     expect(parseCost('{1}, Discard a card')).toBeNull();
     expect(parseCost('{T}, Pay 3 life')).toBeNull();
+  });
+});
+
+describe('the trigger vocabulary 7.1 widened', () => {
+  const when = (sentence: string) => {
+    const parsed = parseTrigger(sentence);
+    return 'when' in parsed ? parsed.when : parsed;
+  };
+
+  it('reads the beginning of combat, and says whose (CR 507.1)', () => {
+    expect(when('At the beginning of combat on your turn, draw a card.')).toEqual({
+      kind: 'beginningOfCombat',
+      whose: 'self',
+    });
+    expect(when('At the beginning of each combat, draw a card.')).toEqual({
+      kind: 'beginningOfCombat',
+      whose: 'any',
+    });
+  });
+
+  it('reads an opponent’s step, and "the end step" as every one', () => {
+    expect(when("At the beginning of each opponent's upkeep, draw a card.")).toEqual({
+      kind: 'beginningOfUpkeep',
+      whose: 'opponent',
+    });
+    expect(when('At the beginning of the end step, sacrifice ~.')).toEqual({
+      kind: 'beginningOfEndStep',
+      whose: 'any',
+    });
+  });
+
+  it('reads "that player" in an opponent’s step as that opponent', () => {
+    expect(
+      parseTrigger("At the beginning of each opponent's upkeep, that player loses 1 life."),
+    ).toMatchObject({ ability: { effects: [{ op: 'loseLife', player: 'opponent' }] } });
+  });
+
+  it('leaves "that player" unread when the step is either player’s', () => {
+    expect(
+      parseTrigger("At the beginning of each player's upkeep, that player loses 1 life."),
+    ).toHaveProperty('failure');
+  });
+
+  it('reads the older wordings of entering and dying as the same triggers', () => {
+    expect(when('When ~ enters the battlefield, draw a card.')).toEqual({
+      kind: 'selfEntersBattlefield',
+    });
+    expect(when('When ~ is put into a graveyard from the battlefield, draw a card.')).toEqual({
+      kind: 'selfDies',
+    });
+    expect(when('When ~ is put into your graveyard from the battlefield, draw a card.')).toEqual({
+      kind: 'selfDies',
+    });
+  });
+
+  it('reads becoming blocked, but not becoming blocked by something (CR 509.3c)', () => {
+    expect(when('Whenever ~ becomes blocked, draw a card.')).toEqual({
+      kind: 'selfBecomesBlocked',
+    });
+    expect(parseTrigger('Whenever ~ becomes blocked by a creature, draw a card.')).toHaveProperty(
+      'failure',
+    );
+  });
+
+  it('reads gaining life, yours or an opponent’s (CR 119.10)', () => {
+    expect(when('Whenever you gain life, draw a card.')).toEqual({
+      kind: 'lifeGained',
+      player: 'you',
+    });
+    expect(when('Whenever an opponent gains life, draw a card.')).toEqual({
+      kind: 'lifeGained',
+      player: 'opponent',
+    });
+    expect(when('Whenever a player gains life, draw a card.')).toEqual({
+      kind: 'lifeGained',
+      player: 'any',
+    });
+  });
+
+  it('reads casting a spell, and what kind of spell (CR 601.2i)', () => {
+    expect(when('Whenever you cast a spell, draw a card.')).toEqual({
+      kind: 'spellCast',
+      caster: 'you',
+    });
+    expect(when('Whenever you cast an instant or sorcery spell, draw a card.')).toEqual({
+      kind: 'spellCast',
+      caster: 'you',
+      filter: { or: [{ type: 'instant' }, { type: 'sorcery' }] },
+    });
+    expect(when('Whenever an opponent casts a noncreature spell, draw a card.')).toEqual({
+      kind: 'spellCast',
+      caster: 'opponent',
+      filter: { not: { type: 'creature' } },
+    });
+    // A creature spell is a type, not "a creature", which is one on the battlefield.
+    expect(when('Whenever a player casts a creature spell, draw a card.')).toEqual({
+      kind: 'spellCast',
+      caster: 'any',
+      filter: { type: 'creature' },
+    });
+  });
+
+  it('refuses a kind of spell it does not know', () => {
+    expect(parseTrigger('Whenever you cast a multicolored spell, draw a card.')).toHaveProperty(
+      'failure',
+    );
   });
 });
 

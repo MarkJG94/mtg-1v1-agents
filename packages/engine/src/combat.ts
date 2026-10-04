@@ -12,7 +12,12 @@ import type { DamageEvent } from './events/rules-event.js';
 import type { GameState } from './state/game-state.js';
 import { getObject, objectsIn, updateObjects, updateState } from './state/update.js';
 import type { Keywords } from './targeting.js';
-import { queueTriggers, triggersFromAttack, triggersFromBlock } from './triggers.js';
+import {
+  queueTriggers,
+  triggersFromAttack,
+  triggersFromBecomingBlocked,
+  triggersFromBlock,
+} from './triggers.js';
 
 /**
  * Combat (CR 506-511).
@@ -268,6 +273,10 @@ export const declareBlockers = (
   }
   for (const { blocker, blocking } of declarations) {
     if (blocking.length > 0) next = queueTriggers(next, triggersFromBlock(next, blocker));
+  }
+  // Once for each attacker that is blocked, however many block it (CR 509.3c).
+  for (const attacker of blockersOf.keys()) {
+    next = queueTriggers(next, triggersFromBecomingBlocked(next, attacker));
   }
   return next;
 };

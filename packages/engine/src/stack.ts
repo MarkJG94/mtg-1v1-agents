@@ -20,6 +20,7 @@ import {
   updateObject,
 } from './state/update.js';
 import { canBeTargeted, type TargetSource } from './targeting.js';
+import { queueTriggers, triggersFromCast } from './triggers.js';
 
 /**
  * The stack (CR 405).
@@ -159,10 +160,14 @@ export const putOnStack = (
   });
   emitter.emit(moved, { type: 'putOnStack', object: id });
 
+  // "Whenever you cast …" triggers as the spell becomes cast (CR 601.2i), and goes on the
+  // stack above it before anyone has priority.
+  const cast = queueTriggers(moved, triggersFromCast(moved, id, player));
+
   // The caster receives priority again (CR 117.3c), and the pass count restarts because
   // a spell went on the stack. Handing priority back here rather than leaving the caller
   // to do it keeps the state always answerable.
-  return withPriority(moved, player, { passesInARow: 0 });
+  return withPriority(cast, player, { passesInARow: 0 });
 };
 
 /** Each object target's timestamp now: what it must still have when the spell resolves. */

@@ -12,7 +12,7 @@
 - Lands: basics, duals, shocks, fetches, checklands, fastlands, painlands, Wasteland-style effects; land drops per turn; sacrifice-and-search.
 - Combat (CR 506–511): attack/block declaration, menace, multiple blockers, damage assignment order, first/double strike, trample, deathtouch, lifelink, flying/reach, vigilance, haste, defender, indestructible, hexproof/shroud/protection, ward.
 - State-based actions (CR 704) and the legend rule.
-- Triggered abilities (CR 603) with APNAP ordering, intervening-if, ETB/LTB/dies/attacks/blocks/upkeep/end-step/cast triggers, and delayed triggers.
+- Triggered abilities (CR 603) with APNAP ordering, intervening-if, ETB/LTB/dies/attacks/blocks/upkeep/end-step/cast triggers, and delayed triggers. *(As built in 7.1: also the beginning of combat, a step of the opponent's, becoming blocked — once however many block (CR 509.3c) — gaining life, once per life-gain event (CR 119.10, which is why lifelink gains one event per source), and casting a spell, as it becomes cast and with a filter on the spell (CR 601.2i).)*
 - Static abilities and continuous effects with the **layer system** (CR 613): copy, control, text-changing, type, colour, ability add/remove, P/T (set / modify / counters / switch), timestamps and dependency.
 - Planeswalkers (CR 306, 606): they enter with loyalty counters equal to their printed loyalty, damage to them removes that many counters, they can be attacked directly (CR 508.1a), the pre-2018 redirect rule is gone, loyalty abilities cost counters and are sorcery-speed and once per permanent per turn, and zero loyalty is a state-based action.
 - Counters (+1/+1, −1/−1, loyalty, charge, generic), tokens, copies of permanents.

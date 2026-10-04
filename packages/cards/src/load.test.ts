@@ -134,6 +134,54 @@ describe('loading a card script', () => {
   });
 });
 
+describe('trigger conditions', () => {
+  const watcher = (when: unknown) =>
+    loadCardScript({
+      ...bolt,
+      types: ['enchantment'],
+      abilities: [
+        {
+          kind: 'triggered',
+          id: 'watch',
+          when,
+          effects: [{ op: 'draw', player: 'you', count: 1 }],
+        },
+      ],
+    }).abilities[0];
+
+  it('converts a filter in a trigger condition as it would any other', () => {
+    expect(
+      watcher({
+        kind: 'spellCast',
+        caster: 'you',
+        filter: { or: [{ type: 'instant' }, { type: 'sorcery' }] },
+      }),
+    ).toMatchObject({
+      when: {
+        kind: 'spellCast',
+        filter: {
+          kind: 'or',
+          filters: [
+            { kind: 'type', type: 'instant' },
+            { kind: 'type', type: 'sorcery' },
+          ],
+        },
+      },
+    });
+  });
+
+  it('refuses a filter in a trigger condition that is not one', () => {
+    expect(() => watcher({ kind: 'spellCast', caster: 'you', filter: {} })).toThrow(ScriptError);
+  });
+
+  it('takes an opponent’s step, and the beginning of combat', () => {
+    expect(watcher({ kind: 'beginningOfUpkeep', whose: 'opponent' })).toMatchObject({
+      when: { whose: 'opponent' },
+    });
+    expect(() => watcher({ kind: 'beginningOfCombat' })).toThrow(/whose/);
+  });
+});
+
 describe('what the loader refuses', () => {
   const broken = (abilities: unknown) => () => loadCardScript({ ...bolt, abilities });
 
@@ -152,8 +200,8 @@ describe('what the loader refuses', () => {
   });
 
   /**
-   * The engine decides whether a step trigger fires with `whose === 'any' ||
-   * controller === activePlayer`, so a script that leaves `whose` out gets "your upkeep"
+   * The engine decides whether a step trigger fires from `whose` — the controller's step,
+   * the opponent's, or any — so a script that leaves `whose` out gets "your upkeep"
    * by accident and the type that says it is required never sees the object. An
    * auto-scripter meaning "each player's upkeep" would silently produce a trigger that
    * fires on one of them.

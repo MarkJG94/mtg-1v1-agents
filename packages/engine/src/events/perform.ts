@@ -19,7 +19,12 @@ import {
   updatePlayer,
   updateState,
 } from '../state/update.js';
-import { queueTriggers, triggersFromCombatDamage, triggersFromZoneChange } from '../triggers.js';
+import {
+  queueTriggers,
+  triggersFromCombatDamage,
+  triggersFromLifeGain,
+  triggersFromZoneChange,
+} from '../triggers.js';
 import type { EventEmitter } from './emitter.js';
 import type { DamageEvent, LifeEvent, RulesEvent } from './rules-event.js';
 
@@ -97,13 +102,24 @@ export const performEvents = (
   return lifelink.length > 0 ? runBatch(next, emitter, { kind: 'plain' }, lifelink) : next;
 };
 
+/**
+ * The life lifelink gains, one event per source (CR 119.10): two lifelink creatures
+ * dealing combat damage together are two life gains, and "whenever you gain life"
+ * triggers for each. One source dealing damage to several things is still one.
+ */
 const lifelinkGains = (damage: readonly DamageEvent[]): readonly LifeEvent[] => {
-  const byPlayer = new Map<PlayerId, number>();
+  const bySource = new Map<ObjectId, { player: PlayerId; amount: number }>();
   for (const event of damage) {
     if (!event.lifelink || event.amount <= 0) continue;
-    byPlayer.set(event.controller, (byPlayer.get(event.controller) ?? 0) + event.amount);
+    const gained = bySource.get(event.source);
+    bySource.set(event.source, {
+      player: event.controller,
+      amount: (gained?.amount ?? 0) + event.amount,
+    });
   }
-  return [...byPlayer].map(([player, amount]) => ({ kind: 'gainLife', player, amount }) as const);
+  return [...bySource.values()].map(
+    ({ player, amount }) => ({ kind: 'gainLife', player, amount }) as const,
+  );
 };
 
 /**
@@ -339,7 +355,10 @@ const applyLife = (state: GameState, emitter: EventEmitter, event: LifeEvent): G
     to,
     reason: event.kind === 'gainLife' ? 'gain' : 'loss',
   });
-  return next;
+  // "Whenever you gain life": once for this event, which gained more than 0 (CR 119.10).
+  return event.kind === 'gainLife'
+    ? queueTriggers(next, triggersFromLifeGain(next, event.player))
+    : next;
 };
 
 /** CR 122.1: poison counters sit on the player; ten of them is a loss (CR 704.5c). */

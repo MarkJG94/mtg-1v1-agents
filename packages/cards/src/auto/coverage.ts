@@ -4,6 +4,7 @@ import type { CardProjection } from '../scryfall.js';
 import { validateScript } from '../validate.js';
 import { classifyCard } from './classify.js';
 import { emitScript } from './emit.js';
+import { parseTrigger, triggerConditionUnread } from './parse.js';
 
 /**
  * `pnpm cards:coverage` — how much of Magic the auto-scripter can read (docs/03).
@@ -132,7 +133,7 @@ export const measureCoverage = (
     counts.sentencesFallout += read.fallout;
 
     for (const unread of read.failures) {
-      const pattern = patternOf(unread);
+      const pattern = failingPattern(unread);
       const bucket = buckets.get(pattern) ?? {
         count: 0,
         finishes: 0,
@@ -145,7 +146,7 @@ export const measureCoverage = (
 
     // `finishes` counts cards, not sentences: a card whose unread sentences are all the
     // same shape is one template away, however many of them there are.
-    const shapes = new Set(read.failures.map(patternOf));
+    const shapes = new Set(read.failures.map(failingPattern));
     const [only] = shapes;
     if (shapes.size === 1 && only !== undefined) {
       const bucket = buckets.get(only);
@@ -290,3 +291,25 @@ export const patternOf = (sentence: string): string =>
     .slice(0, WORDS)
     .join(' ')
     .replace(/[.,;:]$/, '');
+
+/**
+ * The template an unread sentence is waiting on, which for a trigger is not its first
+ * words.
+ *
+ * A trigger whose condition reads is held up by its body, and its bodies are as varied
+ * as all of Magic: grouped by their first words, "At the beginning of your upkeep, …" was
+ * one row of seven hundred sentences that no one template would ever finish, and the
+ * combat-damage trigger, its row promising 205 cards, finished 22. So once the condition
+ * reads, the row is the body — `…, you may pay {M}` — and bodies alike count together
+ * whatever their trigger. A trigger whose condition does not read keeps its first words,
+ * which is where the condition is.
+ */
+export const failingPattern = (sentence: string): string => {
+  if (!/^(when|whenever|at) /i.test(sentence)) return patternOf(sentence);
+  const read = parseTrigger(sentence);
+  if (!('failure' in read) || read.failure.reason === triggerConditionUnread) {
+    return patternOf(sentence);
+  }
+  const comma = sentence.indexOf(',');
+  return comma < 0 ? patternOf(sentence) : `…, ${patternOf(sentence.slice(comma + 1).trim())}`;
+};

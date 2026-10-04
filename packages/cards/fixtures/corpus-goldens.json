@@ -371,10 +371,8 @@
     }
   },
   "Ajani's Pridemate": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Whenever you gain life, put a +1/+1 counter on this creature.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "95e94dea-5ac0-4d6f-adec-ca147aee861f",
       "name": "Ajani's Pridemate",
@@ -392,7 +390,27 @@
       "power": 2,
       "toughness": 2,
       "text": "Whenever you gain life, put a +1/+1 counter on this creature.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-0",
+          "covers": [
+            0
+          ],
+          "when": {
+            "kind": "lifeGained",
+            "player": "you"
+          },
+          "effects": [
+            {
+              "op": "addCounters",
+              "object": "~",
+              "counter": "+1/+1",
+              "amount": 1
+            }
+          ]
+        }
+      ]
     }
   },
   "Alluring Siren": {
@@ -448,10 +466,8 @@
     }
   },
   "Angel's Feather": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Whenever a player casts a white spell, you may gain 1 life.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "3d0d4ba4-d5aa-4d9f-89ab-46687637fecf",
       "name": "Angel's Feather",
@@ -461,7 +477,35 @@
       ],
       "colours": [],
       "text": "Whenever a player casts a white spell, you may gain 1 life.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-0",
+          "covers": [
+            0
+          ],
+          "when": {
+            "kind": "spellCast",
+            "caster": "any",
+            "filter": {
+              "colour": "W"
+            }
+          },
+          "effects": [
+            {
+              "op": "may",
+              "player": "you",
+              "effects": [
+                {
+                  "op": "gainLife",
+                  "player": "you",
+                  "amount": 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   "Angel's Mercy": {
@@ -578,10 +622,8 @@
     }
   },
   "Arc Runner": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 1 is not claimed by any ability: \"At the beginning of the end step, sacrifice this creature.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "9bbee1a5-2eb0-4fad-9524-4ad9cc5ca998",
       "name": "Arc Runner",
@@ -602,7 +644,25 @@
         "haste"
       ],
       "text": "Haste (This creature can attack and {T} as soon as it comes under your control.)\nAt the beginning of the end step, sacrifice this creature.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-1",
+          "covers": [
+            1
+          ],
+          "when": {
+            "kind": "beginningOfEndStep",
+            "whose": "any"
+          },
+          "effects": [
+            {
+              "op": "sacrifice",
+              "object": "~"
+            }
+          ]
+        }
+      ]
     }
   },
   "Armored Ascension": {
@@ -835,10 +895,8 @@
     }
   },
   "Ball Lightning": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 2 is not claimed by any ability: \"At the beginning of the end step, sacrifice this creature.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "7485cf25-eb41-4397-be13-7f0b8c10c70a",
       "name": "Ball Lightning",
@@ -859,7 +917,25 @@
         "haste"
       ],
       "text": "Trample (This creature can deal excess combat damage to the player or planeswalker it's attacking.)\nHaste (This creature can attack and {T} as soon as it comes under your control.)\nAt the beginning of the end step, sacrifice this creature.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-2",
+          "covers": [
+            2
+          ],
+          "when": {
+            "kind": "beginningOfEndStep",
+            "whose": "any"
+          },
+          "effects": [
+            {
+              "op": "sacrifice",
+              "object": "~"
+            }
+          ]
+        }
+      ]
     }
   },
   "Baneslayer Angel": {
@@ -2423,10 +2499,8 @@
     }
   },
   "Demon's Horn": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Whenever a player casts a black spell, you may gain 1 life.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "ee38377f-8d3a-402e-a5d7-a01cfe3a5322",
       "name": "Demon's Horn",
@@ -2436,7 +2510,35 @@
       ],
       "colours": [],
       "text": "Whenever a player casts a black spell, you may gain 1 life.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-0",
+          "covers": [
+            0
+          ],
+          "when": {
+            "kind": "spellCast",
+            "caster": "any",
+            "filter": {
+              "colour": "B"
+            }
+          },
+          "effects": [
+            {
+              "op": "may",
+              "player": "you",
+              "effects": [
+                {
+                  "op": "gainLife",
+                  "player": "you",
+                  "amount": 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   "Destructive Force": {
@@ -2749,10 +2851,8 @@
     }
   },
   "Dragon's Claw": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Whenever a player casts a red spell, you may gain 1 life.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "bd8d707d-1201-42c6-bce6-fbda12ce5ea8",
       "name": "Dragon's Claw",
@@ -2762,7 +2862,35 @@
       ],
       "colours": [],
       "text": "Whenever a player casts a red spell, you may gain 1 life.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-0",
+          "covers": [
+            0
+          ],
+          "when": {
+            "kind": "spellCast",
+            "caster": "any",
+            "filter": {
+              "colour": "R"
+            }
+          },
+          "effects": [
+            {
+              "op": "may",
+              "player": "you",
+              "effects": [
+                {
+                  "op": "gainLife",
+                  "player": "you",
+                  "amount": 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   "Dragonskull Summit": {
@@ -5483,10 +5611,8 @@
     }
   },
   "Kraken's Eye": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Whenever a player casts a blue spell, you may gain 1 life.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "14a21d8a-2097-4150-8af5-8c155049477a",
       "name": "Kraken's Eye",
@@ -5496,7 +5622,35 @@
       ],
       "colours": [],
       "text": "Whenever a player casts a blue spell, you may gain 1 life.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-0",
+          "covers": [
+            0
+          ],
+          "when": {
+            "kind": "spellCast",
+            "caster": "any",
+            "filter": {
+              "colour": "U"
+            }
+          },
+          "effects": [
+            {
+              "op": "may",
+              "player": "you",
+              "effects": [
+                {
+                  "op": "gainLife",
+                  "player": "you",
+                  "amount": 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   "Lava Axe": {
@@ -6441,10 +6595,8 @@
     }
   },
   "Mesa Enchantress": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Whenever you cast an enchantment spell, you may draw a card.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "8f4b8a19-72f4-48ed-ac05-62a7c7525797",
       "name": "Mesa Enchantress",
@@ -6462,7 +6614,35 @@
       "power": 0,
       "toughness": 2,
       "text": "Whenever you cast an enchantment spell, you may draw a card.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-0",
+          "covers": [
+            0
+          ],
+          "when": {
+            "kind": "spellCast",
+            "caster": "you",
+            "filter": {
+              "type": "enchantment"
+            }
+          },
+          "effects": [
+            {
+              "op": "may",
+              "player": "you",
+              "effects": [
+                {
+                  "op": "draw",
+                  "player": "you",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   "Might of Oaks": {
@@ -6749,10 +6929,8 @@
     }
   },
   "Mold Adder": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Whenever an opponent casts a blue or black spell, you may put a +1/+1 counter on this creature.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "2091eb7e-2357-4ef8-b15e-1e6f82176340",
       "name": "Mold Adder",
@@ -6770,7 +6948,43 @@
       "power": 1,
       "toughness": 1,
       "text": "Whenever an opponent casts a blue or black spell, you may put a +1/+1 counter on this creature.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-0",
+          "covers": [
+            0
+          ],
+          "when": {
+            "kind": "spellCast",
+            "caster": "opponent",
+            "filter": {
+              "or": [
+                {
+                  "colour": "U"
+                },
+                {
+                  "colour": "B"
+                }
+              ]
+            }
+          },
+          "effects": [
+            {
+              "op": "may",
+              "player": "you",
+              "effects": [
+                {
+                  "op": "addCounters",
+                  "object": "~",
+                  "counter": "+1/+1",
+                  "amount": 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   "Mountain": {
@@ -11092,10 +11306,8 @@
     }
   },
   "Wurm's Tooth": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Whenever a player casts a green spell, you may gain 1 life.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "69476326-fda5-48c8-a506-e71eb7c81c2f",
       "name": "Wurm's Tooth",
@@ -11105,7 +11317,35 @@
       ],
       "colours": [],
       "text": "Whenever a player casts a green spell, you may gain 1 life.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-0",
+          "covers": [
+            0
+          ],
+          "when": {
+            "kind": "spellCast",
+            "caster": "any",
+            "filter": {
+              "colour": "G"
+            }
+          },
+          "effects": [
+            {
+              "op": "may",
+              "player": "you",
+              "effects": [
+                {
+                  "op": "gainLife",
+                  "player": "you",
+                  "amount": 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   "Xathrid Demon": {
