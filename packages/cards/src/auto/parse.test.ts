@@ -223,11 +223,42 @@ describe('cards and removal', () => {
     ]);
   });
 
-  it('refuses a discard the player chooses, which needs a decision mid-resolution', () => {
-    expect(effectsOf('Target player discards two cards.')).toBeNull();
+  /** The player discarding chooses (CR 701.9b); "at random" nobody does. */
+  it('reads a discard the player chooses apart from one at random', () => {
+    expect(effectsOf('Target player discards two cards.')).toEqual([
+      { op: 'discard', player: '$t', count: 2 },
+    ]);
     expect(effectsOf('Target player discards two cards at random.')).toEqual([
       { op: 'discardAtRandom', player: '$t', count: 2 },
     ]);
+  });
+
+  it('reads "you may", with "if you do" inside it (CR 608.2d)', () => {
+    const parsed = parseEffects([
+      'You may sacrifice ~.',
+      'If you do, draw two cards.',
+      'You gain 1 life.',
+    ]);
+    expect(parsed.ok && parsed.ability.effects).toEqual([
+      {
+        op: 'may',
+        player: 'you',
+        effects: [
+          { op: 'sacrifice', object: '~' },
+          { op: 'draw', player: 'you', count: 2 },
+        ],
+      },
+      { op: 'gainLife', player: 'you', amount: 1 },
+    ]);
+  });
+
+  it('does not read "if you do" after nothing that was optional', () => {
+    const parsed = parseEffects(['Draw a card.', 'If you do, you gain 1 life.']);
+    expect(parsed.ok && parsed.ability.sentencesRead).toBe(1);
+  });
+
+  it('reads a "may" whose action it cannot read as unread, not as an empty may', () => {
+    expect(parseEffects(['You may sacrifice a creature.']).ok).toBe(false);
   });
 });
 

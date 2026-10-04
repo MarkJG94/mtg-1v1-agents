@@ -235,8 +235,29 @@ export const resolveTopOfStack = (state: GameState, emitter: EventEmitter): Game
   if (id === undefined) throw new IllegalStackActionError('the stack is empty');
 
   if (hasFizzled(state, id)) return fizzle(state, emitter, id);
+  return finishResolving(state, emitter, id);
+};
 
+/**
+ * The last part of resolving (CR 608.2n, 608.3): the object leaves the stack for wherever
+ * it goes. Whether it fizzled was decided as it began to resolve (CR 608.2b), and is not
+ * asked again here: by now its own effects may have moved its targets — Doom Blade's
+ * creature is in the graveyard because Doom Blade resolved — and asking again called
+ * every removal spell fizzled in the log.
+ */
+export const finishResolving = (
+  state: GameState,
+  emitter: EventEmitter,
+  id: ObjectId,
+): GameState => {
   const object = getObject(state, id);
+  // A spell its own effects moved off the stack — one that counters itself — is a script
+  // that breaks the game, and the executability smoke test exists to catch exactly that.
+  if (object.zone !== 'stack') {
+    throw new IllegalStackActionError(
+      `object ${id} left the stack while it was resolving, so it cannot finish resolving`,
+    );
+  }
 
   // An ability leaves the game entirely rather than going anywhere (CR 608.2m).
   if (object.stack?.isAbility === true) {

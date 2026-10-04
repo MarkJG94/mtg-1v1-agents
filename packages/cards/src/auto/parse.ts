@@ -59,7 +59,27 @@ export const parseEffects = (
     // player discards a card. Draw a card." is two sentences, and the second one is about
     // you however the first one began.
     bindings.subject = null;
-    const parsed = readSentence(sentence, bindings);
+
+    // "You may sacrifice it. If you do, …": the second sentence happens exactly when the
+    // first does, so it goes inside the same `may` (CR 608.2d).
+    const ifYouDo = /^if (you|they) do, (.*)$/i.exec(sentence.trim());
+    const last = effects.at(-1);
+    if (ifYouDo !== null) {
+      const rest = last?.op === 'may' ? readSentence(ifYouDo[2] ?? '', bindings) : null;
+      if (rest === null || last === undefined) {
+        failure =
+          last?.op === 'may' ? lastFailure : { reason: '"if you do" after no "may"', token: null };
+        break;
+      }
+      effects[effects.length - 1] = {
+        ...last,
+        effects: [...(last['effects'] as ScriptEffect[]), ...rest],
+      };
+      read += 1;
+      continue;
+    }
+
+    const parsed = readMay(sentence, bindings) ?? readSentence(sentence, bindings);
     if (parsed === null) {
       failure = lastFailure;
       break;
@@ -85,6 +105,27 @@ export const parseEffects = (
       ...(failure === null ? {} : { unread: failure }),
     },
   };
+};
+
+/**
+ * "You may draw a card." — "may" and the player it asks, then an ordinary sentence of what
+ * they may do (CR 608.2d). Null when the sentence is not one, so it is read as usual.
+ */
+const readMay = (sentence: string, bindings: Bindings): readonly ScriptEffect[] | null => {
+  const reader = Reader.of(sentence);
+  const mark = bindings.mark();
+  const who = reader.try(() => {
+    const found = player(reader, bindings);
+    return found !== null && reader.word('may') ? found : null;
+  });
+  if (who === null) {
+    bindings.reset(mark);
+    return null;
+  }
+  bindings.subject = who;
+  const effects = readSentence(sentence.slice(reader.offset).trim(), bindings);
+  if (effects === null) return null;
+  return [{ op: 'may', player: who, effects }];
 };
 
 /** Where the most recent sentence gave up, kept for the result above. */

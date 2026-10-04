@@ -329,10 +329,8 @@
     }
   },
   "Ajani's Mantra": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"At the beginning of your upkeep, you may gain 1 life.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "2f47661e-a107-4d98-8773-0a068a63df49",
       "name": "Ajani's Mantra",
@@ -344,7 +342,32 @@
         "W"
       ],
       "text": "At the beginning of your upkeep, you may gain 1 life.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-0",
+          "covers": [
+            0
+          ],
+          "when": {
+            "kind": "beginningOfUpkeep",
+            "whose": "self"
+          },
+          "effects": [
+            {
+              "op": "may",
+              "player": "you",
+              "effects": [
+                {
+                  "op": "gainLife",
+                  "player": "you",
+                  "amount": 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   "Ajani's Pridemate": {
@@ -4158,10 +4181,8 @@
     }
   },
   "Goldenglow Moth": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 1 is not claimed by any ability: \"Whenever this creature blocks, you may gain 4 life.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "8dcfa697-5350-43b9-896f-c5eefcc3893a",
       "name": "Goldenglow Moth",
@@ -4181,7 +4202,31 @@
         "flying"
       ],
       "text": "Flying\nWhenever this creature blocks, you may gain 4 life.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-1",
+          "covers": [
+            1
+          ],
+          "when": {
+            "kind": "selfBlocks"
+          },
+          "effects": [
+            {
+              "op": "may",
+              "player": "you",
+              "effects": [
+                {
+                  "op": "gainLife",
+                  "player": "you",
+                  "amount": 4
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   "Gorgon Flail": {
@@ -5773,7 +5818,6 @@
   "Liliana Vess": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"+1: Target player discards a card.\"",
       "coverage: sentence 1 is not claimed by any ability: \"−2: Search your library for a card, then shuffle and put that card on top.\"",
       "coverage: sentence 2 is not claimed by any ability: \"−8: Put all creature cards from all graveyards onto the battlefield under your control.\""
     ],
@@ -5795,7 +5839,29 @@
       ],
       "loyalty": 5,
       "text": "+1: Target player discards a card.\n−2: Search your library for a card, then shuffle and put that card on top.\n−8: Put all creature cards from all graveyards onto the battlefield under your control.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "loyalty",
+          "id": "auto-loyalty-0",
+          "covers": [
+            0
+          ],
+          "cost": 1,
+          "targets": [
+            {
+              "id": "t",
+              "filter": "player"
+            }
+          ],
+          "effects": [
+            {
+              "op": "discard",
+              "player": "$t",
+              "count": 1
+            }
+          ]
+        }
+      ]
     }
   },
   "Liliana's Caress": {
@@ -5818,10 +5884,8 @@
     }
   },
   "Liliana's Specter": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 1 is not claimed by any ability: \"When this creature enters, each opponent discards a card.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "1a7e0e55-41c3-4fd8-b718-55b59b5cab90",
       "name": "Liliana's Specter",
@@ -5841,7 +5905,25 @@
         "flying"
       ],
       "text": "Flying\nWhen this creature enters, each opponent discards a card.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-1",
+          "covers": [
+            1
+          ],
+          "when": {
+            "kind": "selfEntersBattlefield"
+          },
+          "effects": [
+            {
+              "op": "discard",
+              "player": "opponent",
+              "count": 1
+            }
+          ]
+        }
+      ]
     }
   },
   "Llanowar Elves": {
@@ -6261,10 +6343,8 @@
     }
   },
   "Merfolk Looter": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"{T}: Draw a card, then discard a card.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "67362406-b1ca-49e2-800d-9050bfe8742a",
       "name": "Merfolk Looter",
@@ -6282,7 +6362,30 @@
       "power": 1,
       "toughness": 1,
       "text": "{T}: Draw a card, then discard a card.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "activated",
+          "id": "auto-activated-0",
+          "covers": [
+            0
+          ],
+          "cost": {
+            "tap": true
+          },
+          "effects": [
+            {
+              "op": "draw",
+              "player": "you",
+              "count": 1
+            },
+            {
+              "op": "discard",
+              "player": "you",
+              "count": 1
+            }
+          ]
+        }
+      ]
     }
   },
   "Merfolk Sovereign": {
@@ -6469,10 +6572,8 @@
     }
   },
   "Mind Rot": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Target player discards two cards.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "ad44cf74-b717-48fb-9fa2-77512024d76a",
       "name": "Mind Rot",
@@ -6484,7 +6585,27 @@
         "B"
       ],
       "text": "Target player discards two cards.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "spell",
+          "covers": [
+            0
+          ],
+          "targets": [
+            {
+              "id": "t",
+              "filter": "player"
+            }
+          ],
+          "effects": [
+            {
+              "op": "discard",
+              "player": "$t",
+              "count": 2
+            }
+          ]
+        }
+      ]
     }
   },
   "Mind Shatter": {
@@ -10525,10 +10646,8 @@
     }
   },
   "War Priest of Thune": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"When this creature enters, you may destroy target enchantment.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "2e44fd5c-5c7f-4ca8-90cd-34015047eb26",
       "name": "War Priest of Thune",
@@ -10546,7 +10665,38 @@
       "power": 2,
       "toughness": 2,
       "text": "When this creature enters, you may destroy target enchantment.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-0",
+          "covers": [
+            0
+          ],
+          "when": {
+            "kind": "selfEntersBattlefield"
+          },
+          "targets": [
+            {
+              "id": "t",
+              "filter": {
+                "type": "enchantment"
+              }
+            }
+          ],
+          "effects": [
+            {
+              "op": "may",
+              "player": "you",
+              "effects": [
+                {
+                  "op": "destroy",
+                  "object": "$t"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   "Warlord's Axe": {

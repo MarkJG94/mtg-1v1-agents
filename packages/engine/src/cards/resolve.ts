@@ -11,8 +11,8 @@ import {
   spellAbilityOf,
   targetsOf,
 } from './definition.js';
-import { applyEffects, EffectsPausedError } from './effects.js';
 import type { EffectContext } from './evaluate.js';
+import { beginResolution } from './program.js';
 
 /**
  * Resolution, with the card script doing the work (CR 608).
@@ -37,11 +37,11 @@ const resolvingAbility = (state: GameState, id: ObjectId): CardAbility | undefin
 /**
  * Resolve the top of the stack, running whatever the card says it does first.
  *
- * The one thing that cannot happen here is finishing while the game is still waiting on
- * something: if the effects stopped for a replacement choice, the spell has not finished
- * resolving and must not be moved anywhere, so this says so loudly rather than leaving a
- * half-resolved spell in a graveyard. Resumable effects are the fix, and are the same
- * work as the ops that need a choice of their own (see `effects.ts`).
+ * Whether it fizzles is decided here, before anything happens (CR 608.2b). Then its
+ * effects run as a program the game can stop in (ADR 0021): a "you may", a discard the
+ * player chooses, a replacement choice each leave it waiting with the rest of the
+ * effects kept, and `applyDecision` picks it up again. The object leaves the stack only
+ * when the program has run out.
  */
 export const resolveTop = (state: GameState, emitter: EventEmitter): GameState => {
   const id = topOfStack(state);
@@ -67,12 +67,5 @@ export const resolveTop = (state: GameState, emitter: EventEmitter): GameState =
     x: object.stack?.x ?? 0,
   };
 
-  const after = applyEffects(state, emitter, context, effectsOf(ability));
-  if (after.pendingReplacement !== null) {
-    throw new EffectsPausedError(
-      'this spell stopped part-way for a replacement choice, so it cannot finish resolving',
-    );
-  }
-
-  return after.result !== null ? after : resolveTopOfStack(after, emitter);
+  return beginResolution(state, emitter, id, context, effectsOf(ability));
 };

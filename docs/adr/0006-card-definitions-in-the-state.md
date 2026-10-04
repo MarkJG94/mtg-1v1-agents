@@ -71,3 +71,6 @@ scry, "you may", modal spells, a chosen discard — all of which need the effect
 pause and resume the way a replacement batch already does (ADR 0004). Building it once,
 with those ops, beats building half of it now. Until then the boundary is loud, and the
 bootstrap card set in 2.3 is chosen to stay inside it.
+
+*(Built in 7.1 as ADR 0021: resolution is a resumable program kept in the state, and the
+throw is gone.)*
