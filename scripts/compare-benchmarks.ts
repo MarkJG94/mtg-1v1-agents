@@ -1,8 +1,9 @@
 /**
  * Compare a benchmark run against a baseline and fail on a regression (docs/09 "CI").
  *
- * The baseline is the last run recorded on `main`, so what this catches is a change that
- * makes the engine slower than the branch it is about to be merged into. Cases the
+ * In CI the baseline is the commit being merged into, measured on the same runner just
+ * before the comparison, so what this catches is a change that makes the engine slower
+ * than the branch it is about to be merged into. Cases the
  * baseline does not have are reported and ignored: a new case is not a regression.
  *
  * Usage:
