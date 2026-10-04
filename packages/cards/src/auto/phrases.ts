@@ -47,6 +47,13 @@ export class Bindings {
   private readonly declared: DeclaredTarget[] = [];
 
   /**
+   * @param thatPlayer Who "that player" means when no player has been named: the player
+   *   a trigger is about, such as the one "whenever ~ deals combat damage to a player"
+   *   dealt it to.
+   */
+  constructor(private readonly thatPlayer: string | null = null) {}
+
+  /**
    * The player the last clause was about, so "Target player draws two cards and loses 2
    * life" does not need a subject twice.
    */
@@ -77,6 +84,17 @@ export class Bindings {
     const id = String.fromCharCode('t'.charCodeAt(0) + this.declared.length);
     this.declared.push({ id, filter, noun });
     return `$${id}`;
+  }
+
+  /**
+   * "That player": a player target declared earlier, else the player the trigger is about,
+   * else whatever the most recent target was (the old reading, kept for what it already
+   * reads).
+   */
+  thatPlayerRef(): string | null {
+    const named = [...this.declared].reverse().find((each) => each.noun === 'player');
+    if (named !== undefined) return `$${named.id}`;
+    return this.thatPlayer ?? this.resolve('player');
   }
 
   /** What a pronoun refers to: the most recent target, or one declared under this noun. */
@@ -163,7 +181,7 @@ const readPlayer = (reader: Reader, bindings: Bindings): string | null =>
         : null,
     () => (reader.words('each', 'player') ? 'each' : null),
     () => (reader.words('each', 'opponent') ? 'opponent' : null),
-    () => (reader.words('that', 'player') ? bindings.resolve('player') : null),
+    () => (reader.words('that', 'player') ? bindings.thatPlayerRef() : null),
   );
 
 /**

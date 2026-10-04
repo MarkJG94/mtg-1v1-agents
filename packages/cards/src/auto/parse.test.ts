@@ -467,6 +467,43 @@ describe('the parts that are not effects', () => {
   });
 });
 
+describe('a trigger on combat damage to a player (CR 510.3a)', () => {
+  it('reads it, whether the card says a player or an opponent', () => {
+    for (const who of ['a player', 'an opponent']) {
+      const parsed = parseTrigger(`Whenever ~ deals combat damage to ${who}, draw a card.`);
+      expect('when' in parsed && parsed.when).toEqual({ kind: 'selfDealsCombatDamageToPlayer' });
+    }
+  });
+
+  /** Two players: the one dealt combat damage by your creature is your opponent. */
+  it('reads "that player" as the player who was dealt the damage', () => {
+    const parsed = parseTrigger(
+      'Whenever ~ deals combat damage to a player, that player loses 2 life.',
+    );
+    expect('ability' in parsed && parsed.ability.effects).toEqual([
+      { op: 'loseLife', player: 'opponent', amount: 2 },
+    ]);
+  });
+
+  it('still reads "that player" as a player the ability targeted, when it did', () => {
+    const parsed = parseEffects(['Target player draws a card.', 'That player loses 1 life.'], {
+      thatPlayer: 'opponent',
+    });
+    expect(parsed.ok && parsed.ability.effects[1]).toEqual({
+      op: 'loseLife',
+      player: '$t',
+      amount: 1,
+    });
+  });
+
+  it('does not read one that also counts a planeswalker', () => {
+    expect(
+      'failure' in
+        parseTrigger('Whenever ~ deals combat damage to a player or planeswalker, draw a card.'),
+    ).toBe(true);
+  });
+});
+
 describe('auras and equipment', () => {
   it('reads what an Aura enchants (CR 702.5a)', () => {
     expect(parseEnchant('Enchant creature')).toBe('creature');

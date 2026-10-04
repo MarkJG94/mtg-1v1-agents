@@ -8395,10 +8395,8 @@
     }
   },
   "Scroll Thief": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Whenever this creature deals combat damage to a player, draw a card.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "637c5583-4683-4ae4-8b4e-f5da42a772c7",
       "name": "Scroll Thief",
@@ -8416,7 +8414,25 @@
       "power": 1,
       "toughness": 3,
       "text": "Whenever this creature deals combat damage to a player, draw a card.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-0",
+          "covers": [
+            0
+          ],
+          "when": {
+            "kind": "selfDealsCombatDamageToPlayer"
+          },
+          "effects": [
+            {
+              "op": "draw",
+              "player": "you",
+              "count": 1
+            }
+          ]
+        }
+      ]
     }
   },
   "Seismic Strike": {

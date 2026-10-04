@@ -19,7 +19,7 @@ import {
   updatePlayer,
   updateState,
 } from '../state/update.js';
-import { queueTriggers, triggersFromZoneChange } from '../triggers.js';
+import { queueTriggers, triggersFromCombatDamage, triggersFromZoneChange } from '../triggers.js';
 import type { EventEmitter } from './emitter.js';
 import type { DamageEvent, LifeEvent, RulesEvent } from './rules-event.js';
 
@@ -189,6 +189,15 @@ const applyDamage = (
       to: from - amount,
       reason: 'damage',
     });
+  }
+
+  // "Whenever ~ deals combat damage to a player" triggers as the damage is dealt
+  // (CR 510.3a), and only for damage that was: what a prevention effect took to nothing
+  // never reached here.
+  for (const event of events) {
+    if (!event.combat || event.amount <= 0 || event.target.kind !== 'player') continue;
+    const fired = triggersFromCombatDamage(next, event.source);
+    if (fired.length > 0) next = queueTriggers(next, fired);
   }
 
   return next;

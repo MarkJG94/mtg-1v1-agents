@@ -30,6 +30,13 @@ export type TriggerWhen =
   | { readonly kind: 'anotherDies'; readonly controlledBy?: 'you' | 'any' }
   | { readonly kind: 'selfAttacks' }
   | { readonly kind: 'selfBlocks' }
+  /**
+   * "Whenever ~ deals combat damage to a player" (CR 510.3a): as the damage is dealt, once
+   * for each time it is — so twice for double strike, and not at all when it is prevented.
+   * In a two-player game the player is always the opponent, which is who "that player" in
+   * the ability means.
+   */
+  | { readonly kind: 'selfDealsCombatDamageToPlayer' }
   | { readonly kind: 'beginningOfUpkeep'; readonly whose: 'self' | 'any' }
   | { readonly kind: 'beginningOfEndStep'; readonly whose: 'self' | 'any' };
 
@@ -45,6 +52,7 @@ export const triggerWhenKinds = [
   'anotherDies',
   'selfAttacks',
   'selfBlocks',
+  'selfDealsCombatDamageToPlayer',
   'beginningOfUpkeep',
   'beginningOfEndStep',
 ] as const satisfies readonly TriggerWhen['kind'][];
@@ -229,6 +237,22 @@ export const triggersFromBlock = (
   if (!object) return [];
   return object.triggers
     .filter((ability) => ability.when.kind === 'selfBlocks' && notYetFired(state, ability, blocker))
+    .map((ability) => instanceFor(object, ability));
+};
+
+/** Triggers fired by a creature dealing combat damage to a player (CR 510.3a). */
+export const triggersFromCombatDamage = (
+  state: GameState,
+  source: ObjectId,
+): readonly TriggerInstance[] => {
+  const object = state.objects.get(source);
+  if (!object) return [];
+  return object.triggers
+    .filter(
+      (ability) =>
+        ability.when.kind === 'selfDealsCombatDamageToPlayer' &&
+        notYetFired(state, ability, source),
+    )
     .map((ability) => instanceFor(object, ability));
 };
 

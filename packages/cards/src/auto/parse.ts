@@ -45,8 +45,11 @@ export interface ParsedCost {
   readonly sacrificeSelf?: boolean;
 }
 
-export const parseEffects = (sentences: readonly string[]): ParseResult => {
-  const bindings = new Bindings();
+export const parseEffects = (
+  sentences: readonly string[],
+  options: { readonly thatPlayer?: string } = {},
+): ParseResult => {
+  const bindings = new Bindings(options.thatPlayer ?? null);
   const effects: ScriptEffect[] = [];
   let read = 0;
   let failure: ParseFailure | null = null;
@@ -151,7 +154,12 @@ export const parseTrigger = (
     return { failure: reader.failure() };
   }
 
-  const rest = parseEffects([sentence.slice(comma + 1).trim()]);
+  // "That player" in a combat-damage trigger is the player who was dealt the damage, who
+  // in a two-player game is always the opponent (CR 510.3a).
+  const rest = parseEffects(
+    [sentence.slice(comma + 1).trim()],
+    when['kind'] === 'selfDealsCombatDamageToPlayer' ? { thatPlayer: 'opponent' } : {},
+  );
   return rest.ok ? { when, ability: rest.ability } : { failure: rest.failure };
 };
 
@@ -167,6 +175,13 @@ const triggerCondition = (reader: Reader): Readonly<Record<string, unknown>> | n
         : null,
     () => (reader.words('whenever', '~', 'attacks') ? { kind: 'selfAttacks' } : null),
     () => (reader.words('whenever', '~', 'blocks') ? { kind: 'selfBlocks' } : null),
+    // "to a player" and "to an opponent" are one trigger with two players in the game; "to
+    // a player or planeswalker" is not, and its "or" is left over for the caller to refuse.
+    () =>
+      reader.words('whenever', '~', 'deals', 'combat', 'damage', 'to') &&
+      (reader.words('a', 'player') || reader.words('an', 'opponent'))
+        ? { kind: 'selfDealsCombatDamageToPlayer' }
+        : null,
     () => {
       if (!reader.words('whenever', 'another')) return null;
       const what = filter(reader);
