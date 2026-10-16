@@ -39,6 +39,7 @@ export interface SmokeResult {
 
 const ANY_LAND = asOracleId('validator-any-land');
 const VANILLA = asOracleId('validator-vanilla');
+const FODDER = asOracleId('validator-fodder');
 
 /** A land that taps for any colour, so the card's own cost is never what stops it. */
 const anyLand: CardDefinition = {
@@ -73,6 +74,27 @@ const vanilla: CardDefinition = {
   toughness: 2,
   abilities: [],
 };
+
+/**
+ * What a spell with an additional cost (CR 601.2b) is given to pay it with: an artifact
+ * creature answers "sacrifice a creature", "an artifact" and "an artifact or creature"
+ * alike, and the lands already there answer "a land". Without something to pay with, the
+ * card would be skipped in every scenario — and a card skipped everywhere is one that
+ * passed without ever being played.
+ */
+const fodder: CardDefinition = {
+  oracleId: FODDER,
+  name: 'Validator Fodder',
+  manaCost: parseManaCost('{2}'),
+  types: ['artifact', 'creature'],
+  colours: [],
+  power: 1,
+  toughness: 1,
+  abilities: [],
+};
+
+/** Two of each, for a cost of two. */
+const FODDER_COUNT = 2;
 
 export interface SmokeScenario {
   readonly name: string;
@@ -157,11 +179,15 @@ export const playSmokeScenario = (
   const caster = scenario.onOpponentsTurn ? 'B' : 'A';
 
   let board: Scenario = game({
-    definitions: [definition, anyLand, vanilla],
+    definitions: [definition, anyLand, vanilla, fodder],
     seed: 'validator',
   }).player(caster);
   for (let i = 0; i < lands; i += 1) board = board.battlefield({ definitionId: ANY_LAND });
   board = board.hand({ name: 'subject', definitionId: definition.oracleId }).library(10);
+  const paying = definition.additionalCost !== undefined;
+  for (let i = 0; paying && i < FODDER_COUNT; i += 1) {
+    board = board.battlefield({ definitionId: FODDER }).hand({ definitionId: VANILLA });
+  }
 
   board = board.player(caster === 'A' ? 'B' : 'A').library(10);
   for (let i = 0; i < scenario.opposing; i += 1) {
@@ -176,6 +202,19 @@ export const playSmokeScenario = (
   // A land is played, not cast (CR 305.1), and playing it is the whole of its behaviour
   // until an ability of it is activated.
   if (hasType(definition, 'land')) return started.get();
+
+  // A cost to choose as well as targets: take the first casting the engine itself offers,
+  // so the payment tried is one it accepts, as an agent's would be.
+  if (paying) {
+    const decision = started.get().pendingDecision;
+    const subject = started.ref('subject');
+    const offered =
+      decision?.kind === 'priority'
+        ? decision.options.find((action) => action.kind === 'cast' && action.object === subject)
+        : undefined;
+    if (offered === undefined) return 'skipped';
+    return started.decide({ kind: 'priority', action: offered }).resolve().get();
+  }
 
   const targets = chooseTargets(started.get(), started.ref('subject'), caster, definition);
   if (targets === null) return 'skipped';

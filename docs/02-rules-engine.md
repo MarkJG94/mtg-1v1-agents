@@ -165,7 +165,14 @@ printed characteristics and the abilities it carries from its card; a token has 
 and states everything itself.
 
 Casting is the rest of CR 601.2 — timing, targets checked against what the ability asks
-for, and paying, with mana sources tapped in object order when the pool is short.
+for, and paying, with mana sources tapped in object order when the pool is short. Since
+7.1 that includes a spell's **additional cost** (CR 601.2b, 118.8): a sacrifice of the
+caster's permanents of some kind, a discard of other cards from hand, or life, which only
+a player who has it can pay (CR 119.4). Which permanents and which cards are part of the
+cast action, as its targets are, so `legalActions` offers one casting per way of paying
+— capped as targetings are, and never offering a spell's own target as what it
+sacrifices — and nothing when it cannot be paid. The rest of the cost is paid after the
+mana, so a creature tapped for mana can still be the one sacrificed.
 Resolution runs the card's effects and then lets the stack finish the move, so a card
 with no script resolves exactly as it did before definitions existed.
 

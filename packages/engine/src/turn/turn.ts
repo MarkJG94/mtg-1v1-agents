@@ -605,7 +605,11 @@ const applyPriority = (
     case 'cast':
       // `castSpell` hands priority back itself (CR 117.3c), with the options recomputed,
       // because putting a spell on the stack is what restarts the pass count.
-      return castSpell(state, emitter, decision.player, action.object, { targets: action.targets });
+      return castSpell(state, emitter, decision.player, action.object, {
+        targets: action.targets,
+        ...(action.sacrifice === undefined ? {} : { sacrifice: action.sacrifice }),
+        ...(action.discard === undefined ? {} : { discard: action.discard }),
+      });
     case 'activateLoyalty':
       return activateLoyaltyAbility(state, emitter, decision.player, action.object, action.ability);
   }

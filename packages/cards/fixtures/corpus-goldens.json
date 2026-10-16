@@ -3707,7 +3707,6 @@
   "Fling": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"As an additional cost to cast this spell, sacrifice a creature.\"",
       "coverage: sentence 1 is not claimed by any ability: \"Fling deals damage equal to the sacrificed creature's power to any target.\""
     ],
     "script": {
@@ -3720,6 +3719,12 @@
       "colours": [
         "R"
       ],
+      "additionalCost": {
+        "sacrifice": {
+          "filter": "creature",
+          "count": 1
+        }
+      },
       "text": "As an additional cost to cast this spell, sacrifice a creature.\nFling deals damage equal to the sacrificed creature's power to any target.",
       "abilities": []
     }

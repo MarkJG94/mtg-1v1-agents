@@ -182,6 +182,30 @@ describe('trigger conditions', () => {
   });
 });
 
+describe('an additional cost', () => {
+  it('loads with its filter converted, and only the parts the script set', () => {
+    const definition = loadCardScript({
+      ...bolt,
+      additionalCost: {
+        sacrifice: { filter: { or: [{ type: 'artifact' }, 'creature'] }, count: 1 },
+      },
+    });
+    expect(definition.additionalCost).toEqual({
+      sacrifice: {
+        filter: {
+          kind: 'or',
+          filters: [{ kind: 'type', type: 'artifact' }, { kind: 'creature' }],
+        },
+        count: 1,
+      },
+    });
+  });
+
+  it('refuses one that costs nothing', () => {
+    expect(() => loadCardScript({ ...bolt, additionalCost: {} })).toThrow();
+  });
+});
+
 describe('what the loader refuses', () => {
   const broken = (abilities: unknown) => () => loadCardScript({ ...bolt, abilities });
 

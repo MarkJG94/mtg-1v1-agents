@@ -312,6 +312,62 @@ describe('the executability smoke test', () => {
     expect(result.reasons.some((reason) => reason.check === 'executability')).toBe(true);
   });
 
+  /**
+   * A card skipped in every scenario passes without ever having been played, so a spell
+   * with an additional cost has to be given what to pay it with — a sacrifice, a discard,
+   * an artifact for "sacrifice an artifact" — and cast with a payment the engine offers.
+   */
+  it('leaves the additional-cost line unclaimed when the script does not say the cost', () => {
+    const result = validateScript(
+      script({
+        abilities: [
+          {
+            kind: 'spell',
+            covers: [1],
+            targets: [{ id: 't', filter: 'any' }],
+            effects: [{ op: 'damage', to: '$t', amount: 3 }],
+          },
+        ],
+      }),
+      printed({
+        oracleText:
+          'As an additional cost to cast this spell, pay 3 life.\nJolt deals 3 damage to any target.',
+      }),
+    );
+    expect(result.status).toBe('partial');
+  });
+
+  it('pays an additional cost, so a card that has one is really played', () => {
+    for (const additionalCost of [
+      { sacrifice: { filter: 'creature', count: 2 } },
+      { sacrifice: { filter: { type: 'artifact' }, count: 1 } },
+      { sacrifice: { filter: { type: 'land' }, count: 1 } },
+      { discard: 2 },
+      { life: 3 },
+    ]) {
+      const result = validateScript(
+        script({
+          text: 'As an additional cost to cast this spell, pay. Jolt deals 3 damage to any target.',
+          additionalCost,
+          abilities: [
+            {
+              kind: 'spell',
+              covers: [1],
+              targets: [{ id: 't', filter: 'any' }],
+              effects: [{ op: 'damage', to: '$t', amount: 3 }],
+            },
+          ],
+        }),
+        printed({
+          oracleText:
+            'As an additional cost to cast this spell, pay.\nJolt deals 3 damage to any target.',
+        }),
+      );
+      expect(result.status).toBe('supported');
+      expect(result.skipped).toEqual([]);
+    }
+  });
+
   it('skips a scenario it cannot cast the card in rather than failing it', () => {
     const result = validateScript(
       script({

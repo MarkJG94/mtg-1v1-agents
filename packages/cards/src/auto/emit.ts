@@ -3,6 +3,7 @@ import type { CardProjection } from '../scryfall.js';
 import { type ClassifiedLine, classifyCard } from './classify.js';
 import {
   type ParsedAbility,
+  parseAdditionalCost,
   parseCost,
   parseEffects,
   parseEnchant,
@@ -43,7 +44,25 @@ export const emitScript = (card: CardProjection): EmittedScript => {
   // A card has one spell ability, however many lines its spell text runs to (CR 112.3a).
   // One per line would leave every line after the first unplayed, because the engine
   // resolves the first spell ability it finds — which is how Twisted Image drew no card.
-  const spellLines = classified.lines.filter((line) => line.kind === 'spell');
+  // "As an additional cost to cast ~, …" is not an ability at all but part of what the
+  // spell costs (CR 601.2b, 118.8): a field on the card, as `enchant` is, which claims its
+  // line. The classifier files it with the spell text on an instant and as a static
+  // ability on a permanent, so once read it is taken out before either is.
+  //
+  // Only once read. One this cannot read stays where it was, where it still stops the
+  // spell ability being built from the lines after it — which matters: Draconic
+  // Intervention's middle line is a replacement, and without its first line the "spell"
+  // was its last one alone, "Exile ~", a spell that did nothing but exile itself.
+  let additionalCost: unknown = null;
+  const lines = classified.lines.filter((line) => {
+    if (!/^as an additional cost to cast\b/i.test(line.line.text)) return true;
+    const read = line.line.sentences.length === 1 ? parseAdditionalCost(line.line.text) : null;
+    if (read === null) return true;
+    additionalCost = read;
+    return false;
+  });
+
+  const spellLines = lines.filter((line) => line.kind === 'spell');
   const spell = spellAbility(spellLines);
   if (spell !== null) abilities.push(spell);
   else if (spellLines.length > 0) {
@@ -54,7 +73,7 @@ export const emitScript = (card: CardProjection): EmittedScript => {
   // An Aura's "Enchant creature" is a field on the card rather than an ability (CR 702.5a),
   // and the field is what claims its line.
   let enchant: unknown = null;
-  for (const line of classified.lines) {
+  for (const line of lines) {
     if (line.kind === 'keyword' || line.kind === 'spell') continue;
     if (line.kind === 'static' && /^enchant\b/i.test(line.line.text)) {
       enchant = parseEnchant(line.line.text);
@@ -105,6 +124,7 @@ export const emitScript = (card: CardProjection): EmittedScript => {
       // keeps them where casting can see them.
       ...Object.fromEntries(classified.cardKeywords.map((keyword) => [keyword, true])),
       ...(enchant !== null ? { enchant } : {}),
+      ...(additionalCost !== null ? { additionalCost } : {}),
       text: card.oracleText,
       abilities,
     },
@@ -274,7 +294,7 @@ const body = (ability: ParsedAbility): Readonly<Record<string, unknown>> => ({
  * what makes a cached "unsupported" from an older parser be re-earned rather than believed
  * — which is the whole reason the row stores a version at all.
  */
-export const AUTO_SCRIPTER_VERSION = 5;
+export const AUTO_SCRIPTER_VERSION = 6;
 
 export const autoScripter = {
   version: AUTO_SCRIPTER_VERSION,

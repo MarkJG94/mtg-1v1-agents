@@ -116,11 +116,23 @@ const definitionFrom = (script: CardScript): CardDefinition => {
     ...(script.flash !== undefined ? { flash: script.flash } : {}),
     ...(script.splitSecond !== undefined ? { splitSecond: script.splitSecond } : {}),
     ...(script.enchant !== undefined ? { enchant: script.enchant } : {}),
+    ...(script.additionalCost !== undefined
+      ? { additionalCost: additionalCostFrom(script.additionalCost) }
+      : {}),
     abilities: script.abilities.map((ability, index) =>
       abilityFrom(script, ability, `abilities[${index}]`),
     ),
   };
 };
+
+/** Only the parts a script set, so a cost with no discard has no `discard` at all. */
+const additionalCostFrom = (
+  cost: NonNullable<CardScript['additionalCost']>,
+): NonNullable<CardDefinition['additionalCost']> => ({
+  ...(cost.sacrifice !== undefined ? { sacrifice: cost.sacrifice } : {}),
+  ...(cost.discard !== undefined ? { discard: cost.discard } : {}),
+  ...(cost.life !== undefined ? { life: cost.life } : {}),
+});
 
 const abilityFrom = (
   script: CardScript,

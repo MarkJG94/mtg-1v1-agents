@@ -6,7 +6,13 @@ import {
   type PlayerId,
   playerZone,
 } from '@mtg/shared';
-import type { TargetSpec } from './cards/definition.js';
+import {
+  canPayLife,
+  choose,
+  discardCandidates,
+  sacrificeCandidates,
+} from './cards/additional-cost.js';
+import type { AdditionalCost, TargetSpec } from './cards/definition.js';
 import { matchesFilter } from './cards/evaluate.js';
 import type { ManaAbility } from './mana/ability.js';
 import type { ManaCost } from './mana/cost.js';
@@ -44,6 +50,8 @@ export interface CardInfo {
   readonly colours: readonly Colour[];
   /** What the spell ability targets (CR 601.2c), so the choices can be enumerated. */
   readonly targets: readonly TargetSpec[];
+  /** What it costs beyond its mana (CR 118.8), whose payments are enumerated too. */
+  readonly additionalCost?: AdditionalCost;
 }
 
 export interface CardInfoSource {
@@ -66,6 +74,15 @@ export type LegalAction =
        * targets appears as three actions rather than one with a choice still to make.
        */
       readonly targets: readonly EventTarget[];
+      /**
+       * How this casting pays an additional cost (CR 601.2b): the permanents it sacrifices
+       * and the cards it discards, chosen as part of the action like the targets are.
+       * Absent for a spell that has no such cost.
+       */
+      readonly sacrifice?: readonly ObjectId[];
+      readonly discard?: readonly ObjectId[];
+      /** The life it pays (CR 119.4), so an agent that sees only the action can price it. */
+      readonly life?: number;
     }
   /** A planeswalker's loyalty ability (CR 606). Its cost is counters, not mana. */
   | {
@@ -150,9 +167,13 @@ export const legalActions = (
       choices = targetChoices(state, player, id, info);
       targetings.set(info.targets, choices);
     }
-    for (const targets of choices) {
-      actions.push({ kind: 'cast', object: id, cost: info.manaCost, targets });
+    if (info.additionalCost === undefined) {
+      for (const targets of choices) {
+        actions.push({ kind: 'cast', object: id, cost: info.manaCost, targets });
+      }
+      continue;
     }
+    actions.push(...withAdditionalCost(state, player, id, info, info.additionalCost, choices));
   }
 
   return actions;
@@ -169,6 +190,55 @@ export const legalActions = (
  * rather than a crash.
  */
 const MOST_TARGETINGS = 24;
+
+/**
+ * The castings of a spell with an additional cost: each targeting with each way of paying
+ * it, up to the same cap targetings have. None at all when it cannot be paid — too few
+ * creatures to sacrifice, too few other cards to discard, too little life (CR 601.2b).
+ *
+ * A permanent that is one of the spell's own targets is not offered as its sacrifice.
+ * Sacrificing it is legal and leaves the spell nothing to do (CR 608.2b), so leaving it
+ * out under-reports by moves that only throw a card away.
+ */
+const withAdditionalCost = (
+  state: GameState,
+  player: PlayerId,
+  id: ObjectId,
+  info: CardInfo,
+  cost: AdditionalCost,
+  targetings: readonly (readonly EventTarget[])[],
+): readonly LegalAction[] => {
+  if (!canPayLife(state, player, cost)) return [];
+  const sacrifices = choose(
+    sacrificeCandidates(state, player, id, cost),
+    cost.sacrifice?.count ?? 0,
+    MOST_TARGETINGS,
+  );
+  const discards = choose(discardCandidates(state, player, id), cost.discard ?? 0, MOST_TARGETINGS);
+
+  const actions: LegalAction[] = [];
+  for (const targets of targetings) {
+    const aimedAt = new Set(
+      targets.flatMap((target) => (target.kind === 'object' ? [target.object] : [])),
+    );
+    for (const sacrifice of sacrifices) {
+      if (sacrifice.some((each) => aimedAt.has(each))) continue;
+      for (const discard of discards) {
+        if (actions.length >= MOST_TARGETINGS) return actions;
+        actions.push({
+          kind: 'cast',
+          object: id,
+          cost: info.manaCost,
+          targets,
+          ...(sacrifice.length > 0 ? { sacrifice } : {}),
+          ...(discard.length > 0 ? { discard } : {}),
+          ...((cost.life ?? 0) > 0 ? { life: cost.life } : {}),
+        });
+      }
+    }
+  }
+  return actions;
+};
 
 /**
  * Every way this spell could have its targets chosen, or `[[]]` for one that has none.

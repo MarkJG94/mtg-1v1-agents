@@ -137,7 +137,26 @@ export interface CardDefinition {
    * into its owner's graveyard (CR 303.4d, 704.5m).
    */
   readonly enchant?: Filter;
+  /**
+   * "As an additional cost to cast this spell, …" (CR 601.2b, 601.2h, 118.8): paid with
+   * the mana as the spell is cast, and chosen then — which permanents, which cards.
+   */
+  readonly additionalCost?: AdditionalCost;
   readonly abilities: readonly CardAbility[];
+}
+
+/**
+ * What a spell costs beyond its mana (CR 118.8). Each part is paid in full or the spell
+ * cannot be cast: a sacrifice needs that many permanents to sacrifice, a discard that many
+ * other cards in hand, and life can be paid only by a player who has that much (CR 119.4).
+ */
+export interface AdditionalCost {
+  /** "Sacrifice a creature" (CR 701.21): permanents the caster controls that match. */
+  readonly sacrifice?: { readonly filter: Filter; readonly count: number };
+  /** "Discard a card": cards from the caster's hand other than the spell itself. */
+  readonly discard?: number;
+  /** "Pay 3 life." */
+  readonly life?: number;
 }
 
 // --- Reading a definition ---

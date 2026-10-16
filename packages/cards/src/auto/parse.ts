@@ -672,3 +672,42 @@ export const parseCost = (text: string): ParsedCost | null => {
 
 export type { ParseFailure };
 export { duration, player, quantity };
+
+// --- Additional costs ---
+
+/**
+ * "As an additional cost to cast ~, sacrifice a creature." — what the spell costs beyond
+ * its mana (CR 601.2b, 118.8), as the script's `additionalCost:` field. One of three
+ * shapes: a sacrifice of permanents the noun phrase names ("an artifact or creature"),
+ * a discard of a number of cards, or a payment of life. An optional one ("you may pay
+ * {2}") is a different thing, kicker by another name, and is left unread; so is "X
+ * cards", whose X nobody chose.
+ */
+export const parseAdditionalCost = (sentence: string): Readonly<Record<string, unknown>> | null => {
+  const reader = Reader.of(sentence);
+  if (!reader.words('as', 'an', 'additional', 'cost', 'to', 'cast', '~', ',')) return null;
+  const cost = reader.first<Readonly<Record<string, unknown>>>(
+    () => {
+      if (!reader.word('sacrifice')) return null;
+      const count = quantity(reader);
+      const what = filter(reader);
+      return typeof count === 'number' && count > 0 && what !== null
+        ? { sacrifice: { filter: what, count } }
+        : null;
+    },
+    () => {
+      if (!reader.word('discard')) return null;
+      const count = quantity(reader);
+      return typeof count === 'number' && count > 0 && reader.anyWord('card', 'cards') !== null
+        ? { discard: count }
+        : null;
+    },
+    () => {
+      if (!reader.word('pay')) return null;
+      const count = quantity(reader);
+      return typeof count === 'number' && count > 0 && reader.word('life') ? { life: count } : null;
+    },
+  );
+  reader.word('.');
+  return cost !== null && reader.done ? cost : null;
+};

@@ -6,6 +6,7 @@ import { parseTypeLine } from '../oracle-text.js';
 import type { CardProjection } from '../scryfall.js';
 import { classifyCard } from './classify.js';
 import {
+  parseAdditionalCost,
   parseCost,
   parseEffects,
   parseEnchant,
@@ -601,6 +602,38 @@ describe('the trigger vocabulary 7.1 widened', () => {
     expect(parseTrigger('Whenever you cast a multicolored spell, draw a card.')).toHaveProperty(
       'failure',
     );
+  });
+});
+
+describe('an additional cost to cast (CR 601.2b, 118.8)', () => {
+  const cost = (rest: string) => parseAdditionalCost(`As an additional cost to cast ~, ${rest}`);
+
+  it('reads a sacrifice, with how many and of what', () => {
+    expect(cost('sacrifice a creature.')).toEqual({ sacrifice: { filter: 'creature', count: 1 } });
+    expect(cost('sacrifice two creatures.')).toEqual({
+      sacrifice: { filter: 'creature', count: 2 },
+    });
+    expect(cost('sacrifice an artifact or creature.')).toEqual({
+      sacrifice: { filter: { or: [{ type: 'artifact' }, 'creature'] }, count: 1 },
+    });
+  });
+
+  it('reads a discard and a payment of life', () => {
+    expect(cost('discard a card.')).toEqual({ discard: 1 });
+    expect(cost('discard two cards.')).toEqual({ discard: 2 });
+    expect(cost('pay 3 life.')).toEqual({ life: 3 });
+  });
+
+  it('refuses an X nobody chose, an optional cost, a choice between two, and anything after', () => {
+    expect(cost('discard X cards.')).toBeNull();
+    expect(cost('pay X life.')).toBeNull();
+    expect(cost('you may pay {2}.')).toBeNull();
+    expect(cost('sacrifice a creature or pay 3 life.')).toBeNull();
+    expect(cost('discard a card at random.')).toBeNull();
+  });
+
+  it('is only the additional-cost sentence', () => {
+    expect(parseAdditionalCost('Sacrifice a creature.')).toBeNull();
   });
 });
 

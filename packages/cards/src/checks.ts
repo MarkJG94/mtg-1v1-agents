@@ -119,6 +119,9 @@ export const checkCharacteristics = (
 const isClaimedByKeywords = (sentence: string, script: CardScript): boolean => {
   // "Enchant creature" is an Aura's enchant ability, which the script's `enchant:` says.
   if (/^enchant\b/i.test(sentence)) return script.enchant !== undefined;
+  // "As an additional cost to cast ~, …" is what the script's `additionalCost:` says.
+  if (/^as an additional cost to cast\b/i.test(sentence))
+    return script.additionalCost !== undefined;
   const parts = sentence
     .toLowerCase()
     .replace(/\.$/, '')
