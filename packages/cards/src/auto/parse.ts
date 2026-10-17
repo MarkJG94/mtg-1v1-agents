@@ -1,4 +1,5 @@
 import { parseManaCost } from '@mtg/engine';
+import { continueLook, isOpenLook } from './look.js';
 import { Bindings, duration, filter, player, quantity, type ScriptFilter } from './phrases.js';
 import { type ParseFailure, Reader } from './reader.js';
 import { readKeywords, type ScriptEffect, verbs } from './verbs.js';
@@ -54,8 +55,25 @@ export const parseEffects = (
   const effects: ScriptEffect[] = [];
   let read = 0;
   let failure: ParseFailure | null = null;
+  /** How many sentences the look still waiting on where its rest go has read. */
+  let looking = 0;
 
   for (const sentence of sentences) {
+    // "Look at the top three cards of your library." says which cards, and the sentences
+    // after it say what becomes of them, so they are read into the same look.
+    const open = effects.at(-1);
+    if (isOpenLook(open) && open !== undefined) {
+      const more = continueLook(sentence, open);
+      if ('failure' in more) {
+        failure = more.failure;
+        break;
+      }
+      effects[effects.length - 1] = more.effect;
+      read += 1;
+      looking = isOpenLook(more.effect) ? looking + 1 : 0;
+      continue;
+    }
+
     // The subject carries between the clauses of one sentence and no further. "Target
     // player discards a card. Draw a card." is two sentences, and the second one is about
     // you however the first one began.
@@ -70,7 +88,8 @@ export const parseEffects = (
     if (ifYouDo === null && isUnspentPayment(last)) break;
     if (ifYouDo !== null) {
       const rest = last?.op === 'may' ? readSentence(ifYouDo[2] ?? '', bindings) : null;
-      if (rest === null || last === undefined) {
+      // A look opened inside a "may" has no later sentence to finish it.
+      if (rest === null || last === undefined || rest.some(isOpenLook)) {
         failure =
           last?.op === 'may' ? lastFailure : { reason: '"if you do" after no "may"', token: null };
         break;
@@ -91,6 +110,14 @@ export const parseEffects = (
     effects.push(...parsed);
     bindings.started = effects.length > 0;
     read += 1;
+    if (isOpenLook(effects.at(-1))) looking = 1;
+  }
+
+  // A look that never said where the cards go is unread, with every sentence it took.
+  if (isOpenLook(effects.at(-1))) {
+    effects.pop();
+    read -= looking;
+    failure ??= { reason: 'a look at cards with nothing done with them', token: null };
   }
 
   if (isUnspentPayment(effects.at(-1))) {
@@ -144,7 +171,9 @@ const readMay = (sentence: string, bindings: Bindings): readonly ScriptEffect[] 
   });
   if (payment !== null) return [{ op: 'may', player: who, pay: payment, effects: [] }];
   const effects = readSentence(sentence.slice(reader.offset).trim(), bindings);
-  if (effects === null) return null;
+  // "You may look at the top card of your library": a look opened inside a "may" has no
+  // later sentence to finish it.
+  if (effects === null || effects.some(isOpenLook)) return null;
   return [{ op: 'may', player: who, effects }];
 };
 
@@ -194,7 +223,8 @@ const readSentence = (sentence: string, bindings: Bindings): readonly ScriptEffe
     effects.push(...clause);
   }
 
-  if (effects.length === 0) {
+  // A look still open has to end its sentence, so that the next one can finish it.
+  if (effects.length === 0 || effects.slice(0, -1).some(isOpenLook)) {
     lastFailure = reader.failure();
     bindings.reset(mark);
     return null;

@@ -60,6 +60,20 @@ export const opSpecs: Readonly<Record<OpName, OpSpec>> = {
   sacrifice: { args: { object: 'object' }, required: ['object'] },
   moveZone: { args: { object: 'object', to: 'raw' }, required: ['object', 'to'] },
   shuffle: { args: { player: 'player' }, required: ['player'] },
+  lookAtTop: {
+    args: {
+      player: 'player',
+      count: 'quantity',
+      take: 'quantity',
+      upTo: 'raw',
+      filter: 'filter',
+      to: 'raw',
+      rest: 'raw',
+    },
+    required: ['player', 'count', 'rest'],
+  },
+  scry: { args: { player: 'player', count: 'quantity' }, required: ['player', 'count'] },
+  surveil: { args: { player: 'player', count: 'quantity' }, required: ['player', 'count'] },
   createToken: {
     args: { controller: 'player', token: 'raw', count: 'quantity' },
     required: ['controller', 'token'],

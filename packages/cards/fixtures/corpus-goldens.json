@@ -803,10 +803,8 @@
     }
   },
   "Augury Owl": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 1 is not claimed by any ability: \"When this creature enters, scry 3.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "44c5f8e1-d9b8-4067-a60a-1ecc8bd11145",
       "name": "Augury Owl",
@@ -826,7 +824,25 @@
         "flying"
       ],
       "text": "Flying\nWhen this creature enters, scry 3. (Look at the top three cards of your library, then put any number of them on the bottom and the rest on top in any order.)",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-1",
+          "covers": [
+            1
+          ],
+          "when": {
+            "kind": "selfEntersBattlefield"
+          },
+          "effects": [
+            {
+              "op": "scry",
+              "player": "you",
+              "count": 3
+            }
+          ]
+        }
+      ]
     }
   },
   "Autumn's Veil": {
@@ -2209,10 +2225,8 @@
     }
   },
   "Crystal Ball": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"{1}, {T}: Scry 2.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "bd85fe4d-1d62-416f-ac2d-e287911c84e3",
       "name": "Crystal Ball",
@@ -2222,7 +2236,26 @@
       ],
       "colours": [],
       "text": "{1}, {T}: Scry 2. (Look at the top two cards of your library, then put any number of them on the bottom and the rest on top in any order.)",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "activated",
+          "id": "auto-activated-0",
+          "covers": [
+            0
+          ],
+          "cost": {
+            "mana": "{1}",
+            "tap": true
+          },
+          "effects": [
+            {
+              "op": "scry",
+              "player": "you",
+              "count": 2
+            }
+          ]
+        }
+      ]
     }
   },
   "Cudgel Troll": {
@@ -3829,10 +3862,8 @@
     }
   },
   "Foresee": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Scry 4, then draw two cards.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "441de890-7b9f-42f7-859a-a154b8ed74ac",
       "name": "Foresee",
@@ -3844,7 +3875,26 @@
         "U"
       ],
       "text": "Scry 4, then draw two cards.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "spell",
+          "covers": [
+            0
+          ],
+          "effects": [
+            {
+              "op": "scry",
+              "player": "you",
+              "count": 4
+            },
+            {
+              "op": "draw",
+              "player": "you",
+              "count": 2
+            }
+          ]
+        }
+      ]
     }
   },
   "Forest": {
@@ -7944,12 +7994,8 @@
     }
   },
   "Ponder": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Look at the top three cards of your library, then put them back in any order.\"",
-      "coverage: sentence 1 is not claimed by any ability: \"You may shuffle.\"",
-      "coverage: sentence 2 is not claimed by any ability: \"Draw a card.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "02090581-61aa-4348-ad57-451be8ee91c2",
       "name": "Ponder",
@@ -7961,14 +8007,44 @@
         "U"
       ],
       "text": "Look at the top three cards of your library, then put them back in any order. You may shuffle.\nDraw a card.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "spell",
+          "covers": [
+            0,
+            1,
+            2
+          ],
+          "effects": [
+            {
+              "op": "lookAtTop",
+              "player": "you",
+              "count": 3,
+              "rest": "top"
+            },
+            {
+              "op": "may",
+              "player": "you",
+              "effects": [
+                {
+                  "op": "shuffle",
+                  "player": "you"
+                }
+              ]
+            },
+            {
+              "op": "draw",
+              "player": "you",
+              "count": 1
+            }
+          ]
+        }
+      ]
     }
   },
   "Preordain": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Scry 2, then draw a card.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "ac641490-ca14-48d7-8cc4-b69ce984befa",
       "name": "Preordain",
@@ -7980,7 +8056,26 @@
         "U"
       ],
       "text": "Scry 2, then draw a card. (To scry 2, look at the top two cards of your library, then put any number of them on the bottom and the rest on top in any order.)",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "spell",
+          "covers": [
+            0
+          ],
+          "effects": [
+            {
+              "op": "scry",
+              "player": "you",
+              "count": 2
+            },
+            {
+              "op": "draw",
+              "player": "you",
+              "count": 1
+            }
+          ]
+        }
+      ]
     }
   },
   "Primal Cocoon": {
@@ -8797,10 +8892,8 @@
     }
   },
   "Sage Owl": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 1 is not claimed by any ability: \"When this creature enters, look at the top four cards of your library, then put them back in any order.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "d47fc902-51f7-4ad1-8ee4-c973e32192b8",
       "name": "Sage Owl",
@@ -8820,7 +8913,26 @@
         "flying"
       ],
       "text": "Flying\nWhen this creature enters, look at the top four cards of your library, then put them back in any order.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-1",
+          "covers": [
+            1
+          ],
+          "when": {
+            "kind": "selfEntersBattlefield"
+          },
+          "effects": [
+            {
+              "op": "lookAtTop",
+              "player": "you",
+              "count": 4,
+              "rest": "top"
+            }
+          ]
+        }
+      ]
     }
   },
   "Sanguine Bond": {

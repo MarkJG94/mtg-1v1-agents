@@ -229,6 +229,55 @@ describe('a payment in a "may"', () => {
   });
 });
 
+describe('a look at the top of a library', () => {
+  const looking = (look: Record<string, unknown>) =>
+    loadCardScript({
+      ...bolt,
+      abilities: [
+        { kind: 'spell', effects: [{ op: 'lookAtTop', player: 'you', count: 3, ...look }] },
+      ],
+    });
+
+  it('loads a look, its filter in the short form every filter is written in', () => {
+    const definition = looking({
+      take: 1,
+      upTo: true,
+      filter: { type: 'creature' },
+      to: { kind: 'hand' },
+      rest: 'bottomRandom',
+    });
+    expect(definition.abilities[0]).toMatchObject({
+      effects: [
+        { op: 'lookAtTop', filter: { kind: 'type', type: 'creature' }, rest: 'bottomRandom' },
+      ],
+    });
+  });
+
+  it('refuses a rest it has no case for, a take with nowhere to go, and tapped in a hand', () => {
+    expect(() => looking({ rest: 'sideways' })).toThrow(/rest/);
+    expect(() => looking({ take: 1, rest: 'top' })).toThrow(/"to"/);
+    expect(() => looking({ to: { kind: 'hand' }, rest: 'top' })).toThrow(/"to"/);
+    expect(() => looking({ take: 1, to: { kind: 'exile' }, rest: 'top' })).toThrow(/to/);
+    expect(() => looking({ take: 1, to: { kind: 'hand', tapped: true }, rest: 'top' })).toThrow(
+      /tapped/,
+    );
+    expect(() => looking({ take: 1, upTo: 'yes', to: { kind: 'hand' }, rest: 'top' })).toThrow(
+      /upTo/,
+    );
+  });
+
+  it('loads scry and surveil', () => {
+    for (const op of ['scry', 'surveil']) {
+      expect(() =>
+        loadCardScript({
+          ...bolt,
+          abilities: [{ kind: 'spell', effects: [{ op, player: 'you', count: 2 }] }],
+        }),
+      ).not.toThrow();
+    }
+  });
+});
+
 describe('a cost reduction', () => {
   it('loads its quantity and condition, and a graveyard filter, into the engine’s forms', () => {
     const definition = loadCardScript({

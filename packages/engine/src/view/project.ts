@@ -49,6 +49,7 @@ export const viewFor = (state: GameState, viewer: PlayerId): PlayerView => {
   for (const zone of allZoneIds) {
     if (canSeeZone(viewer, zone)) for (const id of state.zones[zone]) ids.push(id);
   }
+  ids.push(...lookingAt(state, viewer));
   ids.sort((a, b) => a - b);
   for (const id of ids) {
     const object = state.objects.get(id);
@@ -83,6 +84,20 @@ export const viewFor = (state: GameState, viewer: PlayerId): PlayerView => {
  */
 export const canSee = (viewer: PlayerId, object: GameObject): boolean =>
   canSeeZone(viewer, object.zone);
+
+/**
+ * The library cards this player is looking at right now, as a decision about them waits
+ * on their answer: scry's, surveil's, "look at the top three cards" (CR 701.22a). They are
+ * the one exception to a library being known to nobody, and only while they are asked
+ * about — what the player saw is not remembered once the cards are back.
+ */
+const lookingAt = (state: GameState, viewer: PlayerId): readonly ObjectId[] => {
+  const decision = state.pendingDecision;
+  if (decision === null || decision.player !== viewer) return [];
+  if (decision.kind === 'chooseCardsFromLibrary') return decision.looking;
+  if (decision.kind === 'orderCards') return decision.cards;
+  return [];
+};
 
 /** Whether this player knows what the cards in a zone are; see `canSee`. */
 export const canSeeZone = (viewer: PlayerId, zone: ZoneId): boolean => {

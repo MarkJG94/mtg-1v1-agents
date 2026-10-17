@@ -9,7 +9,7 @@ import {
   steps,
 } from '@mtg/shared';
 import { activateAbility, castSpell } from '../cards/cast.js';
-import { answerMay, runResolution } from '../cards/program.js';
+import { answerChooseCards, answerMay, answerOrderCards, runResolution } from '../cards/program.js';
 import { resolveTop } from '../cards/resolve.js';
 import { expireEndOfTurnEffects } from '../characteristics.js';
 import {
@@ -515,6 +515,13 @@ export const applyDecision = (
     if (next.resolution !== null) next = runResolution(next, emitter);
   } else if (decision.kind === 'yesNo' && response.kind === 'yesNo') {
     next = answerMay(cleared, emitter, decision.player, response.answer);
+  } else if (
+    decision.kind === 'chooseCardsFromLibrary' &&
+    response.kind === 'chooseCardsFromLibrary'
+  ) {
+    next = answerChooseCards(cleared, emitter, decision, response.cards);
+  } else if (decision.kind === 'orderCards' && response.kind === 'orderCards') {
+    next = answerOrderCards(cleared, emitter, decision, response.order);
   } else if (decision.kind === 'declareAttackers' && response.kind === 'declareAttackers') {
     next = declareAttackers(cleared, emitter, response.attackers);
   } else if (decision.kind === 'declareBlockers' && response.kind === 'declareBlockers') {
@@ -744,6 +751,10 @@ const defaultAnswer = (decision: Decision, options: AutoPlayOptions): DecisionRe
       return { kind: 'playOrDraw', choice: 'play' };
     case 'yesNo':
       return { kind: 'yesNo', answer: true };
+    case 'chooseCardsFromLibrary':
+      return { kind: 'chooseCardsFromLibrary', cards: decision.from.slice(0, decision.min) };
+    case 'orderCards':
+      return { kind: 'orderCards', order: decision.cards };
     case 'mulligan':
       return { kind: 'mulligan', action: options.mulligan?.(decision) ?? 'keep' };
     case 'bottomCards':

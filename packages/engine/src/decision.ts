@@ -1,4 +1,5 @@
 import type { DecisionKind, EventTarget, ObjectId, PlayerId } from '@mtg/shared';
+import type { LookDestination, LookRest } from './cards/ops.js';
 import type { BlockDeclaration } from './combat.js';
 import type { RulesEvent } from './events/rules-event.js';
 import type { LegalAction } from './legal-actions.js';
@@ -170,8 +171,44 @@ export interface YesNoDecision {
   readonly options: readonly [true, false];
 }
 
+/**
+ * Choosing from among the cards being looked at on top of a library: scry's cards for the
+ * bottom (CR 701.22a), surveil's for the graveyard (CR 701.25a), "put one of them into
+ * your hand". Answered with between `min` and `max` of `from`, in the order they are to
+ * go — which for the bottom of a library is the order they end up in, first nearest the
+ * top.
+ */
+export interface ChooseCardsFromLibraryDecision {
+  readonly kind: 'chooseCardsFromLibrary';
+  readonly player: PlayerId;
+  /** Every card being looked at, top first. */
+  readonly looking: readonly ObjectId[];
+  /** The ones that may be chosen: those of `looking` the ability allows. */
+  readonly from: readonly ObjectId[];
+  readonly min: number;
+  readonly max: number;
+  /** Where the chosen cards go. */
+  readonly to: LookDestination['kind'];
+  /** Where the others go, so a driver can weigh one against the other. */
+  readonly rest: LookRest;
+}
+
+/**
+ * Putting cards back on top of a library, or on its bottom, in an order the player
+ * chooses ("then put them back in any order"). Answered with every one of `cards`, the
+ * first to end up nearest the top.
+ */
+export interface OrderCardsDecision {
+  readonly kind: 'orderCards';
+  readonly player: PlayerId;
+  readonly cards: readonly ObjectId[];
+  readonly to: 'libraryTop' | 'libraryBottom';
+}
+
 export type Decision =
   | MulliganDecision
+  | ChooseCardsFromLibraryDecision
+  | OrderCardsDecision
   | YesNoDecision
   | PlayOrDrawDecision
   | BottomCardsDecision
@@ -209,7 +246,9 @@ export type DecisionResponse =
   | { readonly kind: 'chooseOption'; readonly chosen: ObjectId }
   | { readonly kind: 'chooseReplacement'; readonly effect: number }
   | { readonly kind: 'orderTriggers'; readonly order: readonly string[] }
-  | { readonly kind: 'yesNo'; readonly answer: boolean };
+  | { readonly kind: 'yesNo'; readonly answer: boolean }
+  | { readonly kind: 'chooseCardsFromLibrary'; readonly cards: readonly ObjectId[] }
+  | { readonly kind: 'orderCards'; readonly order: readonly ObjectId[] };
 
 export class UnexpectedDecisionError extends Error {
   constructor(message: string) {

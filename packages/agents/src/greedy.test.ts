@@ -1,4 +1,5 @@
 import type {
+  ChooseCardsFromLibraryDecision,
   Decision,
   DecisionResponse,
   DeclareBlockersDecision,
@@ -324,6 +325,84 @@ describe('getting rid of cards', () => {
     expect(
       decide(view, { kind: 'discard', player: 'A', count: 1, from: [spare.id, bear.id] }),
     ).toEqual({ kind: 'discard', cards: [spare.id] });
+  });
+});
+
+describe('looking at the top of the library (CR 701.22a, 701.25a)', () => {
+  const looked = (view: PlayerView, decision: Partial<ChooseCardsFromLibraryDecision>) =>
+    decide(view, {
+      kind: 'chooseCardsFromLibrary',
+      player: 'A',
+      looking: [],
+      from: [],
+      min: 0,
+      max: 0,
+      to: 'libraryBottom',
+      rest: 'top',
+      ...decision,
+    });
+
+  it('scries away a land it has no use for, and keeps a spell it can cast', () => {
+    const inPlay = Array.from({ length: w.landTarget }, () => land());
+    const spare = land({ zone: 'library' });
+    const bear = creature(2, 2, { zone: 'library', manaValue: 2 });
+    const view = viewOf({ mine: inPlay, looking: [spare, bear] });
+    const both = [spare.id, bear.id];
+    expect(looked(view, { looking: both, from: both, max: 2 })).toEqual({
+      kind: 'chooseCardsFromLibrary',
+      cards: [spare.id],
+    });
+  });
+
+  it('keeps a land while short of them, and bins a spell far beyond its mana', () => {
+    const top = land({ zone: 'library' });
+    // Six to cast with two lands, counting the one on top: not soon.
+    const dragon = card({ zone: 'library', manaValue: 6 });
+    const view = viewOf({ mine: [land()], looking: [top, dragon] });
+    const both = [top.id, dragon.id];
+    expect(looked(view, { looking: both, from: both, max: 2, to: 'graveyard' })).toEqual({
+      kind: 'chooseCardsFromLibrary',
+      cards: [dragon.id],
+    });
+  });
+
+  it('puts away as many as it must, the least wanted first', () => {
+    const cheap = card({ zone: 'library', manaValue: 1 });
+    const dear = card({ zone: 'library', manaValue: 4 });
+    const view = viewOf({ mine: [land(), land(), land()], looking: [cheap, dear] });
+    const both = [cheap.id, dear.id];
+    expect(looked(view, { looking: both, from: both, min: 1, max: 1, to: 'graveyard' })).toEqual({
+      kind: 'chooseCardsFromLibrary',
+      cards: [dear.id],
+    });
+  });
+
+  it('takes into its hand the cards it wants most, as many as it may', () => {
+    const top = land({ zone: 'library' });
+    const cheap = card({ zone: 'library', manaValue: 2 });
+    const dear = card({ zone: 'library', manaValue: 6 });
+    const view = viewOf({ mine: [land()], looking: [cheap, dear, top] });
+    const all = [cheap.id, dear.id, top.id];
+    expect(
+      looked(view, { looking: all, from: all, min: 1, max: 1, to: 'hand', rest: 'graveyard' }),
+    ).toEqual({ kind: 'chooseCardsFromLibrary', cards: [top.id] });
+  });
+
+  it('puts back on top the card it wants most first', () => {
+    const dear = card({ zone: 'library', manaValue: 5 });
+    const cheap = card({ zone: 'library', manaValue: 1 });
+    const view = viewOf({
+      mine: Array.from({ length: w.landTarget }, () => land()),
+      looking: [dear, cheap],
+    });
+    expect(
+      decide(view, {
+        kind: 'orderCards',
+        player: 'A',
+        cards: [dear.id, cheap.id],
+        to: 'libraryTop',
+      }),
+    ).toEqual({ kind: 'orderCards', order: [cheap.id, dear.id] });
   });
 });
 

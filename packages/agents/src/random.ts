@@ -48,6 +48,15 @@ export const randomAgent: PlayAgent = {
         return { kind: 'chooseReplacement', effect: rng.pick(decision.options) };
       case 'yesNo':
         return { kind: 'yesNo', answer: rng.pick(decision.options) };
+      case 'chooseCardsFromLibrary':
+        return {
+          kind: 'chooseCardsFromLibrary',
+          cards: rng
+            .shuffled(decision.from)
+            .slice(0, rng.nextIntBetween(decision.min, decision.max)),
+        };
+      case 'orderCards':
+        return { kind: 'orderCards', order: rng.shuffled(decision.cards) };
     }
   },
 };

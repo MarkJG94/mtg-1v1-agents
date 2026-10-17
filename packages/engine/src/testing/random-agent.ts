@@ -49,6 +49,15 @@ export const randomDecision = (
     case 'yesNo':
       return { kind: 'yesNo', answer: rng.pick(decision.options) };
 
+    case 'chooseCardsFromLibrary':
+      return {
+        kind: 'chooseCardsFromLibrary',
+        cards: rng.shuffled(decision.from).slice(0, rng.nextIntBetween(decision.min, decision.max)),
+      };
+
+    case 'orderCards':
+      return { kind: 'orderCards', order: rng.shuffled(decision.cards) };
+
     case 'declareAttackers': {
       const attacking = subset(rng, decision.legal);
       return {

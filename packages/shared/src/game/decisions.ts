@@ -22,6 +22,8 @@ export const decisionKinds = [
   'orderTriggers',
   'chooseReplacement',
   'chooseCardsFromLibrary',
+  // Putting cards looked at back on a library in an order of the player's choosing.
+  'orderCards',
   'discard',
   'distributeCounters',
   'yesNo',

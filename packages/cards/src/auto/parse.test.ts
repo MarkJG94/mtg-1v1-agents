@@ -677,6 +677,174 @@ describe('"you may pay {N}. If you do, …" (CR 117.12)', () => {
   });
 });
 
+describe('looking at the top of a library (CR 701.22a, 701.25a)', () => {
+  const sentencesRead = (...sentences: readonly string[]) => {
+    const parsed = parseEffects(sentences);
+    return parsed.ok ? parsed.ability.sentencesRead : 0;
+  };
+
+  it('reads scry and surveil as clauses, with or without someone else in the sentence', () => {
+    expect(effectsOf('Scry 2.')).toEqual([{ op: 'scry', player: 'you', count: 2 }]);
+    expect(effectsOf('Surveil 1, then draw a card.')).toEqual([
+      { op: 'surveil', player: 'you', count: 1 },
+      { op: 'draw', player: 'you', count: 1 },
+    ]);
+    expect(effectsOf('You gain 3 life and scry 1.')).toEqual([
+      { op: 'gainLife', player: 'you', amount: 3 },
+      { op: 'scry', player: 'you', count: 1 },
+    ]);
+  });
+
+  it('reads a look that puts the cards back in one sentence, and "you may shuffle"', () => {
+    expect(
+      effectsOf(
+        'Look at the top three cards of your library, then put them back in any order.',
+        'You may shuffle.',
+      ),
+    ).toEqual([
+      { op: 'lookAtTop', player: 'you', count: 3, rest: 'top' },
+      { op: 'may', player: 'you', effects: [{ op: 'shuffle', player: 'you' }] },
+    ]);
+  });
+
+  it('folds what is done with the cards into the look: a number taken, and the rest', () => {
+    expect(
+      effectsOf(
+        'Look at the top three cards of your library.',
+        'Put one of them into your hand and the rest into your graveyard.',
+      ),
+    ).toEqual([
+      {
+        op: 'lookAtTop',
+        player: 'you',
+        count: 3,
+        take: 1,
+        to: { kind: 'hand' },
+        rest: 'graveyard',
+      },
+    ]);
+    expect(
+      effectsOf(
+        'Look at the top two cards of your library.',
+        'Put one of those cards into your hand and the other on the bottom of your library.',
+      ),
+    ).toMatchObject([{ take: 1, rest: 'bottom' }]);
+  });
+
+  it('reads "you may reveal a … card from among them" over three sentences', () => {
+    expect(
+      effectsOf(
+        'Look at the top four cards of your library.',
+        'You may reveal a creature card from among them and put it into your hand.',
+        'Put the rest on the bottom of your library in a random order.',
+      ),
+    ).toEqual([
+      {
+        op: 'lookAtTop',
+        player: 'you',
+        count: 4,
+        take: 1,
+        upTo: true,
+        filter: { type: 'creature' },
+        to: { kind: 'hand' },
+        rest: 'bottomRandom',
+      },
+    ]);
+  });
+
+  it('puts a land onto the battlefield tapped, and reads "any number of"', () => {
+    expect(
+      effectsOf(
+        'Look at the top five cards of your library.',
+        'You may put a land card from among them onto the battlefield tapped.',
+        'Put the rest on the bottom of your library in any order.',
+      ),
+    ).toMatchObject([{ take: 1, to: { kind: 'battlefield', tapped: true }, rest: 'bottom' }]);
+    expect(
+      effectsOf(
+        'Look at the top five cards of your library.',
+        'You may reveal any number of artifact cards from among them and put the revealed cards into your hand.',
+        'Put the rest on the bottom of your library in a random order.',
+      ),
+    ).toMatchObject([{ take: 5, upTo: true, filter: { type: 'artifact' } }]);
+  });
+
+  it('reads the kinds of card: "or" offers either, commas between "non-" words ask for both', () => {
+    const filterOf = (kind: string) =>
+      (
+        effectsOf(
+          'Look at the top four cards of your library.',
+          `You may reveal ${kind} from among them and put it into your hand.`,
+          'Put the rest on the bottom of your library in a random order.',
+        ) as { filter?: unknown }[] | null
+      )?.[0]?.filter;
+    expect(filterOf('an instant or sorcery card')).toEqual({
+      or: [{ type: 'instant' }, { type: 'sorcery' }],
+    });
+    expect(filterOf('a noncreature, nonland card')).toEqual({
+      and: [{ not: { type: 'creature' } }, { not: { type: 'land' } }],
+    });
+    expect(filterOf('an Elf, Warrior, or Tyvar card')).toEqual({
+      or: [{ subtype: 'elf' }, { subtype: 'warrior' }, { subtype: 'tyvar' }],
+    });
+    expect(filterOf('a creature card with power 3 or less')).toEqual({
+      and: [{ type: 'creature' }, { powerAtMost: 3 }],
+    });
+    expect(filterOf('a legendary card')).toBeUndefined();
+  });
+
+  it('leaves a look unread, with every sentence it took, when nothing is done with the cards', () => {
+    expect(effectsOf('Look at the top five cards of your library.')).toBeNull();
+    expect(
+      sentencesRead('Draw a card.', 'Look at the top five cards of your library.', 'Draw a card.'),
+    ).toBe(1);
+    // Two sentences into it, and the third says nothing about where the rest go.
+    expect(
+      sentencesRead(
+        'Draw a card.',
+        'Look at the top four cards of your library.',
+        'You may reveal a creature card from among them and put it into your hand.',
+        'You gain 2 life.',
+      ),
+    ).toBe(1);
+  });
+
+  it('reads only your own library, and no look inside a "may"', () => {
+    expect(effectsOf("Look at the top card of target player's library.")).toBeNull();
+    expect(effectsOf('You may look at the top card of your library.')).toBeNull();
+    // Folded into a "may" by "if you do", a look has no sentence of its own to finish it.
+    expect(
+      sentencesRead(
+        'You may draw a card.',
+        'If you do, look at the top two cards of your library.',
+      ),
+    ).toBe(1);
+  });
+
+  it('wants a look still open to end its sentence, so the next one can finish it', () => {
+    expect(effectsOf('Look at the top two cards of your library and draw a card.')).toBeNull();
+  });
+
+  it('loads what it reads', () => {
+    const parsed = parseEffects([
+      'Look at the top four cards of your library.',
+      'You may reveal a creature card from among them and put it into your hand.',
+      'Put the rest on the bottom of your library in a random order.',
+    ]);
+    if (!parsed.ok) throw new Error('did not parse');
+    expect(() =>
+      loadCardScript({
+        name: 'Seer',
+        oracleId: 'seer',
+        manaCost: '{G}',
+        types: ['sorcery'],
+        colours: ['G'],
+        abilities: [{ kind: 'spell', effects: parsed.ability.effects }],
+      } as never),
+    ).not.toThrow();
+  });
+});
+
 describe('a spell’s reduction of its own cost (CR 601.2f)', () => {
   const less = (rest: string) => parseCostReduction(`~ costs ${rest}`);
 

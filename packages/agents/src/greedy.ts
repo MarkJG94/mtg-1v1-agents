@@ -1,9 +1,11 @@
 import type {
+  ChooseCardsFromLibraryDecision,
   Decision,
   DecisionResponse,
   DeclareAttackersDecision,
   DeclareBlockersDecision,
   DiscardDecision,
+  OrderCardsDecision,
   PlayerView,
   PriorityAction,
   PriorityDecision,
@@ -80,6 +82,10 @@ export const greedyAgent = (
       // weigh the two answers by. The searching agent can do better.
       case 'yesNo':
         return { kind: 'yesNo', answer: true };
+      case 'chooseCardsFromLibrary':
+        return { kind: 'chooseCardsFromLibrary', cards: cardsToTake(view, decision, weights) };
+      case 'orderCards':
+        return { kind: 'orderCards', order: cardsInOrder(view, decision, weights) };
     }
   },
 });
@@ -201,6 +207,69 @@ const worstCards = (
     .sort((a, b) => a.keep - b.keep)
     .slice(0, decision.count)
     .map((entry) => entry.card.id);
+};
+
+// --- Looking at the top of the library ---
+
+/**
+ * How much greedy wants each of these cards to draw, by the discard rule's measure: a land
+ * while it is short of the land target and hardly at all after, and a spell by how cheap
+ * it is — hardly at all, too, while it costs more than the lands it has could pay soon.
+ * The lands it has are the ones in play and in hand; the cards are counted top first,
+ * since that is the order they would be drawn in.
+ */
+const wanted = (
+  view: PlayerView,
+  cards: readonly ObjectId[],
+  weights: Weights,
+): ReadonlyMap<ObjectId, number> => {
+  let lands = objectsSeenIn(view, [...view.you.battlefield, ...view.you.hand]).filter(
+    isLand,
+  ).length;
+  const scores = new Map<ObjectId, number>();
+  for (const card of objectsSeenIn(view, cards)) {
+    if (isLand(card)) {
+      scores.set(card.id, lands < weights.landTarget ? 10 : 0.1);
+      lands += 1;
+    } else {
+      scores.set(card.id, card.manaValue > lands + 2 ? 0.5 : 5 - card.manaValue * 0.5);
+    }
+  }
+  return scores;
+};
+
+/** Below this, a card is one greedy would rather not draw next. */
+const unwanted = 1;
+
+/**
+ * Into the hand or onto the battlefield, the cards it wants most, as many as it may. To
+ * the bottom or the graveyard — scry and surveil — the ones it does not want, and only as
+ * many of the others as it must.
+ */
+const cardsToTake = (
+  view: PlayerView,
+  decision: ChooseCardsFromLibraryDecision,
+  weights: Weights,
+): readonly ObjectId[] => {
+  const scores = wanted(view, decision.looking, weights);
+  const score = (card: ObjectId) => scores.get(card) ?? 0;
+  if (decision.to === 'hand' || decision.to === 'battlefield') {
+    return [...decision.from].sort((a, b) => score(b) - score(a)).slice(0, decision.max);
+  }
+  const worstFirst = [...decision.from].sort((a, b) => score(a) - score(b));
+  const away = worstFirst.filter((card) => score(card) < unwanted).slice(0, decision.max);
+  return away.length >= decision.min ? away : worstFirst.slice(0, decision.min);
+};
+
+/** Back on top, the card it wants most first; on the bottom the order hardly matters. */
+const cardsInOrder = (
+  view: PlayerView,
+  decision: OrderCardsDecision,
+  weights: Weights,
+): readonly ObjectId[] => {
+  if (decision.to === 'libraryBottom') return decision.cards;
+  const scores = wanted(view, decision.cards, weights);
+  return [...decision.cards].sort((a, b) => (scores.get(b) ?? 0) - (scores.get(a) ?? 0));
 };
 
 // --- Combat ---

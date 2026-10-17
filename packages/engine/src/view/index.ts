@@ -24,6 +24,7 @@
 export type { CardType } from '../cards/vocabulary.js';
 export type {
   BottomCardsDecision,
+  ChooseCardsFromLibraryDecision,
   ChooseOptionDecision,
   ChooseReplacementDecision,
   Decision,
@@ -33,6 +34,7 @@ export type {
   DiscardDecision,
   MulliganDecision,
   OrderBlockersDecision,
+  OrderCardsDecision,
   OrderTriggersDecision,
   PlayOrDrawDecision,
   PriorityAction,
