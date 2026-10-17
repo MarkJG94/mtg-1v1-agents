@@ -193,10 +193,15 @@ export const scriptedRng = (yes = true): Rng => {
 type Cast = Extract<PriorityAction, { kind: 'cast' }>;
 
 /** A cast action as the engine would offer it; the cost is the engine's business, not an agent's. */
-export const cast = (object: ObjectId, targets: Cast['targets'] = []): PriorityAction => ({
+/** A cast action, costing `generic` mana: what the engine would offer once it has priced it. */
+export const cast = (
+  object: ObjectId,
+  targets: Cast['targets'] = [],
+  generic = 0,
+): PriorityAction => ({
   kind: 'cast',
   object,
-  cost: { generic: 0, variable: 0, symbols: [] },
+  cost: { generic, variable: 0, symbols: [] },
   targets,
 });
 

@@ -45,6 +45,7 @@ const infoFrom = (definition: CardDefinition): CardInfo => {
     ...(definition.additionalCost === undefined
       ? {}
       : { additionalCost: definition.additionalCost }),
+    ...(definition.costReduction === undefined ? {} : { costReduction: definition.costReduction }),
   };
   infos.set(definition, info);
   return info;

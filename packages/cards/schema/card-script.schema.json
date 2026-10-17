@@ -142,6 +142,20 @@
         }
       }
     },
+    "costReduction": {
+      "type": "object",
+      "properties": {
+        "generic": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "if": {
+          "$ref": "#/$defs/__schema2"
+        }
+      },
+      "required": [
+        "generic"
+      ]
+    },
     "abilities": {
       "type": "array",
       "items": {
@@ -1378,6 +1392,14 @@
             "zone": {
               "type": "string"
             },
+            "graveyard": {
+              "type": "string",
+              "enum": [
+                "you",
+                "opponent",
+                "any"
+              ]
+            },
             "tapped": {
               "type": "boolean"
             },
@@ -1457,6 +1479,137 @@
           }
         }
       ]
+    },
+    "__schema1": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        {
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "boolean",
+              "const": true
+            },
+            "count": {
+              "$ref": "#/$defs/__schema0"
+            },
+            "cardsInHand": {
+              "type": "string",
+              "pattern": "^(~|\\$[a-zA-Z][\\w-]*|you|opponent|each)$"
+            },
+            "lifeTotal": {
+              "type": "string",
+              "pattern": "^(~|\\$[a-zA-Z][\\w-]*|you|opponent|each)$"
+            },
+            "powerOf": {
+              "type": "string",
+              "pattern": "^(~|\\$[a-zA-Z][\\w-]*|you|opponent|each)$"
+            },
+            "toughnessOf": {
+              "type": "string",
+              "pattern": "^(~|\\$[a-zA-Z][\\w-]*|you|opponent|each)$"
+            },
+            "counters": {
+              "type": "object",
+              "properties": {
+                "on": {
+                  "type": "string",
+                  "pattern": "^(~|\\$[a-zA-Z][\\w-]*|you|opponent|each)$"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "on",
+                "kind"
+              ]
+            },
+            "add": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema1"
+              }
+            },
+            "sub": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema1"
+              }
+            },
+            "mul": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema1"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "__schema2": {
+      "type": "object",
+      "properties": {
+        "atLeast": {
+          "type": "object",
+          "properties": {
+            "amount": {
+              "$ref": "#/$defs/__schema1"
+            },
+            "than": {
+              "$ref": "#/$defs/__schema1"
+            }
+          },
+          "required": [
+            "amount",
+            "than"
+          ]
+        },
+        "equal": {
+          "type": "object",
+          "properties": {
+            "amount": {
+              "$ref": "#/$defs/__schema1"
+            },
+            "than": {
+              "$ref": "#/$defs/__schema1"
+            }
+          },
+          "required": [
+            "amount",
+            "than"
+          ]
+        },
+        "exists": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "notExists": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "not": {
+          "$ref": "#/$defs/__schema2"
+        },
+        "and": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema2"
+          }
+        },
+        "or": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema2"
+          }
+        }
+      }
     }
   }
 }

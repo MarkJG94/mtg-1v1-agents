@@ -876,10 +876,8 @@
     }
   },
   "Back to Nature": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Destroy all enchantments.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "b8d8ece6-397e-4bc9-b86c-7caa1d675d0f",
       "name": "Back to Nature",
@@ -891,7 +889,28 @@
         "G"
       ],
       "text": "Destroy all enchantments.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "spell",
+          "covers": [
+            0
+          ],
+          "effects": [
+            {
+              "op": "forEach",
+              "of": {
+                "type": "enchantment"
+              },
+              "effects": [
+                {
+                  "op": "destroy",
+                  "object": "$each"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   "Ball Lightning": {
@@ -9927,10 +9946,8 @@
     }
   },
   "Tempest of Light": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Destroy all enchantments.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "9399ed27-31c7-4d6a-99eb-644b74e67344",
       "name": "Tempest of Light",
@@ -9942,7 +9959,28 @@
         "W"
       ],
       "text": "Destroy all enchantments.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "spell",
+          "covers": [
+            0
+          ],
+          "effects": [
+            {
+              "op": "forEach",
+              "of": {
+                "type": "enchantment"
+              },
+              "effects": [
+                {
+                  "op": "destroy",
+                  "object": "$each"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   "Temple Bell": {

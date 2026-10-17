@@ -11,7 +11,8 @@ import { type ObjectId, playerZone } from '@mtg/shared';
  * visibly changes on the viewer's side of the table:
  *
  * - a land played moves from hand to the battlefield;
- * - a spell cast leaves the hand, and taps as many mana sources as its mana value;
+ * - a spell cast leaves the hand, and taps as many mana sources as the casting costs —
+ *   which is its mana value less any reduction it gets (CR 601.2f);
  * - its additional cost is paid: what it sacrifices goes to the graveyard, what it
  *   discards leaves the hand, and the life comes off (CR 601.2h) — so a sacrifice is
  *   priced as the creature it costs, not as free;
@@ -36,7 +37,10 @@ export const afterAction = (view: PlayerView, action: PriorityAction): PlayerVie
     case 'cast': {
       const card = view.objects.get(action.object);
       if (card === undefined) return view;
-      const paid = payAdditional(tapFor(leaveHand(view, action.object), card.manaValue), action);
+      const paid = payAdditional(
+        tapFor(leaveHand(view, action.object), manaIn(action.cost)),
+        action,
+      );
       return isPermanentCard(card)
         ? enterBattlefield(paid, action.object, card.isCreature)
         : toGraveyard(paid, action.object);
@@ -118,6 +122,10 @@ const sacrifice = (view: PlayerView, id: ObjectId): PlayerView => {
     id,
   );
 };
+
+/** Mana symbols a cost asks for, an X counting as none: what tapping has to cover. */
+const manaIn = (cost: Extract<PriorityAction, { kind: 'cast' }>['cost']): number =>
+  cost.generic + cost.symbols.length;
 
 const toGraveyard = (view: PlayerView, id: ObjectId): PlayerView => ({
   ...view,

@@ -711,3 +711,117 @@ export const parseAdditionalCost = (sentence: string): Readonly<Record<string, u
   reader.word('.');
   return cost !== null && reader.done ? cost : null;
 };
+
+// --- Cost reduction ---
+
+/**
+ * "~ costs {1} less to cast for each artifact you control", "~ costs {2} less to cast if
+ * you control a Wizard" — what a spell takes off its own cost (CR 601.2f), as the script's
+ * `costReduction:` field: a generic amount, counted or fixed, and the condition it waits
+ * on. Only generic mana: "{U} less" is a different and rarer thing, and is left unread.
+ */
+export const parseCostReduction = (sentence: string): Readonly<Record<string, unknown>> | null => {
+  const reader = Reader.of(sentence);
+  if (!reader.words('~', 'costs')) return null;
+  const amount = reader.match(/^\{(\d+)\}$/);
+  const generic = amount === null ? Number.NaN : Number(amount[1]);
+  if (!(generic > 0) || !reader.words('less', 'to', 'cast')) return null;
+
+  const reduction = reader.first<Readonly<Record<string, unknown>>>(
+    () => {
+      if (!reader.words('for', 'each')) return null;
+      const counted = countable(reader);
+      if (counted === null) return null;
+      // Two players: "for each opponent" is one of them.
+      if (counted === 'opponent') return { generic };
+      const count = { count: counted };
+      return { generic: generic === 1 ? count : { mul: [generic, count] } };
+    },
+    () => {
+      if (!reader.word('if')) return null;
+      const holds = condition(reader);
+      return holds === null ? null : { generic, if: holds };
+    },
+  );
+  reader.word('.');
+  return reduction !== null && reader.done ? reduction : null;
+};
+
+/** "Affinity for artifacts" — one less for each of them you control (CR 702.41a). */
+export const parseAffinity = (sentence: string): Readonly<Record<string, unknown>> | null => {
+  const reader = Reader.of(sentence);
+  if (!reader.words('affinity', 'for')) return null;
+  const what = filter(reader);
+  reader.word('.');
+  if (what === null || !reader.done || controllerOf(what) !== null) return null;
+  return { generic: { count: yoursOf(what) } };
+};
+
+/**
+ * What "for each" counts: permanents ("artifact you control", "creature on the
+ * battlefield", "attacking creature"), cards in your graveyard ("instant and sorcery card
+ * in your graveyard"), or opponents.
+ */
+const countable = (reader: Reader): ScriptFilter | 'opponent' | null =>
+  reader.first<ScriptFilter | 'opponent'>(
+    () => (reader.word('opponent') ? 'opponent' : null),
+    () => {
+      const kinds = cardKinds(reader);
+      if (kinds === null) return null;
+      return reader.anyWord('card', 'cards') !== null && reader.words('in', 'your', 'graveyard')
+        ? { ...kinds, graveyard: 'you' }
+        : null;
+    },
+    () => {
+      const what = filter(reader);
+      if (what === null) return null;
+      reader.words('on', 'the', 'battlefield');
+      return what;
+    },
+  );
+
+/** "creature", "instant and sorcery" (either of them), "land" — card types, as a filter. */
+const cardKinds = (reader: Reader): Readonly<Record<string, unknown>> | null => {
+  const types: string[] = [];
+  for (;;) {
+    const type = reader.anyWord(
+      'artifact',
+      'creature',
+      'enchantment',
+      'instant',
+      'land',
+      'sorcery',
+    );
+    if (type === null) return null;
+    types.push(type);
+    if (reader.anyWord('and', 'or') === null) break;
+  }
+  return types.length === 1 ? { type: types[0] } : { or: types.map((type) => ({ type })) };
+};
+
+/**
+ * "you control a Wizard", "you control three or more artifacts" — the conditions a cost
+ * reduction waits on, as a script condition. Read against the caster as the spell is cast.
+ */
+const condition = (reader: Reader): Readonly<Record<string, unknown>> | null => {
+  if (!reader.words('you', 'control')) return null;
+  return reader.first<Readonly<Record<string, unknown>>>(
+    () => {
+      if (reader.anyWord('a', 'an') === null) return null;
+      const what = filter(reader);
+      return what === null || controllerOf(what) !== null ? null : { exists: yoursOf(what) };
+    },
+    () => {
+      const count = quantity(reader);
+      if (typeof count !== 'number' || !reader.words('or', 'more')) return null;
+      const what = filter(reader);
+      return what === null || controllerOf(what) !== null
+        ? null
+        : { atLeast: { amount: { count: yoursOf(what) }, than: count } };
+    },
+  );
+};
+
+/** A filter with "you control" added, in the script's short forms. */
+const yoursOf = (what: ScriptFilter): ScriptFilter =>
+  typeof what === 'string' ? { is: what, controller: 'you' } : { ...what, controller: 'you' };

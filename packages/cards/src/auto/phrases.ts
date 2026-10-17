@@ -250,7 +250,10 @@ const noun = (reader: Reader): ScriptFilter | null => {
 
     const word = reader.peek()?.word ?? '';
     const bare = word.startsWith('non') ? word.slice(3) : word;
-    const type = (types as readonly string[]).includes(bare) ? bare : null;
+    // "artifacts", "lands": a plural is the same filter as the singular. "creatures" has
+    // its own case below, which keeps "artifact creatures" both.
+    const singular = bare.endsWith('s') && bare !== 'creatures' ? bare.slice(0, -1) : bare;
+    const type = (types as readonly string[]).includes(singular) ? singular : null;
     if (type !== null) {
       reader.next();
       found = true;

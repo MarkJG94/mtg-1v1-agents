@@ -12,7 +12,8 @@ import {
   discardCandidates,
   sacrificeCandidates,
 } from './cards/additional-cost.js';
-import type { AdditionalCost, TargetSpec } from './cards/definition.js';
+import { reducedCost } from './cards/cost-reduction.js';
+import type { AdditionalCost, CostReduction, TargetSpec } from './cards/definition.js';
 import { matchesFilter } from './cards/evaluate.js';
 import type { ManaAbility } from './mana/ability.js';
 import type { ManaCost } from './mana/cost.js';
@@ -52,6 +53,8 @@ export interface CardInfo {
   readonly targets: readonly TargetSpec[];
   /** What it costs beyond its mana (CR 118.8), whose payments are enumerated too. */
   readonly additionalCost?: AdditionalCost;
+  /** What its own text takes off its cost (CR 601.2f), counted as it would be cast. */
+  readonly costReduction?: CostReduction;
 }
 
 export interface CardInfoSource {
@@ -157,7 +160,10 @@ export const legalActions = (
     }
 
     if (!canCastNow(state, player, info.sorcerySpeed)) continue;
-    if (!canPay(info.manaCost)) continue;
+    // The cost as it would be paid now. A reduced cost is a new object each time, so the
+    // payability cache below simply misses for it; the printed one still shares.
+    const cost = reducedCost(state, player, id, info.manaCost, info.costReduction);
+    if (!canPay(cost)) continue;
 
     // Four copies of one card in hand ask the same question, and the answer depends only
     // on the board — so the enumeration is keyed on the spec list, which comes from the
@@ -169,11 +175,11 @@ export const legalActions = (
     }
     if (info.additionalCost === undefined) {
       for (const targets of choices) {
-        actions.push({ kind: 'cast', object: id, cost: info.manaCost, targets });
+        actions.push({ kind: 'cast', object: id, cost, targets });
       }
       continue;
     }
-    actions.push(...withAdditionalCost(state, player, id, info, info.additionalCost, choices));
+    actions.push(...withAdditionalCost(state, player, id, cost, info.additionalCost, choices));
   }
 
   return actions;
@@ -204,7 +210,7 @@ const withAdditionalCost = (
   state: GameState,
   player: PlayerId,
   id: ObjectId,
-  info: CardInfo,
+  manaCost: ManaCost,
   cost: AdditionalCost,
   targetings: readonly (readonly EventTarget[])[],
 ): readonly LegalAction[] => {
@@ -228,7 +234,7 @@ const withAdditionalCost = (
         actions.push({
           kind: 'cast',
           object: id,
-          cost: info.manaCost,
+          cost: manaCost,
           targets,
           ...(sacrifice.length > 0 ? { sacrifice } : {}),
           ...(discard.length > 0 ? { discard } : {}),

@@ -6,7 +6,7 @@ import type { EventMatcher, ReplacementChange } from '../replacement.js';
 import type { Keywords } from '../targeting.js';
 import type { InterveningCondition, TriggerWhen } from '../triggers.js';
 import type { EffectOp } from './ops.js';
-import type { CardType, Filter, Supertype } from './vocabulary.js';
+import type { CardType, Condition, Filter, Quantity, Supertype } from './vocabulary.js';
 
 /**
  * What a card is and what it does (docs/03).
@@ -142,7 +142,22 @@ export interface CardDefinition {
    * the mana as the spell is cast, and chosen then — which permanents, which cards.
    */
   readonly additionalCost?: AdditionalCost;
+  /**
+   * "This spell costs {1} less to cast for each artifact you control" (CR 601.2f): taken
+   * off the generic part of the cost as it is paid. Its mana value is unchanged (CR 202.3).
+   */
+  readonly costReduction?: CostReduction;
   readonly abilities: readonly CardAbility[];
+}
+
+/**
+ * How much generic mana a spell's own text takes off its cost: `generic`, counted as the
+ * spell is cast, and only `if` the condition holds then. Never below nothing, and never
+ * the coloured part (CR 601.2f).
+ */
+export interface CostReduction {
+  readonly generic: Quantity;
+  readonly if?: Condition;
 }
 
 /**

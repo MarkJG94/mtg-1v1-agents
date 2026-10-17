@@ -30,7 +30,7 @@ describe('casting a spell (CR 601.2)', () => {
     const lands = [land(), land(), land()];
     const view = viewOf({ mine: lands, hand: [bear] });
 
-    const after = afterAction(view, cast(bear.id));
+    const after = afterAction(view, cast(bear.id, [], 2));
 
     expect(after.you.battlefield).toContain(bear.id);
     expect(after.objects.get(bear.id)?.summoningSick).toBe(true);
@@ -44,7 +44,7 @@ describe('casting a spell (CR 601.2)', () => {
     const spell = card({ zone: 'hand', types: ['sorcery'], manaValue: 1 });
     const view = viewOf({ mine: [elf, forest], hand: [spell] });
 
-    const after = afterAction(view, cast(spell.id));
+    const after = afterAction(view, cast(spell.id, [], 1));
 
     expect(after.objects.get(forest.id)?.tapped).toBe(true);
     expect(after.objects.get(elf.id)?.tapped).toBe(false);
@@ -60,6 +60,18 @@ describe('casting a spell (CR 601.2)', () => {
     expect(after.you.graveyard).toEqual([bolt.id]);
     expect(after.you.battlefield).not.toContain(bolt.id);
     expect(after.opponent).toBe(view.opponent);
+  });
+});
+
+describe('a reduced cost (CR 601.2f)', () => {
+  it('taps what the casting costs, not the card’s mana value', () => {
+    const golem = card({ zone: 'hand', types: ['artifact'], manaValue: 4 });
+    const lands = [land(), land(), land(), land()];
+    const view = viewOf({ mine: lands, hand: [golem] });
+
+    const after = afterAction(view, cast(golem.id, [], 1));
+
+    expect(lands.filter((l) => after.objects.get(l.id)?.tapped)).toHaveLength(1);
   });
 });
 

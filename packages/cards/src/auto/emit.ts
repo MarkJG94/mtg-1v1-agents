@@ -4,7 +4,9 @@ import { type ClassifiedLine, classifyCard } from './classify.js';
 import {
   type ParsedAbility,
   parseAdditionalCost,
+  parseAffinity,
   parseCost,
+  parseCostReduction,
   parseEffects,
   parseEnchant,
   parseManaModes,
@@ -53,13 +55,32 @@ export const emitScript = (card: CardProjection): EmittedScript => {
   // spell ability being built from the lines after it — which matters: Draconic
   // Intervention's middle line is a replacement, and without its first line the "spell"
   // was its last one alone, "Exile ~", a spell that did nothing but exile itself.
+  //
+  // A spell's reduction of its own cost (CR 601.2f) — "~ costs {1} less to cast for each
+  // artifact you control", or the same said as "Affinity for artifacts" — is a field of the
+  // same kind, taken out the same way.
   let additionalCost: unknown = null;
+  let costReduction: unknown = null;
   const lines = classified.lines.filter((line) => {
-    if (!/^as an additional cost to cast\b/i.test(line.line.text)) return true;
-    const read = line.line.sentences.length === 1 ? parseAdditionalCost(line.line.text) : null;
-    if (read === null) return true;
-    additionalCost = read;
-    return false;
+    const text = line.line.text;
+    const single = line.line.sentences.length === 1;
+    if (single && /^as an additional cost to cast\b/i.test(text)) {
+      const read = parseAdditionalCost(text);
+      if (read === null) return true;
+      additionalCost = read;
+      return false;
+    }
+    if (
+      single &&
+      (/^~ costs \{\d+\} less to cast\b/i.test(text) || /^affinity for\b/i.test(text))
+    ) {
+      const read = parseCostReduction(text) ?? parseAffinity(text);
+      // Two of them on one card would be two reductions, and the field holds one.
+      if (read === null || costReduction !== null) return true;
+      costReduction = read;
+      return false;
+    }
+    return true;
   });
 
   const spellLines = lines.filter((line) => line.kind === 'spell');
@@ -125,6 +146,7 @@ export const emitScript = (card: CardProjection): EmittedScript => {
       ...Object.fromEntries(classified.cardKeywords.map((keyword) => [keyword, true])),
       ...(enchant !== null ? { enchant } : {}),
       ...(additionalCost !== null ? { additionalCost } : {}),
+      ...(costReduction !== null ? { costReduction } : {}),
       text: card.oracleText,
       abilities,
     },
@@ -294,7 +316,7 @@ const body = (ability: ParsedAbility): Readonly<Record<string, unknown>> => ({
  * what makes a cached "unsupported" from an older parser be re-earned rather than believed
  * — which is the whole reason the row stores a version at all.
  */
-export const AUTO_SCRIPTER_VERSION = 6;
+export const AUTO_SCRIPTER_VERSION = 7;
 
 export const autoScripter = {
   version: AUTO_SCRIPTER_VERSION,
