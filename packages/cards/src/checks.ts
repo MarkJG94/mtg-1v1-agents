@@ -160,7 +160,7 @@ export interface CoverageReport {
  * claim and is covered by definition.
  */
 export const checkCoverage = (script: CardScript, card: CardProjection): CoverageReport => {
-  const sentences = sentencesOf(card.oracleText);
+  const sentences = sentencesOf(rulesTextOf(card));
   const problems: CheckProblem[] = [];
   const say = (message: string) => problems.push({ check: 'coverage', message });
 
@@ -190,6 +190,22 @@ export const checkCoverage = (script: CardScript, card: CardProjection): Coverag
 
   return { sentences, unclaimed, problems };
 };
+
+/**
+ * All of a card's rules text, wherever Scryfall keeps it.
+ *
+ * A card with two faces — transform, modal, flip, adventure, split — has its text on the
+ * faces and none on the card, and checked against the card's alone it had no sentences to
+ * claim, so it was **supported** with whatever its script said: 356 such cards were, among
+ * them every transform creature, and were played as their front face with their text
+ * ignored. Every face's sentences now have to be claimed, the front face's first — which is
+ * the numbering the emitter, reading the front face, already uses — so a card whose back
+ * face nobody read is partial, as it is.
+ */
+export const rulesTextOf = (card: CardProjection): string =>
+  card.oracleText.length > 0 || card.faces === undefined
+    ? card.oracleText
+    : card.faces.map((face) => face.oracleText).join('\n');
 
 const isOwnCostReduction = (sentence: string, name: string): boolean => {
   const lower = sentence.toLowerCase();

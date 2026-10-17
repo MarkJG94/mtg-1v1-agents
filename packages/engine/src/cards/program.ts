@@ -1,8 +1,10 @@
 import { type ObjectId, type PlayerId, playerZone } from '@mtg/shared';
 import type { EventEmitter } from '../events/emitter.js';
+import type { ManaCost } from '../mana/cost.js';
 import { finishResolving } from '../stack.js';
 import type { GameState } from '../state/game-state.js';
 import { objectsIn, updateState } from '../state/update.js';
+import { canPayMana, payMana } from './cast.js';
 import { applyOp } from './effects.js';
 import {
   type EffectContext,
@@ -42,8 +44,8 @@ export interface Resolution {
   readonly object: ObjectId;
   /** Innermost last, as a call stack. */
   readonly frames: readonly EffectFrame[];
-  /** A "may" waiting on its yes or no: what happens on a yes. */
-  readonly asking: Omit<EffectFrame, 'next'> | null;
+  /** A "may" waiting on its yes or no: what happens on a yes, and what a yes costs. */
+  readonly asking: (Omit<EffectFrame, 'next'> & { readonly pay?: ManaCost }) | null;
 }
 
 /** Start resolving `object` with these effects, and run as far as the program goes. */
@@ -93,16 +95,20 @@ export const runResolution = (state: GameState, emitter: EventEmitter): GameStat
 };
 
 /** The answer to a "may": on a yes its effects run next, on a no they are skipped. */
-export const answerMay = (state: GameState, emitter: EventEmitter, yes: boolean): GameState => {
+export const answerMay = (
+  state: GameState,
+  emitter: EventEmitter,
+  player: PlayerId,
+  yes: boolean,
+): GameState => {
   const resolution = state.resolution;
   if (resolution?.asking == null) throw new Error('no "may" is waiting on an answer');
-  const frames = yes
-    ? [...resolution.frames, { ...resolution.asking, next: 0 }]
-    : resolution.frames;
-  return runResolution(
-    updateState(state, { resolution: { ...resolution, frames, asking: null } }),
-    emitter,
-  );
+  const { pay, ...asking } = resolution.asking;
+  const frames = yes ? [...resolution.frames, { ...asking, next: 0 }] : resolution.frames;
+  const answered = updateState(state, { resolution: { ...resolution, frames, asking: null } });
+  // A yes to "you may pay" pays before anything it buys happens, by the player asked.
+  const paid = yes && pay !== undefined ? payMana(answered, emitter, player, pay) : answered;
+  return runResolution(paid, emitter);
 };
 
 const withFrames = (state: GameState, frames: readonly EffectFrame[]): GameState => {
@@ -158,8 +164,17 @@ const step = (
       const [player] = resolvePlayers(state, context, op.player);
       const resolution = state.resolution;
       if (player === undefined || resolution === null) return state;
+      // A payment nobody can make is not a question: the answer is no (CR 117.12).
+      if (op.pay !== undefined && !canPayMana(state, player, op.pay)) return state;
       return updateState(state, {
-        resolution: { ...resolution, asking: { effects: op.effects, context } },
+        resolution: {
+          ...resolution,
+          asking: {
+            effects: op.effects,
+            context,
+            ...(op.pay === undefined ? {} : { pay: op.pay }),
+          },
+        },
         pendingDecision: { kind: 'yesNo', player, source: context.source, options: [true, false] },
       });
     }

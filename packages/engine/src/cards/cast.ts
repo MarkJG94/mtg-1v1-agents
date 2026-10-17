@@ -330,6 +330,26 @@ const checkTargets = (
  * Mana is spent before life: a phyrexian symbol (CR 107.4f) takes 2 life only when the pool
  * and the lands cannot make its colour, and the life is lost as paying it (CR 119.4).
  */
+/**
+ * Mana an ability asks for as it resolves — "you may pay {2}" (CR 117.12): whether the
+ * player could pay it from their pool and what they could still tap, and paying it the way
+ * casting pays, tapping in object order to cover what the pool cannot.
+ */
+export const canPayMana = (state: GameState, player: PlayerId, cost: ManaCost): boolean =>
+  canPayFromSources(
+    state.players[player].manaPool,
+    potentialManaFor(state, player, manaAbilitiesOf(state, player)),
+    cost,
+    { life: state.players[player].life },
+  );
+
+export const payMana = (
+  state: GameState,
+  emitter: EventEmitter,
+  player: PlayerId,
+  cost: ManaCost,
+): GameState => payFor(state, emitter, player, cost, 0, true);
+
 const payFor = (
   state: GameState,
   emitter: EventEmitter,

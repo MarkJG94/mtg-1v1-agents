@@ -239,6 +239,54 @@ describe('validating a script against its card', () => {
   });
 });
 
+describe('a card with two faces', () => {
+  /**
+   * Its text is on its faces and none on the card. Checked against the card's alone it had
+   * nothing to claim, so it was supported with whatever its script said — 356 cards were,
+   * played as their front faces with their text ignored.
+   */
+  const faced = (front: string, back: string) =>
+    printed({
+      oracleText: '',
+      layout: 'transform',
+      faces: [
+        {
+          name: 'Jolt',
+          manaCost: '{R}',
+          typeLine: 'Instant',
+          oracleText: front,
+          power: null,
+          toughness: null,
+          loyalty: null,
+        },
+        {
+          name: 'Bolt',
+          manaCost: '',
+          typeLine: 'Instant',
+          oracleText: back,
+          power: null,
+          toughness: null,
+          loyalty: null,
+        },
+      ] as never,
+    });
+
+  it('has every face’s sentences to claim, the front face’s first', () => {
+    const result = validateScript(
+      script(),
+      faced('Jolt deals 3 damage to any target.', 'Draw a card.'),
+    );
+    expect(result.status).toBe('partial');
+    expect(result.reasons.map((reason) => reason.message).join()).toContain('Draw a card');
+  });
+
+  it('is not supported by a script that claims nothing', () => {
+    expect(validateScript(script({ abilities: [] }), faced('Draw a card.', '')).status).toBe(
+      'partial',
+    );
+  });
+});
+
 describe('the executability smoke test', () => {
   it('plays a creature and a land without the engine complaining', () => {
     const cub = validateScript(

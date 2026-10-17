@@ -286,7 +286,6 @@
   "Ajani Goldmane": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 1 is not claimed by any ability: \"−1: Put a +1/+1 counter on each creature you control.\"",
       "coverage: sentence 2 is not claimed by any ability: \"Those creatures gain vigilance until end of turn.\"",
       "coverage: sentence 3 is not claimed by any ability: \"−6: Create a white Avatar creature token.\"",
       "coverage: sentence 4 is not claimed by any ability: \"It has \"This token's power and toughness are each equal to your life total.\"\""
@@ -322,6 +321,31 @@
               "op": "gainLife",
               "player": "you",
               "amount": 2
+            }
+          ]
+        },
+        {
+          "kind": "loyalty",
+          "id": "auto-loyalty-1",
+          "covers": [
+            1
+          ],
+          "cost": -1,
+          "effects": [
+            {
+              "op": "forEach",
+              "of": {
+                "is": "creature",
+                "controller": "you"
+              },
+              "effects": [
+                {
+                  "op": "addCounters",
+                  "object": "$each",
+                  "counter": "+1/+1",
+                  "amount": 1
+                }
+              ]
             }
           ]
         }
@@ -2844,7 +2868,6 @@
   "Dragon Whelp": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 1 is not claimed by any ability: \"{R}: This creature gets +1/+0 until end of turn.\"",
       "coverage: sentence 2 is not claimed by any ability: \"If this ability has been activated four or more times this turn, sacrifice this creature at the beginning of the next end step.\""
     ],
     "script": {
@@ -2866,7 +2889,27 @@
         "flying"
       ],
       "text": "Flying\n{R}: This creature gets +1/+0 until end of turn. If this ability has been activated four or more times this turn, sacrifice this creature at the beginning of the next end step.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "activated",
+          "id": "auto-activated-1",
+          "covers": [
+            1
+          ],
+          "cost": {
+            "mana": "{R}"
+          },
+          "effects": [
+            {
+              "op": "pump",
+              "object": "~",
+              "power": 1,
+              "toughness": 0,
+              "duration": "untilEndOfTurn"
+            }
+          ]
+        }
+      ]
     }
   },
   "Dragon's Claw": {
@@ -3231,7 +3274,6 @@
   "Elixir of Immortality": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"{2}, {T}: You gain 5 life.\"",
       "coverage: sentence 1 is not claimed by any ability: \"Shuffle this artifact and your graveyard into their owner's library.\""
     ],
     "script": {
@@ -3243,7 +3285,26 @@
       ],
       "colours": [],
       "text": "{2}, {T}: You gain 5 life. Shuffle this artifact and your graveyard into their owner's library.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "activated",
+          "id": "auto-activated-0",
+          "covers": [
+            0
+          ],
+          "cost": {
+            "mana": "{2}",
+            "tap": true
+          },
+          "effects": [
+            {
+              "op": "gainLife",
+              "player": "you",
+              "amount": 5
+            }
+          ]
+        }
+      ]
     }
   },
   "Elvish Archdruid": {
@@ -7048,7 +7109,6 @@
   "Mystifying Maze": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 1 is not claimed by any ability: \"{4}, {T}: Exile target attacking creature an opponent controls.\"",
       "coverage: sentence 2 is not claimed by any ability: \"At the beginning of the next end step, return it to the battlefield tapped under its owner's control.\""
     ],
     "script": {
@@ -7075,6 +7135,35 @@
                 "amount": 1
               }
             ]
+          ]
+        },
+        {
+          "kind": "activated",
+          "id": "auto-activated-1",
+          "covers": [
+            1
+          ],
+          "cost": {
+            "mana": "{4}",
+            "tap": true
+          },
+          "targets": [
+            {
+              "id": "t",
+              "filter": {
+                "is": "creature",
+                "and": [
+                  "attacking"
+                ],
+                "controller": "opponent"
+              }
+            }
+          ],
+          "effects": [
+            {
+              "op": "exile",
+              "object": "$t"
+            }
           ]
         }
       ]

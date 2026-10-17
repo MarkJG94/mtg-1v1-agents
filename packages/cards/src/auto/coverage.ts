@@ -1,4 +1,4 @@
-import { checkCoverage } from '../checks.js';
+import { checkCoverage, rulesTextOf } from '../checks.js';
 import { cardScriptSchema } from '../schema.js';
 import type { CardProjection } from '../scryfall.js';
 import { validateScript } from '../validate.js';
@@ -109,7 +109,8 @@ export const measureCoverage = (
     counts.cards += 1;
     if (counts.cards % 1000 === 0) options.onProgress?.(counts.cards);
 
-    const hasText = card.oracleText.trim().length > 0;
+    // A card with faces keeps its text on them: it has rules text, wherever it is.
+    const hasText = rulesTextOf(card).trim().length > 0;
     if (!hasText) counts.withoutRulesText += 1;
 
     const emitted = emitScript(card);

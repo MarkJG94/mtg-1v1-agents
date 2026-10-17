@@ -99,6 +99,39 @@ describe('what a trigger is waiting on', () => {
   });
 });
 
+describe('a card whose text is on its faces', () => {
+  it('has rules text, so it is not counted among the cards supported for having none', () => {
+    const [plain] = corpus;
+    const faced = {
+      ...(plain as CardProjection),
+      name: 'Front // Back',
+      oracleText: '',
+      faces: [
+        {
+          name: 'Front',
+          manaCost: '{R}',
+          typeLine: 'Instant',
+          oracleText: 'Draw a card.',
+          power: null,
+          toughness: null,
+          loyalty: null,
+        },
+        {
+          name: 'Back',
+          manaCost: '',
+          typeLine: 'Instant',
+          oracleText: 'Draw a card.',
+          power: null,
+          toughness: null,
+          loyalty: null,
+        },
+      ],
+    } as CardProjection;
+    const { counts } = measureCoverage([faced], { skipSmokeTest: true });
+    expect(counts.withoutRulesText).toBe(0);
+  });
+});
+
 describe('counting, over the committed corpus', () => {
   // Quick: the smoke test plays every card three times, which is most of a real run and
   // all of it here. What is being checked is the arithmetic, not the verdicts.

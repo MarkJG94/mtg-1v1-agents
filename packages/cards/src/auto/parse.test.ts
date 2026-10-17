@@ -607,6 +607,62 @@ describe('the trigger vocabulary 7.1 widened', () => {
   });
 });
 
+describe('a trigger’s body past its first sentence', () => {
+  it('reads the sentences after the condition’s as more of the same body', () => {
+    expect(parseTrigger('When ~ enters, draw a card.', ['You lose 1 life.'])).toMatchObject({
+      ability: {
+        effects: [
+          { op: 'draw', player: 'you', count: 1 },
+          { op: 'loseLife', player: 'you', amount: 1 },
+        ],
+        sentencesRead: 2,
+      },
+    });
+  });
+
+  it('folds "If you do" from the next sentence into the trigger’s "may"', () => {
+    expect(
+      parseTrigger('Whenever ~ attacks, you may draw a card.', ['If you do, discard a card.']),
+    ).toMatchObject({
+      ability: {
+        effects: [{ op: 'may', effects: [{ op: 'draw' }, { op: 'discard' }] }],
+        sentencesRead: 2,
+      },
+    });
+  });
+
+  it('says how far it got when a later sentence is unread', () => {
+    expect(parseTrigger('When ~ enters, draw a card.', ['Frobnicate.'])).toMatchObject({
+      ability: { sentencesRead: 1 },
+    });
+  });
+});
+
+describe('"you may pay {N}. If you do, …" (CR 117.12)', () => {
+  it('reads the payment, with what it buys folded in', () => {
+    expect(
+      parseTrigger('Whenever ~ attacks, you may pay {2}{R}.', ['If you do, draw a card.']),
+    ).toMatchObject({
+      ability: {
+        effects: [{ op: 'may', player: 'you', pay: '{2}{R}', effects: [{ op: 'draw', count: 1 }] }],
+        sentencesRead: 2,
+      },
+    });
+  });
+
+  it('leaves a payment unread when nothing it buys follows it', () => {
+    for (const following of [["If you don't, sacrifice ~."], ['Draw a card.'], []]) {
+      expect(parseTrigger('When ~ enters, you may pay {1}.', following)).toHaveProperty('failure');
+    }
+  });
+
+  it('pays only mana: energy is not a cost the engine can take', () => {
+    expect(
+      parseTrigger('When ~ enters, you may pay {E}{E}.', ['If you do, draw a card.']),
+    ).toHaveProperty('failure');
+  });
+});
+
 describe('a spell’s reduction of its own cost (CR 601.2f)', () => {
   const less = (rest: string) => parseCostReduction(`~ costs ${rest}`);
 

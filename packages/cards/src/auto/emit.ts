@@ -1,4 +1,4 @@
-import { parseTypeLine } from '../oracle-text.js';
+import { parseTypeLine, sentencesOf } from '../oracle-text.js';
 import type { CardProjection } from '../scryfall.js';
 import { type ClassifiedLine, classifyCard } from './classify.js';
 import {
@@ -228,12 +228,16 @@ const abilityFor = (line: ClassifiedLine): Record<string, unknown> | null => {
     }
 
     case 'triggered': {
-      const parsed = parseTrigger(line.line.text);
+      // The first sentence holds the condition; the rest of the line is more of the same
+      // body, and was once handed to the grammar as part of the first sentence — so no
+      // trigger whose body ran to a second sentence could be read at all.
+      const [first, ...following] = line.line.sentences.map((sentence) => sentence.text);
+      const parsed = parseTrigger(first ?? line.line.text, following);
       if ('failure' in parsed) return null;
       return {
         kind: 'triggered',
         id,
-        covers: covered(line),
+        covers: covered(line, parsed.ability.sentencesRead),
         when: parsed.when,
         ...body(parsed.ability),
       };
@@ -244,12 +248,18 @@ const abilityFor = (line: ClassifiedLine): Record<string, unknown> | null => {
       // The rider comes off before the grammar sees the effect: "Activate only as a
       // sorcery" is a restriction on the ability, not something the ability does.
       const rider = parseRiders(line.effect ?? line.line.text);
-      const parsed = parseEffects([rider.effect]);
+      // Sentence by sentence, as a trigger's body is: "{T}: Draw a card. Then discard a
+      // card." is two, which the grammar was once handed as one. Each sentence of the
+      // effect is the line's sentence of the same place, since a cost has no full stop in
+      // it; all of them read claims the whole line, the rider's sentence with it.
+      const sentences = sentencesOf(rider.effect);
+      const parsed = parseEffects(sentences);
       if (cost === null || !parsed.ok) return null;
+      const read = parsed.ability.sentencesRead;
       return {
         kind: 'activated',
         id,
-        covers: covered(line),
+        covers: read === sentences.length ? covered(line) : covered(line, read),
         cost,
         ...(rider.sorceryOnly === true ? { sorceryOnly: true } : {}),
         ...body(parsed.ability),
@@ -258,9 +268,11 @@ const abilityFor = (line: ClassifiedLine): Record<string, unknown> | null => {
 
     case 'loyalty': {
       const cost = Number(line.cost);
-      const parsed = parseEffects([line.effect ?? line.line.text]);
+      // Sentence by sentence, for the reason an activated ability's effect is.
+      const parsed = parseEffects(sentencesOf(line.effect ?? line.line.text));
       if (!Number.isInteger(cost) || !parsed.ok) return null;
-      return { kind: 'loyalty', id, covers: covered(line), cost, ...body(parsed.ability) };
+      const covers = covered(line, parsed.ability.sentencesRead);
+      return { kind: 'loyalty', id, covers, cost, ...body(parsed.ability) };
     }
 
     default:
@@ -316,7 +328,7 @@ const body = (ability: ParsedAbility): Readonly<Record<string, unknown>> => ({
  * what makes a cached "unsupported" from an older parser be re-earned rather than believed
  * — which is the whole reason the row stores a version at all.
  */
-export const AUTO_SCRIPTER_VERSION = 7;
+export const AUTO_SCRIPTER_VERSION = 8;
 
 export const autoScripter = {
   version: AUTO_SCRIPTER_VERSION,
