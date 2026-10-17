@@ -354,6 +354,35 @@ describe('zone changes', () => {
   });
 
   /**
+   * The log says so. Done to the state inside the replacement, regeneration tapped the
+   * creature and cleared its damage with nothing logged, so a game replayed from its log
+   * had the creature untapped and damaged — found once agents could activate "{B}:
+   * Regenerate ~" and a destroy effect met the shield in a real game.
+   */
+  it('logs the regeneration, as the event that took the destruction’s place', () => {
+    const game = build();
+    const victim = game.put('A', { power: 2, toughness: 2, damage: 3 });
+    game.effect({
+      source: victim,
+      controller: 'A',
+      applies: {
+        kind: 'movesToZone',
+        object: victim,
+        to: playerZone('A', 'graveyard'),
+        destructionOnly: true,
+      },
+      change: { kind: 'regenerate' },
+      duration: { kind: 'untilEndOfTurn' },
+      uses: 1,
+    });
+
+    checkStateBasedActions(game.state, game.emitter);
+    const logged = game.emitter.events.map((event) => event.type);
+    expect(logged).toContain('regenerate');
+    expect(logged).not.toContain('moveZone');
+  });
+
+  /**
    * CR 704.5f: a creature with zero toughness is *put into* its graveyard rather than
    * destroyed, so no regeneration shield saves it.
    */

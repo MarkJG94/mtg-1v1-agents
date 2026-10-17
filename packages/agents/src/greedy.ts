@@ -120,6 +120,12 @@ const bestAction = (
  */
 export const prior = (view: PlayerView, action: PriorityAction, weights: Weights): number => {
   if (action.kind === 'activateLoyalty') return weights.loyaltyActivation;
+  if (action.kind === 'activate') {
+    // Priced as an instant of the same cost would be: what it does is just as unseen, and
+    // what it costs is the only measure of its size there is.
+    const size = Math.max(1, action.cost.generic + action.cost.symbols.length);
+    return targetedCredit(view, action.targets, size, weights, weights.spellUntargeted * size);
+  }
   if (action.kind !== 'cast') return 0;
 
   const card = view.objects.get(action.object);
@@ -127,12 +133,24 @@ export const prior = (view: PlayerView, action: PriorityAction, weights: Weights
   if (action.targets.length === 0) {
     return isPermanentCard(card) ? 0 : weights.spellUntargeted * card.manaValue;
   }
+  return targetedCredit(view, action.targets, card.manaValue, weights, 0);
+};
+
+/** Credit for aiming something of `size` at these targets, or `untargeted` with none. */
+const targetedCredit = (
+  view: PlayerView,
+  targets: Extract<PriorityAction, { kind: 'cast' }>['targets'],
+  size: number,
+  weights: Weights,
+  untargeted: number,
+): number => {
+  if (targets.length === 0) return untargeted;
 
   let credit = 0;
-  for (const target of action.targets) {
+  for (const target of targets) {
     if (target.kind === 'player') {
       if (target.player !== view.viewer) {
-        credit += weights.spellAtOpponent * Math.max(1, card.manaValue);
+        credit += weights.spellAtOpponent * Math.max(1, size);
       }
       continue;
     }

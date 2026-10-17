@@ -20,6 +20,7 @@ import { potentialManaFor } from '../mana/potential.js';
 import { isStackEmpty, putActivatedAbilityOnStack, putOnStack } from '../stack.js';
 import type { GameState } from '../state/game-state.js';
 import { getObject, updateObject, updatePlayer } from '../state/update.js';
+import { canPayTap } from '../tap-cost.js';
 import { canBeTargeted } from '../targeting.js';
 import { canPayLife, discardCandidates, sacrificeCandidates } from './additional-cost.js';
 import { reducedCost } from './cost-reduction.js';
@@ -135,17 +136,22 @@ export const activateAbility = (
   if (definition === undefined || ability === undefined) {
     throw new IllegalCastError(`object ${id} has no activated ability "${abilityId}"`);
   }
-  if (object.zone !== 'battlefield') {
-    throw new IllegalCastError(`object ${id} is in ${object.zone}, not on the battlefield`);
+  // Most abilities work from the battlefield; cycling's works from its owner's hand.
+  const zone = ability.from === 'hand' ? playerZone(player, 'hand') : 'battlefield';
+  if (object.zone !== zone) {
+    throw new IllegalCastError(`object ${id} is in ${object.zone}, not ${zone}`);
   }
-  if (object.controller !== player) {
+  if (ability.from !== 'hand' && object.controller !== player) {
     throw new IllegalCastError(`${player} does not control object ${id}`);
   }
   if (ability.sorceryOnly === true && !atSorcerySpeed(state, player)) {
     throw new IllegalCastError('this ability can only be activated at sorcery speed');
   }
-  if (ability.cost.tap === true && object.tapped) {
-    throw new IllegalCastError(`object ${id} is already tapped, so it cannot pay {T}`);
+  if (ability.cost.tap === true && !canPayTap(state, id)) {
+    throw new IllegalCastError(
+      `object ${id} cannot pay {T}: it is tapped, or a creature that came under its ` +
+        "controller's control this turn without haste (CR 302.6)",
+    );
   }
 
   const targets = options.targets ?? [];
@@ -154,11 +160,33 @@ export const activateAbility = (
 
   let current = state;
   if (ability.cost.mana !== undefined) {
-    current = payFor(current, emitter, player, ability.cost.mana, x, options.autoTap !== false);
+    // "{1}, {T}: …" on a permanent that taps for mana: it cannot pay the {1} by tapping
+    // itself and then tap again for the ability (CR 602.5a).
+    const reserved = ability.cost.tap === true ? id : undefined;
+    current = payFor(
+      current,
+      emitter,
+      player,
+      ability.cost.mana,
+      x,
+      options.autoTap !== false,
+      reserved,
+    );
   }
   if (ability.cost.tap === true) {
     current = updateObject(current, id, { tapped: true });
     emitter.emit(current, { type: 'tap', object: id });
+  }
+  if (ability.cost.discardSelf === true) {
+    // Cycling is a discard (CR 702.29a), so whatever watches for one sees it.
+    current = runEvent(current, emitter, {
+      kind: 'moveZone',
+      object: id,
+      from: playerZone(player, 'hand'),
+      to: playerZone(object.owner, 'graveyard'),
+      cause: 'discard',
+      destruction: false,
+    });
   }
   if (ability.cost.sacrificeSelf === true) {
     // Costs are paid as the ability is activated, before it goes on the stack (CR 601.2h
@@ -357,6 +385,8 @@ const payFor = (
   cost: ManaCost,
   x: number,
   autoTap: boolean,
+  /** A permanent the cost also taps, which therefore cannot tap for its mana too. */
+  reserved?: ObjectId,
 ): GameState => {
   let current = state;
   const life = state.players[player].life;
@@ -364,7 +394,9 @@ const payFor = (
     payCost(current.players[player].manaPool, cost, withLife ? { xValue: x, life } : { xValue: x });
 
   if (autoTap && paid(false) === null) {
-    const sources = untappedSources(current, player);
+    const sources = untappedSources(current, player).filter(
+      (ability) => !(ability.requiresTap && ability.source === reserved),
+    );
     const manaOnly =
       !cost.symbols.some((symbol) => symbol.options.some((option) => option.kind === 'life')) ||
       canPayFromSources(

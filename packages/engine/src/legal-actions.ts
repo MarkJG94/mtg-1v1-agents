@@ -13,10 +13,16 @@ import {
   sacrificeCandidates,
 } from './cards/additional-cost.js';
 import { reducedCost } from './cards/cost-reduction.js';
-import type { AdditionalCost, CostReduction, TargetSpec } from './cards/definition.js';
+import type {
+  ActivatedAbilityDef,
+  AdditionalCost,
+  CardDefinition,
+  CostReduction,
+  TargetSpec,
+} from './cards/definition.js';
 import { matchesFilter } from './cards/evaluate.js';
 import type { ManaAbility } from './mana/ability.js';
-import type { ManaCost } from './mana/cost.js';
+import { emptyManaCost, type ManaCost } from './mana/cost.js';
 import { canPayFromSources, type PotentialMana } from './mana/payment.js';
 import { potentialManaFor } from './mana/potential.js';
 
@@ -27,6 +33,7 @@ import { isStackEmpty, splitSecondActive } from './stack-query.js';
 import type { GameState } from './state/game-state.js';
 import { isGameOver } from './state/game-state.js';
 import { getObject, objectsIn } from './state/update.js';
+import { canPayTap } from './tap-cost.js';
 import { allTargets, canBeTargeted } from './targeting.js';
 import { landsRemainingThisTurn } from './turn/land.js';
 
@@ -86,6 +93,22 @@ export type LegalAction =
       readonly discard?: readonly ObjectId[];
       /** The life it pays (CR 119.4), so an agent that sees only the action can price it. */
       readonly life?: number;
+    }
+  /**
+   * An activated ability of a permanent (CR 602), with its targets chosen. `cost` is its
+   * mana; `tap` and `sacrificeSelf` say what else it costs, so an agent that sees only the
+   * action can price it.
+   */
+  | {
+      readonly kind: 'activate';
+      readonly object: ObjectId;
+      readonly ability: string;
+      readonly cost: ManaCost;
+      readonly tap: boolean;
+      readonly sacrificeSelf: boolean;
+      /** Discarding the card itself, as cycling does from the hand. */
+      readonly discardSelf: boolean;
+      readonly targets: readonly EventTarget[];
     }
   /** A planeswalker's loyalty ability (CR 606). Its cost is counters, not mana. */
   | {
@@ -149,6 +172,8 @@ export const legalActions = (
     return answer;
   };
 
+  actions.push(...activations(state, player, canPay, cards));
+
   for (const id of objectsIn(state, playerZone(player, 'hand'))) {
     const info = cards.infoFor(state, id);
     if (!info) continue;
@@ -196,6 +221,107 @@ export const legalActions = (
  * rather than a crash.
  */
 const MOST_TARGETINGS = 24;
+
+/**
+ * Activated abilities of the player's permanents (CR 602.2), each with its targets chosen
+ * as a cast spell's are, up to the same cap.
+ *
+ * Exactly what `activateAbility` accepts: the timing (CR 602.5d), {T} only from a
+ * permanent that can pay it (CR 302.6), mana the player could make — without tapping the
+ * source for it when the ability taps the source too (CR 602.5a) — and legal targets. An
+ * ability that costs nothing at all is left out: offered every time priority came round,
+ * a free "~ gets +1/+0" could be taken without end.
+ */
+const activations = (
+  state: GameState,
+  player: PlayerId,
+  canPay: (cost: ManaCost) => boolean,
+  cards: CardInfoSource,
+): readonly LegalAction[] => {
+  const found: LegalAction[] = [];
+  const sorceryTiming =
+    state.activePlayer === player && isMainPhase(state.step) && isStackEmpty(state);
+  const hand = objectsIn(state, playerZone(player, 'hand'));
+  for (const id of [...objectsIn(state, 'battlefield'), ...hand]) {
+    const object = getObject(state, id);
+    const inHand = object.zone !== 'battlefield';
+    if (!inHand && object.controller !== player) continue;
+    const definition = state.definitions.get(object.definitionId);
+    if (definition === undefined) continue;
+    for (const ability of activatedOf(definition)) {
+      // An ability works from where it says: the battlefield, or the hand (CR 702.29a).
+      if ((ability.from === 'hand') !== inHand) continue;
+      const mana = ability.cost.mana ?? emptyManaCost;
+      const tap = ability.cost.tap === true;
+      const sacrificeSelf = ability.cost.sacrificeSelf === true;
+      const discardSelf = ability.cost.discardSelf === true;
+      const free =
+        !tap && !sacrificeSelf && !discardSelf && mana.generic === 0 && mana.symbols.length === 0;
+      if (free || mana.variable > 0) continue;
+      if (ability.sorceryOnly === true && !sorceryTiming) continue;
+      if (tap && !canPayTap(state, id)) continue;
+      const payable = tap ? canPayWithout(state, player, mana, id, cards) : canPay(mana);
+      if (!payable) continue;
+      const choices = targetChoices(state, player, id, {
+        isLand: false,
+        manaCost: mana,
+        sorcerySpeed: false,
+        colours: definition.colours,
+        targets: ability.targets ?? [],
+      });
+      for (const targets of choices.slice(0, MOST_TARGETINGS)) {
+        found.push({
+          kind: 'activate',
+          object: id,
+          ability: ability.id,
+          cost: mana,
+          tap,
+          sacrificeSelf,
+          discardSelf,
+          targets,
+        });
+      }
+    }
+  }
+  return found;
+};
+
+/**
+ * A definition's activated abilities, worked out once: this runs at every priority over
+ * every permanent and every card in hand, and most of them have none.
+ */
+const activatedByDefinition = new WeakMap<CardDefinition, readonly ActivatedAbilityDef[]>();
+const activatedOf = (definition: CardDefinition): readonly ActivatedAbilityDef[] => {
+  const known = activatedByDefinition.get(definition);
+  if (known !== undefined) return known;
+  const found = definition.abilities.filter(
+    (ability): ability is ActivatedAbilityDef => ability.kind === 'activated',
+  );
+  activatedByDefinition.set(definition, found);
+  return found;
+};
+
+/** Whether the cost can be paid without tapping `reserved` for mana. */
+const canPayWithout = (
+  state: GameState,
+  player: PlayerId,
+  cost: ManaCost,
+  reserved: ObjectId,
+  cards: CardInfoSource,
+): boolean => {
+  if (cost.generic === 0 && cost.symbols.length === 0) return true;
+  const abilities = (cards.manaAbilitiesFor?.(state, player) ?? []).filter(
+    (ability) => !(ability.requiresTap && ability.source === reserved),
+  );
+  return canPayFromSources(
+    state.players[player].manaPool,
+    potentialManaFor(state, player, abilities),
+    cost,
+    {
+      life: state.players[player].life,
+    },
+  );
+};
 
 /**
  * The castings of a spell with an additional cost: each targeting with each way of paying

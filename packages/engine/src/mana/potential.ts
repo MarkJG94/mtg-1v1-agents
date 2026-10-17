@@ -1,5 +1,6 @@
 import type { PlayerId } from '@mtg/shared';
 import type { GameState } from '../state/game-state.js';
+import { canPayTap } from '../tap-cost.js';
 import type { ManaAbility } from './ability.js';
 import type { PotentialMana } from './payment.js';
 
@@ -22,7 +23,7 @@ export const potentialManaFor = (
   for (const ability of oneTapEach(abilities)) {
     const source = state.objects.get(ability.source);
     if (source?.zone !== 'battlefield' || source.controller !== player) continue;
-    if (ability.requiresTap && source.tapped) continue;
+    if (ability.requiresTap && !canPayTap(state, ability.source)) continue;
 
     // Modes almost always make the same number of mana (a dual land offers a choice of
     // colour, not of count), and then each slot can offer the union of what the modes

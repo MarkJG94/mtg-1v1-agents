@@ -193,8 +193,12 @@ const abilityFrom = (
             ...(ability.cost.sacrificeSelf !== undefined
               ? { sacrificeSelf: ability.cost.sacrificeSelf }
               : {}),
+            ...(ability.cost.discardSelf !== undefined
+              ? { discardSelf: ability.cost.discardSelf }
+              : {}),
           },
           ...(ability.sorceryOnly !== undefined ? { sorceryOnly: ability.sorceryOnly } : {}),
+          ...(ability.from !== undefined ? { from: ability.from } : {}),
           ...(targets.length > 0 ? { targets } : {}),
           effects,
         };

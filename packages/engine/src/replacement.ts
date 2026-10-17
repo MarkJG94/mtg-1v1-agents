@@ -4,7 +4,7 @@ import { enteringReplacements, staticReplacements } from './cards/statics.js';
 import type { CombatState } from './combat.js';
 import { affectedPlayer, type RulesEvent } from './events/rules-event.js';
 import type { GameState } from './state/game-state.js';
-import { updateObject, updateState } from './state/update.js';
+import { updateState } from './state/update.js';
 
 /**
  * Replacement and prevention effects (CR 614–616).
@@ -271,7 +271,7 @@ const scale = (amount: number, multiply: number | undefined, add: number | undef
   Math.max(0, Math.round(amount * (multiply ?? 1)) + (add ?? 0));
 
 /** Take a creature out of combat (CR 506.4), which regeneration does. */
-const withoutInCombat = (combat: CombatState | null, id: ObjectId): CombatState | null => {
+export const withoutInCombat = (combat: CombatState | null, id: ObjectId): CombatState | null => {
   if (!combat) return null;
   return {
     ...combat,
@@ -381,16 +381,12 @@ const applyChange = (state: GameState, effect: ReplacementEffect, event: RulesEv
 
     case 'regenerate': {
       if (event.kind !== 'moveZone') break;
-      const regenerated = updateObject(consume(state, effect), event.object, {
-        tapped: true,
-        damage: 0,
-        deathtouched: false,
-      });
+      // The destruction is replaced by the regeneration, which is performed — and logged —
+      // as the event it is. Done here, to the state, it tapped the creature and cleared its
+      // damage without a word in the log, and replaying the log disagreed with the game.
       return {
-        state: updateState(regenerated, {
-          combat: withoutInCombat(regenerated.combat, event.object),
-        }),
-        events: [],
+        state: consume(state, effect),
+        events: [{ kind: 'regenerate', object: event.object }],
       };
     }
 

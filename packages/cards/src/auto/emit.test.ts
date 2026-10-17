@@ -196,6 +196,27 @@ describe('auras and equipment', () => {
   });
 });
 
+describe('cycling', () => {
+  it('writes the activated ability it is short for, used from the hand', () => {
+    const faith = {
+      ...card('Fling'),
+      name: 'Test Faith',
+      typeLine: 'Instant',
+      oracleText: 'You gain 6 life.\nCycling {1}{W}',
+    };
+    const emitted = emitScript(faith);
+    expect(emitted.script?.['abilities']).toContainEqual({
+      kind: 'activated',
+      id: 'auto-cycling-1',
+      from: 'hand',
+      covers: [1],
+      cost: { mana: '{1}{W}', discardSelf: true },
+      effects: [{ op: 'draw', player: 'you', count: 1 }],
+    });
+    expect(validateScript(emitted.script, faith).status).toBe('supported');
+  });
+});
+
 describe('abilities whose text runs past one sentence', () => {
   const creature = (oracleText: string) => ({
     ...card('Fling'),

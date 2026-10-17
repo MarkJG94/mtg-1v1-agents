@@ -6,6 +6,7 @@ import {
   resolveReplacements,
   resumeReplacements,
   UnknownReplacementError,
+  withoutInCombat,
 } from '../replacement.js';
 import type { GameState } from '../state/game-state.js';
 import { type GameObject, withCounters } from '../state/object.js';
@@ -236,6 +237,8 @@ const applyOne = (state: GameState, emitter: EventEmitter, event: RulesEvent): G
       return applyCounters(state, emitter, event);
     case 'poison':
       return applyPoison(state, emitter, event);
+    case 'regenerate':
+      return applyRegenerate(state, emitter, event);
   }
 };
 
@@ -359,6 +362,25 @@ const applyLife = (state: GameState, emitter: EventEmitter, event: LifeEvent): G
   return event.kind === 'gainLife'
     ? queueTriggers(next, triggersFromLifeGain(next, event.player))
     : next;
+};
+
+/** CR 701.15b: tapped, its damage removed, and out of combat. */
+const applyRegenerate = (
+  state: GameState,
+  emitter: EventEmitter,
+  event: Extract<RulesEvent, { kind: 'regenerate' }>,
+): GameState => {
+  if (state.objects.get(event.object)?.zone !== 'battlefield') return state;
+  const regenerated = updateObject(state, event.object, {
+    tapped: true,
+    damage: 0,
+    deathtouched: false,
+  });
+  const next = updateState(regenerated, {
+    combat: withoutInCombat(regenerated.combat, event.object),
+  });
+  emitter.emit(next, { type: 'regenerate', object: event.object });
+  return next;
 };
 
 /** CR 122.1: poison counters sit on the player; ten of them is a loss (CR 704.5c). */

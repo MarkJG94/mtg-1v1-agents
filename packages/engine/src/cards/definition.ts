@@ -34,6 +34,8 @@ export interface AbilityCost {
   readonly mana?: ManaCost;
   readonly tap?: boolean;
   readonly sacrificeSelf?: boolean;
+  /** "Discard this card" — cycling's cost (CR 702.29a), paid from the hand. */
+  readonly discardSelf?: boolean;
 }
 
 /** An instant or sorcery's effect; also what a permanent spell does on the way in. */
@@ -59,6 +61,11 @@ export interface ActivatedAbilityDef {
   readonly cost: AbilityCost;
   /** Sorcery-speed only, the way most "activate only as a sorcery" abilities read. */
   readonly sorceryOnly?: boolean;
+  /**
+   * Where the card has to be to activate it: on the battlefield, as nearly every ability
+   * is, or in its owner's hand, as cycling is (CR 602.2, 702.29a).
+   */
+  readonly from?: 'hand';
   readonly targets?: readonly TargetSpec[];
   readonly effects: readonly EffectOp[];
 }
