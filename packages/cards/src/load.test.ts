@@ -182,6 +182,37 @@ describe('trigger conditions', () => {
   });
 });
 
+describe('a cost reduction', () => {
+  it('loads its quantity and condition, and a graveyard filter, into the engine’s forms', () => {
+    const definition = loadCardScript({
+      ...bolt,
+      costReduction: {
+        generic: { count: { type: 'creature', graveyard: 'you' } },
+        if: { exists: { is: 'creature', controller: 'you' } },
+      },
+    });
+    expect(definition.costReduction).toEqual({
+      generic: {
+        kind: 'count',
+        of: {
+          kind: 'and',
+          filters: [
+            { kind: 'type', type: 'creature' },
+            { kind: 'inGraveyard', player: 'you' },
+          ],
+        },
+      },
+      if: {
+        kind: 'exists',
+        filter: {
+          kind: 'and',
+          filters: [{ kind: 'creature' }, { kind: 'controlledBy', player: 'you' }],
+        },
+      },
+    });
+  });
+});
+
 describe('an additional cost', () => {
   it('loads with its filter converted, and only the parts the script set', () => {
     const definition = loadCardScript({

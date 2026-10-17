@@ -63,6 +63,12 @@ export type Filter =
   | { readonly kind: 'colour'; readonly colour: Colour }
   | { readonly kind: 'controlledBy'; readonly player: PlayerRelation }
   | { readonly kind: 'inZone'; readonly zone: ZoneId }
+  /**
+   * A card in a graveyard, whose by the ability's controller: "a creature card in your
+   * graveyard". `inZone` names one zone outright, which a card cannot, since whose
+   * graveyard is "yours" depends on who controls the ability.
+   */
+  | { readonly kind: 'inGraveyard'; readonly player: PlayerRelation }
   | { readonly kind: 'tapped'; readonly tapped: boolean }
   | { readonly kind: 'attacking' }
   | { readonly kind: 'blocking' }

@@ -22,6 +22,7 @@ import type { GameState } from '../state/game-state.js';
 import { getObject, updateObject, updatePlayer } from '../state/update.js';
 import { canBeTargeted } from '../targeting.js';
 import { canPayLife, discardCandidates, sacrificeCandidates } from './additional-cost.js';
+import { reducedCost } from './cost-reduction.js';
 import {
   type ActivatedAbilityDef,
   bindTargets,
@@ -97,7 +98,8 @@ export const castSpell = (
   const discard = options.discard ?? [];
   checkAdditionalCost(state, player, id, definition, sacrifice, discard);
 
-  const mana = payFor(state, emitter, player, definition.manaCost, x, options.autoTap !== false);
+  const cost = reducedCost(state, player, id, definition.manaCost, definition.costReduction);
+  const mana = payFor(state, emitter, player, cost, x, options.autoTap !== false);
   // The rest of the cost after the mana (CR 601.2h lets them go in any order): so a
   // creature tapped for mana can still be the one sacrificed, as it can at a table.
   const paid = payAdditionalCost(mana, emitter, player, definition, sacrifice, discard);

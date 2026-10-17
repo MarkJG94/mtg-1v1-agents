@@ -122,6 +122,10 @@ const isClaimedByKeywords = (sentence: string, script: CardScript): boolean => {
   // "As an additional cost to cast ~, …" is what the script's `additionalCost:` says.
   if (/^as an additional cost to cast\b/i.test(sentence))
     return script.additionalCost !== undefined;
+  // "This spell costs {1} less to cast …" and "Affinity for artifacts" are what the
+  // script's `costReduction:` says — only about the spell itself, so a sentence about
+  // other spells ("Creature spells you cast cost {1} less") is not one of them.
+  if (isOwnCostReduction(sentence, script.name)) return script.costReduction !== undefined;
   const parts = sentence
     .toLowerCase()
     .replace(/\.$/, '')
@@ -185,4 +189,16 @@ export const checkCoverage = (script: CardScript, card: CardProjection): Coverag
     );
 
   return { sentences, unclaimed, problems };
+};
+
+const isOwnCostReduction = (sentence: string, name: string): boolean => {
+  const lower = sentence.toLowerCase();
+  if (/^affinity for\b/.test(lower)) return true;
+  const subject = ['this spell', name.toLowerCase()].find((each) =>
+    lower.startsWith(`${each} costs {`),
+  );
+  return (
+    subject !== undefined &&
+    /^\{\d+\} less to cast\b/.test(lower.slice(subject.length + ' costs '.length))
+  );
 };

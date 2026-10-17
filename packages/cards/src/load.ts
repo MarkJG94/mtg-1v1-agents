@@ -119,6 +119,14 @@ const definitionFrom = (script: CardScript): CardDefinition => {
     ...(script.additionalCost !== undefined
       ? { additionalCost: additionalCostFrom(script.additionalCost) }
       : {}),
+    ...(script.costReduction !== undefined
+      ? {
+          costReduction: {
+            generic: script.costReduction.generic,
+            ...(script.costReduction.if !== undefined ? { if: script.costReduction.if } : {}),
+          },
+        }
+      : {}),
     abilities: script.abilities.map((ability, index) =>
       abilityFrom(script, ability, `abilities[${index}]`),
     ),

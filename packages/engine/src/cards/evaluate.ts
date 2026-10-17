@@ -3,6 +3,7 @@ import {
   type ObjectId,
   type PlayerId,
   playerIds,
+  playerZone,
   type ZoneId,
 } from '@mtg/shared';
 import { characteristicsOf } from '../characteristics.js';
@@ -142,6 +143,8 @@ const zonesOf = (filter: Filter): readonly ZoneId[] => {
   switch (filter.kind) {
     case 'inZone':
       return [filter.zone];
+    case 'inGraveyard':
+      return playerIds.map((player) => playerZone(player, 'graveyard'));
     case 'spell':
       return ['stack'];
     case 'not':
@@ -213,6 +216,12 @@ export const matchesFilter = (
       return playerMatches(context, filter.player, traits.controller);
     case 'inZone':
       return object.zone === filter.zone;
+    case 'inGraveyard':
+      // A card in a graveyard is its owner's (CR 404.2), whoever last controlled it.
+      return (
+        object.zone === playerZone(object.owner, 'graveyard') &&
+        playerMatches(context, filter.player, object.owner)
+      );
     case 'tapped':
       return object.tapped === filter.tapped;
     case 'attacking':

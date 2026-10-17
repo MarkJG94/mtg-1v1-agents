@@ -60,6 +60,8 @@ const filterObject = z.object({
   colour: colourSchema.optional(),
   controller: z.enum(['you', 'opponent', 'any']).optional(),
   zone: z.string().optional(),
+  /** A card in a graveyard, whose relative to the ability's controller: `graveyard: you`. */
+  graveyard: z.enum(['you', 'opponent', 'any']).optional(),
   tapped: z.boolean().optional(),
   keyword: keywordSchema.optional(),
   powerAtLeast: z.number().int().optional(),
@@ -87,6 +89,7 @@ const filterFromObject = (value: FilterObject): Filter => {
     parts.push({ kind: 'controlledBy', player: value.controller });
   }
   if (value.zone !== undefined) parts.push({ kind: 'inZone', zone: value.zone as never });
+  if (value.graveyard !== undefined) parts.push({ kind: 'inGraveyard', player: value.graveyard });
   if (value.tapped !== undefined) parts.push({ kind: 'tapped', tapped: value.tapped });
   if (value.keyword !== undefined) parts.push({ kind: 'hasKeyword', keyword: value.keyword });
   if (value.powerAtLeast !== undefined) {
@@ -483,6 +486,13 @@ export const cardScriptSchema = z.object({
       message: 'an additional cost has to cost something',
     })
     .optional(),
+  /**
+   * What the spell takes off its own cost (CR 601.2f): `generic`, a quantity counted as it
+   * is cast, and an optional `if` condition. "This spell costs {1} less to cast for each
+   * artifact you control" is `{ generic: { count: { type: artifact, controller: you } } }`.
+   * Its printed line, and an "Affinity for …" line, are claimed by this field.
+   */
+  costReduction: z.object({ generic: quantitySchema, if: conditionSchema.optional() }).optional(),
   abilities: z.array(abilitySchema).default([]),
   /** The oracle text this script was written against, for the validator to check. */
   text: z.string().optional(),

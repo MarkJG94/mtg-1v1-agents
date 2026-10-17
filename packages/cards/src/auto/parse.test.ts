@@ -7,7 +7,9 @@ import type { CardProjection } from '../scryfall.js';
 import { classifyCard } from './classify.js';
 import {
   parseAdditionalCost,
+  parseAffinity,
   parseCost,
+  parseCostReduction,
   parseEffects,
   parseEnchant,
   parseManaModes,
@@ -602,6 +604,73 @@ describe('the trigger vocabulary 7.1 widened', () => {
     expect(parseTrigger('Whenever you cast a multicolored spell, draw a card.')).toHaveProperty(
       'failure',
     );
+  });
+});
+
+describe('a spell’s reduction of its own cost (CR 601.2f)', () => {
+  const less = (rest: string) => parseCostReduction(`~ costs ${rest}`);
+
+  it('counts what it says, for each one', () => {
+    expect(less('{1} less to cast for each artifact you control.')).toEqual({
+      generic: { count: { type: 'artifact', controller: 'you' } },
+    });
+    expect(less('{2} less to cast for each creature you control.')).toEqual({
+      generic: { mul: [2, { count: { is: 'creature', controller: 'you' } }] },
+    });
+    expect(less('{1} less to cast for each creature on the battlefield.')).toEqual({
+      generic: { count: 'creature' },
+    });
+  });
+
+  it('counts cards in your graveyard, an either-type list included', () => {
+    expect(less('{1} less to cast for each creature card in your graveyard.')).toEqual({
+      generic: { count: { type: 'creature', graveyard: 'you' } },
+    });
+    expect(less('{1} less to cast for each instant and sorcery card in your graveyard.')).toEqual({
+      generic: { count: { or: [{ type: 'instant' }, { type: 'sorcery' }], graveyard: 'you' } },
+    });
+  });
+
+  it('reads "for each opponent" as one, with two players', () => {
+    expect(less('{1} less to cast for each opponent.')).toEqual({ generic: 1 });
+  });
+
+  it('waits on "if you control …"', () => {
+    expect(less('{2} less to cast if you control a creature with flying.')).toEqual({
+      generic: 2,
+      if: { exists: { is: 'creature', and: [{ keyword: 'flying' }], controller: 'you' } },
+    });
+    expect(less('{3} less to cast if you control three or more artifacts.')).toEqual({
+      generic: 3,
+      if: { atLeast: { amount: { count: { type: 'artifact', controller: 'you' } }, than: 3 } },
+    });
+  });
+
+  it('refuses coloured mana, a condition on its targets, and what it cannot count', () => {
+    expect(less('{U} less to cast.')).toBeNull();
+    expect(less('{2} less to cast if it targets a tapped creature.')).toBeNull();
+    expect(less('{1} less to cast for each creature in your party.')).toBeNull();
+    expect(less('{2} less to cast.')).toBeNull();
+  });
+
+  it('reads Affinity as the same reduction (CR 702.41a)', () => {
+    expect(parseAffinity('Affinity for artifacts')).toEqual({
+      generic: { count: { type: 'artifact', controller: 'you' } },
+    });
+    expect(parseAffinity('Affinity for artifacts you control')).toBeNull();
+  });
+});
+
+describe('plural card types', () => {
+  it('reads "enchantments" and "lands" as their singular', () => {
+    expect(parseEffects(['Destroy all enchantments.'])).toMatchObject({
+      ok: true,
+      ability: { effects: [{ op: 'forEach', of: { type: 'enchantment' } }] },
+    });
+    expect(parseEffects(['Destroy all lands.'])).toMatchObject({
+      ok: true,
+      ability: { effects: [{ op: 'forEach', of: { type: 'land' } }] },
+    });
   });
 });
 

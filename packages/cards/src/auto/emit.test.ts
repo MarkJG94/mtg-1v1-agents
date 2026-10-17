@@ -196,6 +196,31 @@ describe('auras and equipment', () => {
   });
 });
 
+describe('a reduction of its own cost (CR 601.2f)', () => {
+  const withText = (oracleText: string) => ({ ...card('Fling'), name: 'Test Act', oracleText });
+
+  it('writes it as the field that claims its line, and reads the spell from the rest', () => {
+    const act = withText(
+      'This spell costs {1} less to cast for each creature on the battlefield.\nDraw two cards.',
+    );
+    const emitted = emitScript(act);
+    expect(emitted.script).toMatchObject({ costReduction: { generic: { count: 'creature' } } });
+    expect(emitted.script?.['abilities']).toEqual([
+      { kind: 'spell', covers: [1], effects: [{ op: 'draw', player: 'you', count: 2 }] },
+    ]);
+    expect(validateScript(emitted.script, act).status).toBe('supported');
+  });
+
+  it('leaves one it cannot read where it was, so it still stops the spell', () => {
+    const lightning = withText(
+      'This spell costs {2} less to cast if it targets a tapped creature.\nDraw two cards.',
+    );
+    const emitted = emitScript(lightning);
+    expect(emitted.script?.['costReduction']).toBeUndefined();
+    expect(emitted.script?.['abilities']).toEqual([]);
+  });
+});
+
 describe('an additional cost to cast (CR 601.2b)', () => {
   const withText = (oracleText: string) => ({ ...card('Fling'), name: 'Test Rites', oracleText });
 

@@ -172,7 +172,12 @@ a player who has it can pay (CR 119.4). Which permanents and which cards are par
 cast action, as its targets are, so `legalActions` offers one casting per way of paying
 — capped as targetings are, and never offering a spell's own target as what it
 sacrifices — and nothing when it cannot be paid. The rest of the cost is paid after the
-mana, so a creature tapped for mana can still be the one sacrificed.
+mana, so a creature tapped for mana can still be the one sacrificed. And a spell's
+**reduction of its own cost** (CR 601.2f): `costReduction` takes a counted or fixed amount
+off the generic part — never below nothing, never the coloured part, and only while its
+condition holds — as the spell is cast, and `legalActions` prices with the same reduced
+cost, so a spell is offered exactly when what it would really cost can be paid. Its mana
+value is unchanged (CR 202.3).
 Resolution runs the card's effects and then lets the stack finish the move, so a card
 with no script resolves exactly as it did before definitions existed.
 

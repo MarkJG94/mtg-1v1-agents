@@ -337,6 +337,42 @@ describe('the executability smoke test', () => {
     expect(result.status).toBe('partial');
   });
 
+  it('claims a spell’s reduction of its own cost, and never a reduction of other spells', () => {
+    const reduced = script({
+      costReduction: { generic: 1 },
+      abilities: [
+        {
+          kind: 'spell',
+          covers: [1],
+          targets: [{ id: 't', filter: 'any' }],
+          effects: [{ op: 'damage', to: '$t', amount: 3 }],
+        },
+      ],
+    });
+    const printedWith = (first: string) =>
+      printed({ oracleText: `${first}\nJolt deals 3 damage to any target.` });
+
+    expect(
+      validateScript(reduced, printedWith('This spell costs {1} less to cast for each opponent.'))
+        .status,
+    ).toBe('supported');
+    expect(
+      validateScript(reduced, printedWith('Jolt costs {1} less to cast for each opponent.')).status,
+    ).toBe('supported');
+    expect(validateScript(reduced, printedWith('Affinity for artifacts')).status).toBe('supported');
+    for (const others of [
+      'Instant spells you cast cost {1} less to cast.',
+      'The second spell you cast each turn costs {1} less to cast.',
+    ]) {
+      expect(validateScript(reduced, printedWith(others)).status).toBe('partial');
+    }
+    const without = script({ abilities: reduced.abilities });
+    expect(
+      validateScript(without, printedWith('This spell costs {1} less to cast for each opponent.'))
+        .status,
+    ).toBe('partial');
+  });
+
   it('pays an additional cost, so a card that has one is really played', () => {
     for (const additionalCost of [
       { sacrifice: { filter: 'creature', count: 2 } },
