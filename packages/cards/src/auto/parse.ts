@@ -866,3 +866,17 @@ const condition = (reader: Reader): Readonly<Record<string, unknown>> | null => 
 /** A filter with "you control" added, in the script's short forms. */
 const yoursOf = (what: ScriptFilter): ScriptFilter =>
   typeof what === 'string' ? { is: what, controller: 'you' } : { ...what, controller: 'you' };
+
+// --- Cycling ---
+
+/**
+ * "Cycling {2}" — "{2}, Discard this card: Draw a card", activated from the hand
+ * (CR 702.29a). Its mana cost, or null. Only mana: "Cycling—Pay 2 life" and the
+ * landcyclings ("Plainscycling {2}", which search rather than draw) are other things.
+ */
+export const parseCycling = (line: string): string | null => {
+  const reader = Reader.of(line);
+  if (!reader.word('cycling')) return null;
+  const symbols = reader.match(/(?:\{[^}]*\})+/);
+  return symbols !== null && reader.done && isManaCost(symbols[0]) ? symbols[0] : null;
+};

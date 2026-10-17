@@ -435,11 +435,18 @@
                   },
                   "sacrificeSelf": {
                     "type": "boolean"
+                  },
+                  "discardSelf": {
+                    "type": "boolean"
                   }
                 }
               },
               "sorceryOnly": {
                 "type": "boolean"
+              },
+              "from": {
+                "type": "string",
+                "const": "hand"
               },
               "targets": {
                 "type": "array",

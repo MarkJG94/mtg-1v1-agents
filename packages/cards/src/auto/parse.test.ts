@@ -10,6 +10,7 @@ import {
   parseAffinity,
   parseCost,
   parseCostReduction,
+  parseCycling,
   parseEffects,
   parseEnchant,
   parseManaModes,
@@ -604,6 +605,19 @@ describe('the trigger vocabulary 7.1 widened', () => {
     expect(parseTrigger('Whenever you cast a multicolored spell, draw a card.')).toHaveProperty(
       'failure',
     );
+  });
+});
+
+describe('cycling (CR 702.29a)', () => {
+  it('reads its mana cost', () => {
+    expect(parseCycling('Cycling {2}')).toBe('{2}');
+    expect(parseCycling('Cycling {1}{W}')).toBe('{1}{W}');
+  });
+
+  it('refuses a cost that is not mana, and the landcyclings', () => {
+    expect(parseCycling('Cycling—Pay 2 life.')).toBeNull();
+    expect(parseCycling('Plainscycling {2}')).toBeNull();
+    expect(parseCycling('Cycling {E}')).toBeNull();
   });
 });
 

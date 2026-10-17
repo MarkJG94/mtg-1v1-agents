@@ -182,6 +182,28 @@ describe('trigger conditions', () => {
   });
 });
 
+describe('an ability used from the hand', () => {
+  it('loads where it works from and its discard-self cost', () => {
+    const definition = loadCardScript({
+      ...bolt,
+      abilities: [
+        {
+          kind: 'activated',
+          id: 'cycling',
+          from: 'hand',
+          cost: { mana: '{2}', discardSelf: true },
+          effects: [{ op: 'draw', player: 'you', count: 1 }],
+        },
+      ],
+    });
+    expect(definition.abilities[0]).toMatchObject({
+      kind: 'activated',
+      from: 'hand',
+      cost: { discardSelf: true, mana: { generic: 2 } },
+    });
+  });
+});
+
 describe('a payment in a "may"', () => {
   const paying = (pay: unknown) =>
     loadCardScript({

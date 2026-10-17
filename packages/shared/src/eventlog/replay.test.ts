@@ -127,6 +127,29 @@ describe('a board folded from its log', () => {
     expect(cleaned.objects.get(id(4))).toMatchObject({ damage: 0, deathtouched: false });
   });
 
+  it('taps a regenerated creature and clears its damage (CR 701.15b)', () => {
+    const hit = replayEvents([
+      ...creatureOut,
+      at(
+        1,
+        'precombatMain',
+      )({
+        type: 'damage',
+        source: id(13),
+        target: { kind: 'object', object: id(4) },
+        amount: 3,
+        combat: false,
+        deathtouch: true,
+      }),
+    ]);
+    const saved = applyEvent(hit, at(1, 'precombatMain')({ type: 'regenerate', object: id(4) }));
+    expect(saved.objects.get(id(4))).toMatchObject({
+      tapped: true,
+      damage: 0,
+      deathtouched: false,
+    });
+  });
+
   it('forgets a permanent that changes zones (CR 400.7)', () => {
     const board = replayEvents([
       ...creatureOut,

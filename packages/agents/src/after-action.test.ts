@@ -1,3 +1,5 @@
+import type { PriorityAction } from '@mtg/engine/view';
+import type { ObjectId } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
 import { afterAction } from './after-action.js';
 import { card, cast, creature, land, viewOf } from './test-views.js';
@@ -72,6 +74,40 @@ describe('a reduced cost (CR 601.2f)', () => {
     const after = afterAction(view, cast(golem.id, [], 1));
 
     expect(lands.filter((l) => after.objects.get(l.id)?.tapped)).toHaveLength(1);
+  });
+});
+
+describe('an activated ability (CR 602)', () => {
+  const activate = (object: ObjectId, over: object = {}): PriorityAction => ({
+    kind: 'activate',
+    object,
+    ability: 'x',
+    cost: { generic: 1, variable: 0, symbols: [] },
+    tap: false,
+    sacrificeSelf: false,
+    discardSelf: false,
+    targets: [],
+    ...over,
+  });
+
+  it('pays its cost: taps the source if it says {T}, and mana sources for the rest', () => {
+    const pinger = creature(1, 1);
+    const lands = [land(), land()];
+    const view = viewOf({ mine: [pinger, ...lands] });
+    const after = afterAction(view, activate(pinger.id, { tap: true }));
+    expect(after.objects.get(pinger.id)?.tapped).toBe(true);
+    expect(lands.filter((l) => after.objects.get(l.id)?.tapped)).toHaveLength(1);
+  });
+
+  it('sacrifices the source, or discards it from the hand, when the cost says so', () => {
+    const bomb = creature(1, 1);
+    const cycler = card({ zone: 'hand', types: ['sorcery'], manaValue: 5 });
+    const view = viewOf({ mine: [bomb, land()], hand: [cycler] });
+    const sacrificed = afterAction(view, activate(bomb.id, { sacrificeSelf: true }));
+    expect(sacrificed.you.battlefield).not.toContain(bomb.id);
+    const cycled = afterAction(view, activate(cycler.id, { discardSelf: true }));
+    expect(cycled.you.hand).toEqual([]);
+    expect(cycled.you.graveyard).toContain(cycler.id);
   });
 });
 

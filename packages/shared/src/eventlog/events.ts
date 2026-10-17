@@ -136,6 +136,8 @@ export type GameEventBody =
       readonly becomes?: ObjectId;
     }
   | { readonly type: 'tap'; readonly object: ObjectId }
+  /** A creature regenerated instead of being destroyed (CR 701.15b): tapped, damage gone. */
+  | { readonly type: 'regenerate'; readonly object: ObjectId }
   | { readonly type: 'untap'; readonly object: ObjectId }
   | {
       readonly type: 'counterChange';
@@ -249,6 +251,7 @@ export const objectsNamedBy = (event: GameEventBody): ObjectId[] => {
     case 'moveZone':
     case 'tap':
     case 'untap':
+    case 'regenerate':
     case 'counterChange':
       return [event.object];
     case 'cast':

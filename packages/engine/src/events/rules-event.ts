@@ -85,8 +85,19 @@ export interface CountersEvent {
   readonly amount: number;
 }
 
+/**
+ * A creature regenerating (CR 701.15b): what replaces its destruction. It taps, loses its
+ * damage and leaves combat — an event of its own so that it is performed and logged like
+ * every other change, rather than done to the state inside the replacement.
+ */
+export interface RegenerateEvent {
+  readonly kind: 'regenerate';
+  readonly object: ObjectId;
+}
+
 export type RulesEvent =
   | DamageEvent
+  | RegenerateEvent
   | DrawEvent
   | MoveZoneEvent
   | EntersBattlefieldEvent
@@ -117,6 +128,7 @@ export const affectedPlayer = (
     case 'moveZone':
     case 'entersBattlefield':
     case 'addCounters':
+    case 'regenerate':
       return controllerOf(event.object);
   }
 };

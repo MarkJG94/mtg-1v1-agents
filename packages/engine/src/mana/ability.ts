@@ -3,6 +3,7 @@ import type { EventEmitter } from '../events/emitter.js';
 import type { GameState } from '../state/game-state.js';
 import { isGameOver } from '../state/game-state.js';
 import { updateObject, updatePlayer } from '../state/update.js';
+import { canPayTap } from '../tap-cost.js';
 import { addMana, type ManaType } from './pool.js';
 
 /**
@@ -53,7 +54,7 @@ export const canActivateManaAbility = (
   const source = state.objects.get(ability.source);
   if (!source) return false;
   if (source.zone !== 'battlefield' || source.controller !== player) return false;
-  return !(ability.requiresTap && source.tapped);
+  return !ability.requiresTap || canPayTap(state, ability.source);
 };
 
 /**

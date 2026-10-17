@@ -252,6 +252,10 @@ export const applyEvent = (board: Board, event: GameEvent): Board => {
     case 'tap':
       draft.patch(event.object, { tapped: true });
       break;
+    case 'regenerate':
+      // Tapped, its damage — and with it any deathtouch mark — gone (CR 701.15b).
+      draft.patch(event.object, { tapped: true, damage: 0, deathtouched: false });
+      break;
     case 'untap':
       draft.patch(event.object, { tapped: false });
       break;

@@ -275,6 +275,8 @@ const costSchema = z.object({
   mana: z.string().optional(),
   tap: z.boolean().optional(),
   sacrificeSelf: z.boolean().optional(),
+  /** Discard this card, as cycling does. */
+  discardSelf: z.boolean().optional(),
 });
 
 const effectsField = z.array(effectSchema).default([]);
@@ -309,6 +311,8 @@ export const abilitySchema = z.discriminatedUnion('kind', [
     id: z.string().min(1),
     cost: costSchema,
     sorceryOnly: z.boolean().optional(),
+    /** `hand` for an ability its card's owner activates from their hand, as cycling is. */
+    from: z.literal('hand').optional(),
     targets: z.array(targetSpecSchema).optional(),
     effects: effectsField,
   }),

@@ -8,7 +8,7 @@ import {
   skipsPriority,
   steps,
 } from '@mtg/shared';
-import { castSpell } from '../cards/cast.js';
+import { activateAbility, castSpell } from '../cards/cast.js';
 import { answerMay, runResolution } from '../cards/program.js';
 import { resolveTop } from '../cards/resolve.js';
 import { expireEndOfTurnEffects } from '../characteristics.js';
@@ -612,6 +612,11 @@ const applyPriority = (
       });
     case 'activateLoyalty':
       return activateLoyaltyAbility(state, emitter, decision.player, action.object, action.ability);
+    case 'activate':
+      // Like a cast, it puts something on the stack and hands priority back (CR 602.2e).
+      return activateAbility(state, emitter, decision.player, action.object, action.ability, {
+        targets: action.targets,
+      });
   }
 
   const passes = state.passesInARow + 1;

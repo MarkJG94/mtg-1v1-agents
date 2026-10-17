@@ -19,7 +19,9 @@ import { type ObjectId, playerZone } from '@mtg/shared';
  * - a permanent spell arrives on the battlefield, summoning sick, as the card it is;
  * - an instant or sorcery goes to the graveyard, having done — as far as this function
  *   knows — nothing at all;
- * - a loyalty ability moves its planeswalker's loyalty by its cost.
+ * - a loyalty ability moves its planeswalker's loyalty by its cost;
+ * - an activated ability pays its cost: its source taps or is sacrificed if the cost says
+ *   so, and mana sources tap for the rest — and does, as far as this knows, nothing else.
  *
  * What an instant, a sorcery or a loyalty ability does to the board is exactly what
  * greedy cannot see, and `greedy.ts` prices it with an explicit, tunable prior instead
@@ -44,6 +46,14 @@ export const afterAction = (view: PlayerView, action: PriorityAction): PlayerVie
       return isPermanentCard(card)
         ? enterBattlefield(paid, action.object, card.isCreature)
         : toGraveyard(paid, action.object);
+    }
+    case 'activate': {
+      const source = view.objects.get(action.object);
+      let paid = view;
+      if (action.tap && source !== undefined) paid = withObject(paid, { ...source, tapped: true });
+      paid = tapFor(paid, manaIn(action.cost));
+      if (action.discardSelf) paid = toGraveyard(leaveHand(paid, action.object), action.object);
+      return action.sacrificeSelf ? sacrifice(paid, action.object) : paid;
     }
     case 'activateLoyalty': {
       const walker = view.objects.get(action.object);
