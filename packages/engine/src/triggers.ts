@@ -1,4 +1,6 @@
 import { type ObjectId, opponentOf, type PlayerId, type Step } from '@mtg/shared';
+import { matchesFilter } from './cards/evaluate.js';
+import type { Filter } from './cards/vocabulary.js';
 import type { GameState } from './state/game-state.js';
 import type { GameObject } from './state/object.js';
 import { getObject, objectsIn, updateState } from './state/update.js';
@@ -30,8 +32,41 @@ export type TriggerWhen =
   | { readonly kind: 'anotherDies'; readonly controlledBy?: 'you' | 'any' }
   | { readonly kind: 'selfAttacks' }
   | { readonly kind: 'selfBlocks' }
-  | { readonly kind: 'beginningOfUpkeep'; readonly whose: 'self' | 'any' }
-  | { readonly kind: 'beginningOfEndStep'; readonly whose: 'self' | 'any' };
+  /**
+   * "Whenever ~ deals combat damage to a player" (CR 510.3a): as the damage is dealt, once
+   * for each time it is — so twice for double strike, and not at all when it is prevented.
+   * In a two-player game the player is always the opponent, which is who "that player" in
+   * the ability means.
+   */
+  | { readonly kind: 'selfDealsCombatDamageToPlayer' }
+  /**
+   * "Whenever ~ becomes blocked" (CR 509.3c): once, as blockers are declared, however many
+   * creatures block it.
+   */
+  | { readonly kind: 'selfBecomesBlocked' }
+  /**
+   * "Whenever you cast an instant or sorcery spell" (CR 601.2i): as the spell becomes
+   * cast, which is after it is on the stack, so the filter sees it there.
+   */
+  | {
+      readonly kind: 'spellCast';
+      readonly caster: 'you' | 'opponent' | 'any';
+      readonly filter?: Filter;
+    }
+  /**
+   * "Whenever you gain life" — once for each life-gain event, which is once per source
+   * that caused it (CR 119.10), and never for gaining 0.
+   */
+  | { readonly kind: 'lifeGained'; readonly player: 'you' | 'opponent' | 'any' }
+  | { readonly kind: 'beginningOfUpkeep'; readonly whose: StepOwner }
+  | { readonly kind: 'beginningOfCombat'; readonly whose: StepOwner }
+  | { readonly kind: 'beginningOfEndStep'; readonly whose: StepOwner };
+
+/**
+ * Whose step a step trigger watches: the controller's ("your upkeep"), the opponent's
+ * ("each opponent's upkeep"), or every player's ("each upkeep", "the end step").
+ */
+export type StepOwner = 'self' | 'opponent' | 'any';
 
 /**
  * Every trigger condition the engine knows, as data. The card-script schema checks a
@@ -45,7 +80,12 @@ export const triggerWhenKinds = [
   'anotherDies',
   'selfAttacks',
   'selfBlocks',
+  'selfDealsCombatDamageToPlayer',
+  'selfBecomesBlocked',
+  'spellCast',
+  'lifeGained',
   'beginningOfUpkeep',
+  'beginningOfCombat',
   'beginningOfEndStep',
 ] as const satisfies readonly TriggerWhen['kind'][];
 
@@ -232,13 +272,118 @@ export const triggersFromBlock = (
     .map((ability) => instanceFor(object, ability));
 };
 
+/** Triggers fired by a creature dealing combat damage to a player (CR 510.3a). */
+export const triggersFromCombatDamage = (
+  state: GameState,
+  source: ObjectId,
+): readonly TriggerInstance[] => {
+  const object = state.objects.get(source);
+  if (!object) return [];
+  return object.triggers
+    .filter(
+      (ability) =>
+        ability.when.kind === 'selfDealsCombatDamageToPlayer' &&
+        notYetFired(state, ability, source),
+    )
+    .map((ability) => instanceFor(object, ability));
+};
+
+/** Triggers fired by a creature becoming blocked, once per combat (CR 509.3c). */
+export const triggersFromBecomingBlocked = (
+  state: GameState,
+  attacker: ObjectId,
+): readonly TriggerInstance[] => {
+  const object = state.objects.get(attacker);
+  if (!object) return [];
+  return object.triggers
+    .filter(
+      (ability) =>
+        ability.when.kind === 'selfBecomesBlocked' && notYetFired(state, ability, attacker),
+    )
+    .map((ability) => instanceFor(object, ability));
+};
+
+const relationHolds = (
+  relation: 'you' | 'opponent' | 'any',
+  watcher: PlayerId,
+  player: PlayerId,
+): boolean => relation === 'any' || (relation === 'you') === (watcher === player);
+
+/**
+ * Triggers fired by a spell becoming cast (CR 601.2i), from every permanent watching for
+ * one. The spell is on the stack by now, so a filter like "an instant or sorcery spell"
+ * is asked about it there.
+ */
+export const triggersFromCast = (
+  state: GameState,
+  spell: ObjectId,
+  caster: PlayerId,
+): readonly TriggerInstance[] => {
+  const found: TriggerInstance[] = [];
+  for (const id of objectsIn(state, 'battlefield')) {
+    const watcher = getObject(state, id);
+    for (const ability of watcher.triggers) {
+      const when = ability.when;
+      if (when.kind !== 'spellCast') continue;
+      if (!relationHolds(when.caster, watcher.controller, caster)) continue;
+      if (
+        when.filter !== undefined &&
+        !matchesFilter(
+          state,
+          { source: id, controller: watcher.controller, targets: {}, x: 0 },
+          when.filter,
+          { kind: 'object', object: spell },
+        )
+      ) {
+        continue;
+      }
+      if (!notYetFired(state, ability, id)) continue;
+      found.push(instanceFor(watcher, ability));
+    }
+  }
+  return found;
+};
+
+/** Triggers fired by one life-gain event (CR 119.10). */
+export const triggersFromLifeGain = (
+  state: GameState,
+  player: PlayerId,
+): readonly TriggerInstance[] => {
+  const found: TriggerInstance[] = [];
+  for (const id of objectsIn(state, 'battlefield')) {
+    const watcher = getObject(state, id);
+    for (const ability of watcher.triggers) {
+      const when = ability.when;
+      if (when.kind !== 'lifeGained') continue;
+      if (!relationHolds(when.player, watcher.controller, player)) continue;
+      if (!notYetFired(state, ability, id)) continue;
+      found.push(instanceFor(watcher, ability));
+    }
+  }
+  return found;
+};
+
 const stepMatches = (when: TriggerWhen, step: Step): boolean =>
   (when.kind === 'beginningOfUpkeep' && step === 'upkeep') ||
+  (when.kind === 'beginningOfCombat' && step === 'beginCombat') ||
   (when.kind === 'beginningOfEndStep' && step === 'end');
 
 const whoseMatches = (when: TriggerWhen, controller: PlayerId, activePlayer: PlayerId): boolean => {
-  if (when.kind !== 'beginningOfUpkeep' && when.kind !== 'beginningOfEndStep') return false;
-  return when.whose === 'any' || controller === activePlayer;
+  if (
+    when.kind !== 'beginningOfUpkeep' &&
+    when.kind !== 'beginningOfCombat' &&
+    when.kind !== 'beginningOfEndStep'
+  ) {
+    return false;
+  }
+  switch (when.whose) {
+    case 'any':
+      return true;
+    case 'self':
+      return controller === activePlayer;
+    case 'opponent':
+      return controller !== activePlayer;
+  }
 };
 
 /** Triggers fired by a step beginning, such as "at the beginning of your upkeep". */

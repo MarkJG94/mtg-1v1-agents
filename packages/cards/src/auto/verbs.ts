@@ -174,12 +174,10 @@ const cards: Verb = (reader, bindings) => {
 
   if (word.startsWith('draw')) return [{ op: 'draw', player: who, count }];
   if (word.startsWith('mill')) return [{ op: 'mill', player: who, count }];
-  // Only discarding at random is in the vocabulary: choosing which card is a decision
-  // mid-resolution, which the engine cannot pause for yet (roadmap 2.1's stated limit).
-  if (!reader.words('at', 'random')) {
-    return reader.stopped('a discard the player chooses needs a decision mid-resolution');
-  }
-  return [{ op: 'discardAtRandom', player: who, count }];
+  if (reader.words('at', 'random')) return [{ op: 'discardAtRandom', player: who, count }];
+  // The player discarding chooses which (CR 701.9b), and resolution waits on them for it
+  // (ADR 0021).
+  return [{ op: 'discard', player: who, count }];
 };
 
 // --- Removal ---

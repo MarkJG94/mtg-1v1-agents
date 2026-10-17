@@ -21,6 +21,7 @@ import { isStackEmpty, putActivatedAbilityOnStack, putOnStack } from '../stack.j
 import type { GameState } from '../state/game-state.js';
 import { getObject, updateObject, updatePlayer } from '../state/update.js';
 import { canBeTargeted } from '../targeting.js';
+import { canPayLife, discardCandidates, sacrificeCandidates } from './additional-cost.js';
 import {
   type ActivatedAbilityDef,
   bindTargets,
@@ -58,6 +59,10 @@ export class IllegalCastError extends Error {
 
 export interface CastOptions {
   readonly targets?: readonly EventTarget[];
+  /** What pays a spell's additional cost (CR 601.2b): the permanents it sacrifices. */
+  readonly sacrifice?: readonly ObjectId[];
+  /** And the cards it discards. */
+  readonly discard?: readonly ObjectId[];
   /** The value chosen for {X} (CR 601.2b). */
   readonly x?: number;
   /** Tap mana sources to cover what the pool cannot. On by default. */
@@ -88,8 +93,14 @@ export const castSpell = (
   const targets = options.targets ?? [];
   const x = options.x ?? 0;
   checkTargets(state, player, id, definition, spellAbilityOf(definition)?.targets ?? [], targets);
+  const sacrifice = options.sacrifice ?? [];
+  const discard = options.discard ?? [];
+  checkAdditionalCost(state, player, id, definition, sacrifice, discard);
 
-  const paid = payFor(state, emitter, player, definition.manaCost, x, options.autoTap !== false);
+  const mana = payFor(state, emitter, player, definition.manaCost, x, options.autoTap !== false);
+  // The rest of the cost after the mana (CR 601.2h lets them go in any order): so a
+  // creature tapped for mana can still be the one sacrificed, as it can at a table.
+  const paid = payAdditionalCost(mana, emitter, player, definition, sacrifice, discard);
 
   return putOnStack(paid, emitter, player, id, {
     resolvesTo: isPermanentCard(definition) ? 'battlefield' : playerZone(object.owner, 'graveyard'),
@@ -171,6 +182,86 @@ export const activateAbility = (
 };
 
 // --- Internals ---
+
+/**
+ * The additional cost, chosen as the spell is cast (CR 601.2b): exactly as many permanents
+ * as it says to sacrifice, each one the caster's and of the kind it names; exactly as many
+ * other cards from hand to discard; and the life, which only a player who has it can pay
+ * (CR 119.4). A spell with no additional cost takes no choices.
+ */
+const checkAdditionalCost = (
+  state: GameState,
+  player: PlayerId,
+  id: ObjectId,
+  definition: CardDefinition,
+  sacrifice: readonly ObjectId[],
+  discard: readonly ObjectId[],
+): void => {
+  const cost = definition.additionalCost ?? {};
+  const choose = (
+    what: string,
+    chosen: readonly ObjectId[],
+    wanted: number,
+    from: readonly ObjectId[],
+  ) => {
+    if (chosen.length !== wanted) {
+      throw new IllegalCastError(
+        `${definition.name} costs ${wanted} to ${what}, but ${chosen.length} were chosen`,
+      );
+    }
+    const allowed = new Set(from);
+    if (new Set(chosen).size !== chosen.length || chosen.some((each) => !allowed.has(each))) {
+      throw new IllegalCastError(`${definition.name} cannot ${what} what was chosen to pay for it`);
+    }
+  };
+  choose(
+    'sacrifice',
+    sacrifice,
+    cost.sacrifice?.count ?? 0,
+    sacrificeCandidates(state, player, id, cost),
+  );
+  choose('discard', discard, cost.discard ?? 0, discardCandidates(state, player, id));
+  if (!canPayLife(state, player, cost)) {
+    throw new IllegalCastError(
+      `${definition.name} costs ${cost.life} life, more than ${player} has`,
+    );
+  }
+};
+
+const payAdditionalCost = (
+  state: GameState,
+  emitter: EventEmitter,
+  player: PlayerId,
+  definition: CardDefinition,
+  sacrifice: readonly ObjectId[],
+  discard: readonly ObjectId[],
+): GameState => {
+  let current = state;
+  for (const id of sacrifice) {
+    current = runEvent(current, emitter, {
+      kind: 'moveZone',
+      object: id,
+      from: 'battlefield',
+      to: playerZone(getObject(current, id).owner, 'graveyard'),
+      cause: 'sacrifice',
+      destruction: false,
+    });
+  }
+  for (const id of discard) {
+    current = runEvent(current, emitter, {
+      kind: 'moveZone',
+      object: id,
+      from: playerZone(player, 'hand'),
+      to: playerZone(player, 'graveyard'),
+      cause: 'discard',
+      destruction: false,
+    });
+  }
+  const life = definition.additionalCost?.life ?? 0;
+  // Paying life is losing it (CR 119.4), so whatever watches for a life loss sees it.
+  if (life > 0) current = runEvent(current, emitter, { kind: 'loseLife', player, amount: life });
+  return current;
+};
 
 const atSorcerySpeed = (state: GameState, player: PlayerId): boolean =>
   state.activePlayer === player && isMainPhase(state.step) && isStackEmpty(state);

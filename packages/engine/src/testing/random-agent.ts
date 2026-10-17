@@ -46,6 +46,9 @@ export const randomDecision = (
     case 'discard':
       return { kind: 'discard', cards: rng.shuffled(decision.from).slice(0, decision.count) };
 
+    case 'yesNo':
+      return { kind: 'yesNo', answer: rng.pick(decision.options) };
+
     case 'declareAttackers': {
       const attacking = subset(rng, decision.legal);
       return {

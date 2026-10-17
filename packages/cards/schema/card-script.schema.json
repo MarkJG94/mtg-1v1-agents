@@ -110,6 +110,38 @@
     "enchant": {
       "$ref": "#/$defs/__schema0"
     },
+    "additionalCost": {
+      "type": "object",
+      "properties": {
+        "sacrifice": {
+          "type": "object",
+          "properties": {
+            "filter": {
+              "$ref": "#/$defs/__schema0"
+            },
+            "count": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "filter",
+            "count"
+          ]
+        },
+        "discard": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "life": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
     "abilities": {
       "type": "array",
       "items": {
@@ -175,6 +207,7 @@
                         "damage",
                         "delayedTrigger",
                         "destroy",
+                        "discard",
                         "discardAtRandom",
                         "draw",
                         "exile",
@@ -187,6 +220,7 @@
                         "if",
                         "loseGame",
                         "loseLife",
+                        "may",
                         "mill",
                         "moveZone",
                         "poison",
@@ -310,6 +344,7 @@
                         "damage",
                         "delayedTrigger",
                         "destroy",
+                        "discard",
                         "discardAtRandom",
                         "draw",
                         "exile",
@@ -322,6 +357,7 @@
                         "if",
                         "loseGame",
                         "loseLife",
+                        "may",
                         "mill",
                         "moveZone",
                         "poison",
@@ -437,6 +473,7 @@
                         "damage",
                         "delayedTrigger",
                         "destroy",
+                        "discard",
                         "discardAtRandom",
                         "draw",
                         "exile",
@@ -449,6 +486,7 @@
                         "if",
                         "loseGame",
                         "loseLife",
+                        "may",
                         "mill",
                         "moveZone",
                         "poison",
@@ -677,6 +715,7 @@
                         "damage",
                         "delayedTrigger",
                         "destroy",
+                        "discard",
                         "discardAtRandom",
                         "draw",
                         "exile",
@@ -689,6 +728,7 @@
                         "if",
                         "loseGame",
                         "loseLife",
+                        "may",
                         "mill",
                         "moveZone",
                         "poison",

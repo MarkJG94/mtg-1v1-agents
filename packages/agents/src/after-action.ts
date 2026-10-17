@@ -1,5 +1,5 @@
 import type { PlayerView, PriorityAction, VisibleObject } from '@mtg/engine/view';
-import type { ObjectId } from '@mtg/shared';
+import { type ObjectId, playerZone } from '@mtg/shared';
 
 /**
  * What the viewer's own view would look like just after they take one priority action —
@@ -12,6 +12,9 @@ import type { ObjectId } from '@mtg/shared';
  *
  * - a land played moves from hand to the battlefield;
  * - a spell cast leaves the hand, and taps as many mana sources as its mana value;
+ * - its additional cost is paid: what it sacrifices goes to the graveyard, what it
+ *   discards leaves the hand, and the life comes off (CR 601.2h) — so a sacrifice is
+ *   priced as the creature it costs, not as free;
  * - a permanent spell arrives on the battlefield, summoning sick, as the card it is;
  * - an instant or sorcery goes to the graveyard, having done — as far as this function
  *   knows — nothing at all;
@@ -33,7 +36,7 @@ export const afterAction = (view: PlayerView, action: PriorityAction): PlayerVie
     case 'cast': {
       const card = view.objects.get(action.object);
       if (card === undefined) return view;
-      const paid = tapFor(leaveHand(view, action.object), card.manaValue);
+      const paid = payAdditional(tapFor(leaveHand(view, action.object), card.manaValue), action);
       return isPermanentCard(card)
         ? enterBattlefield(paid, action.object, card.isCreature)
         : toGraveyard(paid, action.object);
@@ -86,6 +89,34 @@ const enterBattlefield = (view: PlayerView, id: ObjectId, sick: boolean): Player
         : entered.you.landsPlayedThisTurn,
     },
   };
+};
+
+const payAdditional = (
+  view: PlayerView,
+  action: Extract<PriorityAction, { kind: 'cast' }>,
+): PlayerView => {
+  let next = view;
+  for (const id of action.sacrifice ?? []) next = sacrifice(next, id);
+  for (const id of action.discard ?? []) next = toGraveyard(leaveHand(next, id), id);
+  const life = action.life ?? 0;
+  return life > 0 ? { ...next, you: { ...next.you, life: next.you.life - life } } : next;
+};
+
+/** A permanent of the viewer's, put into the graveyard (CR 701.21a). */
+const sacrifice = (view: PlayerView, id: ObjectId): PlayerView => {
+  const object = view.objects.get(id);
+  const moved =
+    object === undefined
+      ? view
+      : withObject(view, { ...object, zone: playerZone(object.owner, 'graveyard') });
+  return toGraveyard(
+    {
+      ...moved,
+      battlefield: moved.battlefield.filter((other) => other !== id),
+      you: { ...moved.you, battlefield: moved.you.battlefield.filter((other) => other !== id) },
+    },
+    id,
+  );
 };
 
 const toGraveyard = (view: PlayerView, id: ObjectId): PlayerView => ({

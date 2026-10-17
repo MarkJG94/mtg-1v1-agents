@@ -63,6 +63,32 @@ describe('casting a spell (CR 601.2)', () => {
   });
 });
 
+describe('an additional cost (CR 601.2h)', () => {
+  it('sacrifices, discards and pays life as the spell is cast, so none of it is free', () => {
+    const bargain = card({ zone: 'hand', types: ['sorcery'], manaValue: 0 });
+    const fodder = creature(2, 2);
+    const kept = creature(3, 3);
+    const pitched = card({ zone: 'hand', types: ['instant'], manaValue: 1 });
+    const view = viewOf({ mine: [fodder, kept], hand: [bargain, pitched] });
+
+    const after = afterAction(view, {
+      ...cast(bargain.id),
+      sacrifice: [fodder.id],
+      discard: [pitched.id],
+      life: 3,
+    } as never);
+
+    expect(after.you.battlefield).toEqual([kept.id]);
+    expect(after.battlefield).not.toContain(fodder.id);
+    expect(after.objects.get(fodder.id)?.zone).toBe('A:graveyard');
+    expect(after.you.hand).toEqual([]);
+    expect(after.you.graveyard).toEqual(
+      expect.arrayContaining([fodder.id, pitched.id, bargain.id]),
+    );
+    expect(after.you.life).toBe(view.you.life - 3);
+  });
+});
+
 describe('a loyalty ability (CR 606.4)', () => {
   it('moves the planeswalker’s loyalty by its cost', () => {
     const walker = card({ types: ['planeswalker'], loyalty: 3 });

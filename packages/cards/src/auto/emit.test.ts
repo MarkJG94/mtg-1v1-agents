@@ -196,6 +196,38 @@ describe('auras and equipment', () => {
   });
 });
 
+describe('an additional cost to cast (CR 601.2b)', () => {
+  const withText = (oracleText: string) => ({ ...card('Fling'), name: 'Test Rites', oracleText });
+
+  it('writes it as the field that claims its line, and reads the spell from the rest', () => {
+    const rites = withText(
+      'As an additional cost to cast this spell, sacrifice a creature.\nDraw two cards.',
+    );
+    const emitted = emitScript(rites);
+    expect(emitted.script).toMatchObject({
+      additionalCost: { sacrifice: { filter: 'creature', count: 1 } },
+    });
+    expect(emitted.script?.['abilities']).toEqual([
+      { kind: 'spell', covers: [1], effects: [{ op: 'draw', player: 'you', count: 2 }] },
+    ]);
+    expect(validateScript(emitted.script, rites).status).toBe('supported');
+  });
+
+  /**
+   * Draconic Intervention: an unread cost line, a middle line that is a replacement, and a
+   * last line "Exile ~". Taking the unread line out made the spell that last line alone.
+   */
+  it('leaves a cost it cannot read where it was, so it still stops the spell', () => {
+    const intervention = withText(
+      'As an additional cost to cast this spell, exile an instant or sorcery card from your graveyard.\nExile this spell.',
+    );
+    const emitted = emitScript(intervention);
+    expect(emitted.script?.['additionalCost']).toBeUndefined();
+    expect(emitted.script?.['abilities']).toEqual([]);
+    expect(validateScript(emitted.script, intervention).status).toBe('partial');
+  });
+});
+
 describe('the resolver’s third link', () => {
   it('is an auto-scripter the resolver can use', () => {
     expect(autoScripter.version).toBeGreaterThan(0);

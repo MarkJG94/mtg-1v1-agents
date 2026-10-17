@@ -9,6 +9,7 @@ import {
   type ZoneId,
 } from '@mtg/shared';
 import type { CardDefinition } from '../cards/definition.js';
+import type { Resolution } from '../cards/program.js';
 import type { CombatState } from '../combat.js';
 import type { Decision } from '../decision.js';
 import type { ContinuousEffect } from '../layers.js';
@@ -113,6 +114,11 @@ export interface GameState {
    * reproduces the pause exactly.
    */
   readonly pendingReplacement: ReplacementProgress | null;
+  /**
+   * The spell or ability resolving right now, as a program stopped part-way: what is left
+   * to run once a player has answered (ADR 0021). Null between resolutions.
+   */
+  readonly resolution: Resolution | null;
   /**
    * Players owed an extra turn (CR 500.7), oldest first. The next turn goes to the
    * front of this queue if it has one, otherwise to the other player.
@@ -274,6 +280,7 @@ export const createGameState = (options: CreateGameStateOptions): GameState => {
     replacements: [],
     nextEffectId: 1,
     pendingReplacement: null,
+    resolution: null,
     mulligans: null,
     statesThisTurn: [],
     decisionsMade: 0,

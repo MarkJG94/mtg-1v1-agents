@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { CardProjection } from '../scryfall.js';
-import { measureCoverage, patternOf } from './coverage.js';
+import { failingPattern, measureCoverage, patternOf } from './coverage.js';
 
 /**
  * The coverage report (docs/03, roadmap 3.5).
@@ -73,6 +73,29 @@ describe('what a pattern keeps and what it throws away', () => {
 
   it('is the sentence, tidied, when the sentence is short', () => {
     expect(patternOf('Draw a card.')).toBe('draw a card');
+  });
+});
+
+describe('what a trigger is waiting on', () => {
+  it('is its body once its condition reads, whatever the trigger', () => {
+    const upkeep = failingPattern('At the beginning of your upkeep, you may pay {U}{U}.');
+    expect(upkeep).toBe('…, you may pay {M}');
+    expect(failingPattern('When ~ enters, you may pay {2}.')).toBe(upkeep);
+  });
+
+  it('tells two bodies apart under the same trigger', () => {
+    expect(failingPattern('At the beginning of your upkeep, you may pay {U}{U}.')).not.toBe(
+      failingPattern('At the beginning of your upkeep, sacrifice ~ unless you pay {2}.'),
+    );
+  });
+
+  it('is its first words when the condition is what does not read', () => {
+    const sentence = 'Whenever ~ becomes blocked by a creature, draw a card.';
+    expect(failingPattern(sentence)).toBe(patternOf(sentence));
+  });
+
+  it('leaves a sentence that is not a trigger as it was', () => {
+    expect(failingPattern('Choose one —')).toBe(patternOf('Choose one —'));
   });
 });
 

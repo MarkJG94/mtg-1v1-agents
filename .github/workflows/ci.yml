@@ -46,9 +46,12 @@ jobs:
   bench:
     name: Benchmarks
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The base commit is measured too, so its history has to be here.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v6
 
@@ -60,45 +63,47 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      # A branch can read caches from the default branch, so this picks up whatever main
-      # last recorded without any cross-workflow plumbing; the prefix takes the newest.
-      - name: Restore the baseline recorded on main
-        uses: actions/cache/restore@v6
-        with:
-          path: bench-baseline
-          key: bench-baseline-${{ github.sha }}
-          restore-keys: bench-baseline-
-
       # A shared runner is slower and noisier than the machine the 5 ms and 50 ms targets
       # in docs/02 are written for, so the budgets here are only ceilings against
-      # something going badly wrong. The real gate is the comparison with main below.
+      # something going badly wrong. The real gate is the comparison below.
       - name: Run the engine benchmarks
         run: pnpm bench --budget 12 --json bench-results/engine.json
 
       - name: Run the search benchmarks
         run: pnpm bench:search --budget 250 --json bench-results/search.json
 
-      - name: Compare with main
+      # The comparison is with the commit this one is measured against — the pull
+      # request's base, or the previous head of main — timed on this same runner just
+      # now. A baseline recorded by an earlier job came from another machine: runners
+      # differ by more than the 20% the comparison allows, so that read a fast runner
+      # followed by a slow one as a regression (+95% on code that had not changed).
+      - name: Measure the base on this runner
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            BASE=$(git rev-parse HEAD^)
+          fi
+          echo "measuring $BASE"
+          git worktree add "$RUNNER_TEMP/bench-base" "$BASE"
+          cd "$RUNNER_TEMP/bench-base"
+          pnpm install --frozen-lockfile
+          # No budget gate here: this run is only the yardstick.
+          pnpm bench --budget 1000 --json "$GITHUB_WORKSPACE/bench-baseline/engine.json"
+          pnpm bench:search --budget 10000 --json "$GITHUB_WORKSPACE/bench-baseline/search.json"
+
+      - name: Compare with the base
         run: |
           pnpm bench:compare bench-baseline/engine.json bench-results/engine.json
           pnpm bench:compare bench-baseline/search.json bench-results/search.json
 
       - uses: actions/upload-artifact@v7
+        if: always()
         with:
           name: benchmarks
-          path: bench-results/
-
-      - name: Keep this run as the baseline
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          mkdir -p bench-baseline
-          cp bench-results/engine.json bench-results/search.json bench-baseline/
-
-      - uses: actions/cache/save@v6
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        with:
-          path: bench-baseline
-          key: bench-baseline-${{ github.sha }}
+          path: |
+            bench-results/
+            bench-baseline/
 
   smoke:
     name: Browser smoke

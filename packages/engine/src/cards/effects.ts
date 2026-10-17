@@ -35,8 +35,6 @@ import {
   definitionFor,
   type EffectContext,
   evaluateQuantity,
-  holds,
-  objectsMatching,
   resolveObjects,
   resolvePlayers,
   resolveTargets,
@@ -56,44 +54,12 @@ import type { Destination, EffectOp, OpDuration, TokenSpec } from './ops.js';
  * letting the first one die before it hits back (CR 510.2).
  */
 
-export class EffectsPausedError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'EffectsPausedError';
-  }
-}
-
 /**
- * Run a list of ops in order.
- *
- * One limit, and it is loud rather than silent: if an op's events stop mid-flight because
- * a player must choose between two applicable replacement effects (CR 616.1), the ops
- * after it cannot run, because there is nowhere yet to put the rest of the list while the
- * game waits. It throws instead of dropping them. Making the effect list resumable is the
- * same piece of work as the ops that need a choice of their own — search, scry, "you may"
- * — and lands with them; see the roadmap note for 2.1.
+ * One op that changes the game. The ones that only steer — `sequence`, `forEach`, `if`,
+ * `may` — and the ones that ask a player something are run by the resolution program
+ * (`program.ts`, ADR 0021), which can stop between ops and pick up where it left off.
  */
-export const applyEffects = (
-  state: GameState,
-  emitter: EventEmitter,
-  context: EffectContext,
-  effects: readonly EffectOp[],
-): GameState => {
-  let current = state;
-  for (const [index, effect] of effects.entries()) {
-    if (current.pendingReplacement !== null && index > 0) {
-      throw new EffectsPausedError(
-        `effect ${index} of this ability cannot run: the one before it is waiting on a ` +
-          'replacement choice, and resumable effects are not built yet',
-      );
-    }
-    if (current.result !== null) return current;
-    current = applyOp(current, emitter, context, effect);
-  }
-  return current;
-};
-
-const applyOp = (
+export const applyOp = (
   state: GameState,
   emitter: EventEmitter,
   context: EffectContext,
@@ -203,7 +169,7 @@ const applyOp = (
 
     /**
      * At random, so nobody has to be asked (CR 701.9c). A discard the player chooses is
-     * one of the ops that waits for resumable effects.
+     * `discard`, which the resolution program asks for (ADR 0021).
      */
     case 'discardAtRandom': {
       const count = amountOf(effect.count);
@@ -533,23 +499,14 @@ const applyOp = (
       });
     }
 
-    // --- Control flow ---
+    // --- Control flow, and the ops that ask, are the resolution program's ---
 
     case 'sequence':
-      return applyEffects(state, emitter, context, effect.effects);
-
-    case 'forEach': {
-      let current = state;
-      for (const object of objectsMatching(state, context, effect.of)) {
-        current = applyEffects(current, emitter, { ...context, each: object }, effect.effects);
-      }
-      return current;
-    }
-
+    case 'forEach':
     case 'if':
-      return holds(state, context, effect.condition)
-        ? applyEffects(state, emitter, context, effect.thenDo)
-        : applyEffects(state, emitter, context, effect.otherwise ?? []);
+    case 'may':
+    case 'discard':
+      throw new Error(`"${effect.op}" is run by the resolution program, not on its own`);
   }
 };
 

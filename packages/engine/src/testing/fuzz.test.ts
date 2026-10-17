@@ -85,12 +85,21 @@ describe('the invariant fuzzer', () => {
     expect(result.turns).toBeGreaterThan(0);
   });
 
-  it('plays many games without violating an invariant', () => {
-    const games = budget();
-    const results = fuzzGames(games, { turnCap: 8, librarySize: 20 });
-    expect(results).toHaveLength(games);
-    for (const result of results) expect(result.state.result).not.toBeNull();
-  });
+  /**
+   * Its time grows with its budget: the nightly's 20,000 games take a minute and a half on
+   * a CI runner, and under the default five-second timeout every one of those runs failed
+   * having found nothing. 25 ms a game is six times what a runner takes.
+   */
+  it(
+    'plays many games without violating an invariant',
+    () => {
+      const games = budget();
+      const results = fuzzGames(games, { turnCap: 8, librarySize: 20 });
+      expect(results).toHaveLength(games);
+      for (const result of results) expect(result.state.result).not.toBeNull();
+    },
+    5_000 + budget() * 25,
+  );
 
   /** A starting player chosen at the table (CR 103.1), not fixed when the game was made. */
   it('plays games whose first player is chosen, without violating an invariant', () => {

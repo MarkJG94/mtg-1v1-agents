@@ -121,10 +121,26 @@ const resolver = new ScriptResolver({
   store: new MemoryScriptStore(),
   skipSmokeTest: true,
 });
-const seeds = {
-  A: generateSeedDeck({ pool: realPool, resolver, seed: 'bans-A', settings }),
-  B: generateSeedDeck({ pool: realPool, resolver, seed: 'bans-B', settings }),
-};
+const seedA = generateSeedDeck({ pool: realPool, resolver, seed: 'bans-A', settings });
+/**
+ * B's seed deck: the first, from 'bans-B' on, that holds a nonland card A's does too, so
+ * there is a card both decks have to give up. Searched for rather than pinned, because which
+ * cards a seed rolls moves whenever the auto-scripter reads more of them.
+ */
+const seedB = (() => {
+  const nonlandsOf = (seed: ReturnType<typeof generateSeedDeck>) =>
+    seed.deck.main
+      .map((slot) => slot.oracleId)
+      .filter((oracleId) => !(seed.definitions.get(oracleId)?.types.includes('land') ?? false));
+  const inA = new Set(nonlandsOf(seedA));
+  for (let i = 0; i < 50; i += 1) {
+    const seed = i === 0 ? 'bans-B' : `bans-B-${i}`;
+    const rolled = generateSeedDeck({ pool: realPool, resolver, seed, settings });
+    if (nonlandsOf(rolled).some((oracleId) => inA.has(oracleId))) return rolled;
+  }
+  throw new Error('no seed in fifty gives B a nonland card A also holds');
+})();
+const seeds = { A: seedA, B: seedB };
 const decks = { A: seeds.A.deck, B: seeds.B.deck };
 const known = new Map([...seeds.A.definitions, ...seeds.B.definitions]);
 const isLand = (oracleId: OracleId) => known.get(oracleId)?.types.includes('land') ?? false;

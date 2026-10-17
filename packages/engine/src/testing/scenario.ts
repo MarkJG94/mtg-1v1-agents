@@ -291,7 +291,14 @@ export class Scenario {
       const settled =
         this.state.zones.stack.length === 0 && this.state.pendingTriggers.length === 0;
       if (settled || this.state.result !== null) return this;
-      this.pass();
+      // What a resolution can stop to ask (ADR 0021) is answered the simplest legal way:
+      // yes to a "may", the first cards in hand to a discard. A test about the answer
+      // itself answers with `decide` instead.
+      const asked = this.state.pendingDecision;
+      if (asked?.kind === 'yesNo') this.decide({ kind: 'yesNo', answer: true });
+      else if (asked?.kind === 'discard') {
+        this.decide({ kind: 'discard', cards: asked.from.slice(0, asked.count) });
+      } else this.pass();
     }
     throw new ScenarioError(`the stack did not empty within ${limit} decisions`);
   }

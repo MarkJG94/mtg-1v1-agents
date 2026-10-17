@@ -75,6 +75,11 @@ export const greedyAgent = (
         return { kind: 'chooseOption', chosen: mostValuable(view, decision.options, weights) };
       case 'chooseReplacement':
         return { kind: 'chooseReplacement', effect: decision.options[0] ?? 0 };
+      // "You may …" is nearly always worth doing for the player asked — draw a card, put a
+      // counter on, destroy their artifact — and without a simulator there is nothing to
+      // weigh the two answers by. The searching agent can do better.
+      case 'yesNo':
+        return { kind: 'yesNo', answer: true };
     }
   },
 });

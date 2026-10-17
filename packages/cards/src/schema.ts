@@ -467,6 +467,22 @@ export const cardScriptSchema = z.object({
    * ("Enchant creature") is claimed by this field, as a keyword line is by `keywords:`.
    */
   enchant: filterSchema.optional(),
+  /**
+   * What the spell costs beyond its mana (CR 601.2b, 118.8): `sacrifice: { filter, count }`,
+   * `discard: N`, `life: N`. Which permanents and which cards are chosen as it is cast.
+   * Its printed line ("As an additional cost to cast this spell, …") is claimed by this
+   * field, as an Aura's "Enchant …" is by `enchant:`.
+   */
+  additionalCost: z
+    .object({
+      sacrifice: z.object({ filter: filterSchema, count: z.number().int().positive() }).optional(),
+      discard: z.number().int().positive().optional(),
+      life: z.number().int().positive().optional(),
+    })
+    .refine((cost) => Object.values(cost).some((part) => part !== undefined), {
+      message: 'an additional cost has to cost something',
+    })
+    .optional(),
   abilities: z.array(abilitySchema).default([]),
   /** The oracle text this script was written against, for the validator to check. */
   text: z.string().optional(),

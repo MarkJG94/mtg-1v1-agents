@@ -42,6 +42,9 @@ const infoFrom = (definition: CardDefinition): CardInfo => {
     sorcerySpeed: isSorcerySpeed(definition),
     colours: definition.colours,
     targets: spellAbilityOf(definition)?.targets ?? [],
+    ...(definition.additionalCost === undefined
+      ? {}
+      : { additionalCost: definition.additionalCost }),
   };
   infos.set(definition, info);
   return info;

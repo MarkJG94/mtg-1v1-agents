@@ -78,6 +78,12 @@ export type EffectOp =
   | { readonly op: 'draw'; readonly player: PlayerSelector; readonly count: Quantity }
   | { readonly op: 'mill'; readonly player: PlayerSelector; readonly count: Quantity }
   | { readonly op: 'discardAtRandom'; readonly player: PlayerSelector; readonly count: Quantity }
+  /**
+   * "Target player discards two cards": the player discarding chooses which (CR 701.9b),
+   * so resolution waits on their `discard` decision. Each player in turn, for "each player
+   * discards a card" (CR 101.4).
+   */
+  | { readonly op: 'discard'; readonly player: PlayerSelector; readonly count: Quantity }
   | { readonly op: 'destroy'; readonly object: ObjectSelector }
   | { readonly op: 'exile'; readonly object: ObjectSelector }
   | { readonly op: 'bounce'; readonly object: ObjectSelector }
@@ -191,6 +197,12 @@ export type EffectOp =
 
   // --- Control flow ---
   | { readonly op: 'sequence'; readonly effects: readonly EffectOp[] }
+  /**
+   * "You may draw a card": the player chooses, as the ability resolves, whether `effects`
+   * happen (CR 608.2d). "If you do, …" after it is part of `effects`, since it happens
+   * exactly when they do.
+   */
+  | { readonly op: 'may'; readonly player: PlayerSelector; readonly effects: readonly EffectOp[] }
   | { readonly op: 'forEach'; readonly of: Filter; readonly effects: readonly EffectOp[] }
   | {
       readonly op: 'if';
@@ -224,6 +236,7 @@ export const opNames = [
   'damage',
   'delayedTrigger',
   'destroy',
+  'discard',
   'discardAtRandom',
   'draw',
   'exile',
@@ -236,6 +249,7 @@ export const opNames = [
   'if',
   'loseGame',
   'loseLife',
+  'may',
   'mill',
   'moveZone',
   'poison',

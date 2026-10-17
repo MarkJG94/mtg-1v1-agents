@@ -6,6 +6,7 @@ import { parseTypeLine } from '../oracle-text.js';
 import type { CardProjection } from '../scryfall.js';
 import { classifyCard } from './classify.js';
 import {
+  parseAdditionalCost,
   parseCost,
   parseEffects,
   parseEnchant,
@@ -223,11 +224,42 @@ describe('cards and removal', () => {
     ]);
   });
 
-  it('refuses a discard the player chooses, which needs a decision mid-resolution', () => {
-    expect(effectsOf('Target player discards two cards.')).toBeNull();
+  /** The player discarding chooses (CR 701.9b); "at random" nobody does. */
+  it('reads a discard the player chooses apart from one at random', () => {
+    expect(effectsOf('Target player discards two cards.')).toEqual([
+      { op: 'discard', player: '$t', count: 2 },
+    ]);
     expect(effectsOf('Target player discards two cards at random.')).toEqual([
       { op: 'discardAtRandom', player: '$t', count: 2 },
     ]);
+  });
+
+  it('reads "you may", with "if you do" inside it (CR 608.2d)', () => {
+    const parsed = parseEffects([
+      'You may sacrifice ~.',
+      'If you do, draw two cards.',
+      'You gain 1 life.',
+    ]);
+    expect(parsed.ok && parsed.ability.effects).toEqual([
+      {
+        op: 'may',
+        player: 'you',
+        effects: [
+          { op: 'sacrifice', object: '~' },
+          { op: 'draw', player: 'you', count: 2 },
+        ],
+      },
+      { op: 'gainLife', player: 'you', amount: 1 },
+    ]);
+  });
+
+  it('does not read "if you do" after nothing that was optional', () => {
+    const parsed = parseEffects(['Draw a card.', 'If you do, you gain 1 life.']);
+    expect(parsed.ok && parsed.ability.sentencesRead).toBe(1);
+  });
+
+  it('reads a "may" whose action it cannot read as unread, not as an empty may', () => {
+    expect(parseEffects(['You may sacrifice a creature.']).ok).toBe(false);
   });
 });
 
@@ -353,7 +385,7 @@ describe('the parts that are not effects', () => {
     expect(parseTrigger('At the beginning of your first main phase, draw a card.')).toHaveProperty(
       'failure',
     );
-    expect(parseTrigger('At the beginning of combat on your turn, draw a card.')).toHaveProperty(
+    expect(parseTrigger('At the beginning of your draw step, draw a card.')).toHaveProperty(
       'failure',
     );
   });
@@ -464,6 +496,181 @@ describe('the parts that are not effects', () => {
   it('refuses a cost it can only read half of', () => {
     expect(parseCost('{1}, Discard a card')).toBeNull();
     expect(parseCost('{T}, Pay 3 life')).toBeNull();
+  });
+});
+
+describe('the trigger vocabulary 7.1 widened', () => {
+  const when = (sentence: string) => {
+    const parsed = parseTrigger(sentence);
+    return 'when' in parsed ? parsed.when : parsed;
+  };
+
+  it('reads the beginning of combat, and says whose (CR 507.1)', () => {
+    expect(when('At the beginning of combat on your turn, draw a card.')).toEqual({
+      kind: 'beginningOfCombat',
+      whose: 'self',
+    });
+    expect(when('At the beginning of each combat, draw a card.')).toEqual({
+      kind: 'beginningOfCombat',
+      whose: 'any',
+    });
+  });
+
+  it('reads an opponent’s step, and "the end step" as every one', () => {
+    expect(when("At the beginning of each opponent's upkeep, draw a card.")).toEqual({
+      kind: 'beginningOfUpkeep',
+      whose: 'opponent',
+    });
+    expect(when('At the beginning of the end step, sacrifice ~.')).toEqual({
+      kind: 'beginningOfEndStep',
+      whose: 'any',
+    });
+  });
+
+  it('reads "that player" in an opponent’s step as that opponent', () => {
+    expect(
+      parseTrigger("At the beginning of each opponent's upkeep, that player loses 1 life."),
+    ).toMatchObject({ ability: { effects: [{ op: 'loseLife', player: 'opponent' }] } });
+  });
+
+  it('leaves "that player" unread when the step is either player’s', () => {
+    expect(
+      parseTrigger("At the beginning of each player's upkeep, that player loses 1 life."),
+    ).toHaveProperty('failure');
+  });
+
+  it('reads the older wordings of entering and dying as the same triggers', () => {
+    expect(when('When ~ enters the battlefield, draw a card.')).toEqual({
+      kind: 'selfEntersBattlefield',
+    });
+    expect(when('When ~ is put into a graveyard from the battlefield, draw a card.')).toEqual({
+      kind: 'selfDies',
+    });
+    expect(when('When ~ is put into your graveyard from the battlefield, draw a card.')).toEqual({
+      kind: 'selfDies',
+    });
+  });
+
+  it('reads becoming blocked, but not becoming blocked by something (CR 509.3c)', () => {
+    expect(when('Whenever ~ becomes blocked, draw a card.')).toEqual({
+      kind: 'selfBecomesBlocked',
+    });
+    expect(parseTrigger('Whenever ~ becomes blocked by a creature, draw a card.')).toHaveProperty(
+      'failure',
+    );
+  });
+
+  it('reads gaining life, yours or an opponent’s (CR 119.10)', () => {
+    expect(when('Whenever you gain life, draw a card.')).toEqual({
+      kind: 'lifeGained',
+      player: 'you',
+    });
+    expect(when('Whenever an opponent gains life, draw a card.')).toEqual({
+      kind: 'lifeGained',
+      player: 'opponent',
+    });
+    expect(when('Whenever a player gains life, draw a card.')).toEqual({
+      kind: 'lifeGained',
+      player: 'any',
+    });
+  });
+
+  it('reads casting a spell, and what kind of spell (CR 601.2i)', () => {
+    expect(when('Whenever you cast a spell, draw a card.')).toEqual({
+      kind: 'spellCast',
+      caster: 'you',
+    });
+    expect(when('Whenever you cast an instant or sorcery spell, draw a card.')).toEqual({
+      kind: 'spellCast',
+      caster: 'you',
+      filter: { or: [{ type: 'instant' }, { type: 'sorcery' }] },
+    });
+    expect(when('Whenever an opponent casts a noncreature spell, draw a card.')).toEqual({
+      kind: 'spellCast',
+      caster: 'opponent',
+      filter: { not: { type: 'creature' } },
+    });
+    // A creature spell is a type, not "a creature", which is one on the battlefield.
+    expect(when('Whenever a player casts a creature spell, draw a card.')).toEqual({
+      kind: 'spellCast',
+      caster: 'any',
+      filter: { type: 'creature' },
+    });
+  });
+
+  it('refuses a kind of spell it does not know', () => {
+    expect(parseTrigger('Whenever you cast a multicolored spell, draw a card.')).toHaveProperty(
+      'failure',
+    );
+  });
+});
+
+describe('an additional cost to cast (CR 601.2b, 118.8)', () => {
+  const cost = (rest: string) => parseAdditionalCost(`As an additional cost to cast ~, ${rest}`);
+
+  it('reads a sacrifice, with how many and of what', () => {
+    expect(cost('sacrifice a creature.')).toEqual({ sacrifice: { filter: 'creature', count: 1 } });
+    expect(cost('sacrifice two creatures.')).toEqual({
+      sacrifice: { filter: 'creature', count: 2 },
+    });
+    expect(cost('sacrifice an artifact or creature.')).toEqual({
+      sacrifice: { filter: { or: [{ type: 'artifact' }, 'creature'] }, count: 1 },
+    });
+  });
+
+  it('reads a discard and a payment of life', () => {
+    expect(cost('discard a card.')).toEqual({ discard: 1 });
+    expect(cost('discard two cards.')).toEqual({ discard: 2 });
+    expect(cost('pay 3 life.')).toEqual({ life: 3 });
+  });
+
+  it('refuses an X nobody chose, an optional cost, a choice between two, and anything after', () => {
+    expect(cost('discard X cards.')).toBeNull();
+    expect(cost('pay X life.')).toBeNull();
+    expect(cost('you may pay {2}.')).toBeNull();
+    expect(cost('sacrifice a creature or pay 3 life.')).toBeNull();
+    expect(cost('discard a card at random.')).toBeNull();
+  });
+
+  it('is only the additional-cost sentence', () => {
+    expect(parseAdditionalCost('Sacrifice a creature.')).toBeNull();
+  });
+});
+
+describe('a trigger on combat damage to a player (CR 510.3a)', () => {
+  it('reads it, whether the card says a player or an opponent', () => {
+    for (const who of ['a player', 'an opponent']) {
+      const parsed = parseTrigger(`Whenever ~ deals combat damage to ${who}, draw a card.`);
+      expect('when' in parsed && parsed.when).toEqual({ kind: 'selfDealsCombatDamageToPlayer' });
+    }
+  });
+
+  /** Two players: the one dealt combat damage by your creature is your opponent. */
+  it('reads "that player" as the player who was dealt the damage', () => {
+    const parsed = parseTrigger(
+      'Whenever ~ deals combat damage to a player, that player loses 2 life.',
+    );
+    expect('ability' in parsed && parsed.ability.effects).toEqual([
+      { op: 'loseLife', player: 'opponent', amount: 2 },
+    ]);
+  });
+
+  it('still reads "that player" as a player the ability targeted, when it did', () => {
+    const parsed = parseEffects(['Target player draws a card.', 'That player loses 1 life.'], {
+      thatPlayer: 'opponent',
+    });
+    expect(parsed.ok && parsed.ability.effects[1]).toEqual({
+      op: 'loseLife',
+      player: '$t',
+      amount: 1,
+    });
+  });
+
+  it('does not read one that also counts a planeswalker', () => {
+    expect(
+      'failure' in
+        parseTrigger('Whenever ~ deals combat damage to a player or planeswalker, draw a card.'),
+    ).toBe(true);
   });
 });
 

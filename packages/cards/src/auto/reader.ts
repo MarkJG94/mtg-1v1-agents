@@ -88,6 +88,11 @@ export class Reader {
     return this.index >= this.tokens.length;
   }
 
+  /** Where in the line the next token starts: the rest of it, for a rule that hands it on. */
+  get offset(): number {
+    return this.peek()?.at ?? Number.POSITIVE_INFINITY;
+  }
+
   /** The token under the cursor, or `null` past the end. */
   peek(ahead = 0): Token | null {
     return this.tokens[this.index + ahead] ?? null;
