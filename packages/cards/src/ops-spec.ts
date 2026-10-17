@@ -19,6 +19,8 @@ export type ArgKind =
   | 'filter'
   | 'condition'
   | 'effects'
+  /** A mana cost as printed, `{2}{U}`. */
+  | 'manaCost'
   | 'raw';
 
 export interface OpSpec {
@@ -124,7 +126,10 @@ export const opSpecs: Readonly<Record<OpName, OpSpec>> = {
 
   // Control flow
   sequence: { args: { effects: 'effects' }, required: ['effects'] },
-  may: { args: { player: 'player', effects: 'effects' }, required: ['player', 'effects'] },
+  may: {
+    args: { player: 'player', effects: 'effects', pay: 'manaCost' },
+    required: ['player', 'effects'],
+  },
   forEach: { args: { of: 'filter', effects: 'effects' }, required: ['of', 'effects'] },
   if: {
     args: { condition: 'condition', thenDo: 'effects', otherwise: 'effects' },

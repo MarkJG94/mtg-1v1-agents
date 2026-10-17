@@ -365,6 +365,17 @@ const convertArg = (
     case 'raw':
       return value;
 
+    case 'manaCost': {
+      if (typeof value !== 'string') {
+        throw new ScriptError(script.name, path, 'expected a mana cost such as "{2}{U}"');
+      }
+      try {
+        return parseManaCost(value);
+      } catch (error) {
+        throw new ScriptError(script.name, path, (error as Error).message);
+      }
+    }
+
     case 'effects': {
       if (!Array.isArray(value)) {
         throw new ScriptError(script.name, path, 'expected a list of effects');

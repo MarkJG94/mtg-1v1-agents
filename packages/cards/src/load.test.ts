@@ -182,6 +182,31 @@ describe('trigger conditions', () => {
   });
 });
 
+describe('a payment in a "may"', () => {
+  const paying = (pay: unknown) =>
+    loadCardScript({
+      ...bolt,
+      abilities: [
+        {
+          kind: 'spell',
+          effects: [
+            { op: 'may', player: 'you', pay, effects: [{ op: 'draw', player: 'you', count: 1 }] },
+          ],
+        },
+      ],
+    });
+
+  it('loads its mana cost into the engine’s form', () => {
+    const effect = (paying('{2}{R}').abilities[0] as { effects: readonly unknown[] }).effects[0];
+    expect(effect).toMatchObject({ op: 'may', pay: { generic: 2, symbols: [{}] } });
+  });
+
+  it('refuses one that is not a mana cost', () => {
+    expect(() => paying('{E}{E}')).toThrow(ScriptError);
+    expect(() => paying(2)).toThrow(ScriptError);
+  });
+});
+
 describe('a cost reduction', () => {
   it('loads its quantity and condition, and a graveyard filter, into the engine’s forms', () => {
     const definition = loadCardScript({

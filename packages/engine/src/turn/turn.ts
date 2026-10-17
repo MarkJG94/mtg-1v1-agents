@@ -514,7 +514,7 @@ export const applyDecision = (
     next = applyDiscard(cleared, emitter, decision, response.cards);
     if (next.resolution !== null) next = runResolution(next, emitter);
   } else if (decision.kind === 'yesNo' && response.kind === 'yesNo') {
-    next = answerMay(cleared, emitter, response.answer);
+    next = answerMay(cleared, emitter, decision.player, response.answer);
   } else if (decision.kind === 'declareAttackers' && response.kind === 'declareAttackers') {
     next = declareAttackers(cleared, emitter, response.attackers);
   } else if (decision.kind === 'declareBlockers' && response.kind === 'declareBlockers') {

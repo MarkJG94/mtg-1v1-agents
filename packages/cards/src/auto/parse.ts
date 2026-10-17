@@ -1,3 +1,4 @@
+import { parseManaCost } from '@mtg/engine';
 import { Bindings, duration, filter, player, quantity, type ScriptFilter } from './phrases.js';
 import { type ParseFailure, Reader } from './reader.js';
 import { readKeywords, type ScriptEffect, verbs } from './verbs.js';
@@ -64,6 +65,9 @@ export const parseEffects = (
     // first does, so it goes inside the same `may` (CR 608.2d).
     const ifYouDo = /^if (you|they) do, (.*)$/i.exec(sentence.trim());
     const last = effects.at(-1);
+    // A payment is only half a sentence's worth: "you may pay {2}" has to be followed by
+    // what it buys, or it is unread rather than read as paying for nothing.
+    if (ifYouDo === null && isUnspentPayment(last)) break;
     if (ifYouDo !== null) {
       const rest = last?.op === 'may' ? readSentence(ifYouDo[2] ?? '', bindings) : null;
       if (rest === null || last === undefined) {
@@ -87,6 +91,12 @@ export const parseEffects = (
     effects.push(...parsed);
     bindings.started = effects.length > 0;
     read += 1;
+  }
+
+  if (isUnspentPayment(effects.at(-1))) {
+    effects.pop();
+    read -= 1;
+    failure = { reason: 'a payment with nothing it buys after it', token: null };
   }
 
   if (read === 0) {
@@ -123,10 +133,35 @@ const readMay = (sentence: string, bindings: Bindings): readonly ScriptEffect[] 
     return null;
   }
   bindings.subject = who;
+  // "You may pay {2}." — a payment, whose result is the "If you do, …" after it, which
+  // `parseEffects` folds in. Alone it buys nothing, and `parseEffects` refuses it so.
+  const payment = reader.try(() => {
+    if (!reader.word('pay')) return null;
+    const symbols = reader.match(/(?:\{[^}]*\})+/);
+    reader.word('.');
+    // Mana only: {E}{E} is energy, which the engine has no pool for.
+    return symbols !== null && reader.done && isManaCost(symbols[0]) ? symbols[0] : null;
+  });
+  if (payment !== null) return [{ op: 'may', player: who, pay: payment, effects: [] }];
   const effects = readSentence(sentence.slice(reader.offset).trim(), bindings);
   if (effects === null) return null;
   return [{ op: 'may', player: who, effects }];
 };
+
+const isManaCost = (text: string): boolean => {
+  try {
+    parseManaCost(text);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** "You may pay {2}." with no "If you do, …" folded into it yet. */
+const isUnspentPayment = (effect: ScriptEffect | undefined): boolean =>
+  effect?.op === 'may' &&
+  effect['pay'] !== undefined &&
+  (effect['effects'] as readonly ScriptEffect[]).length === 0;
 
 /** Where the most recent sentence gave up, kept for the result above. */
 let lastFailure: ParseFailure = { reason: 'nothing to read', token: null };
@@ -185,6 +220,12 @@ export const triggerConditionUnread = 'a trigger condition this cannot read';
 
 export const parseTrigger = (
   sentence: string,
+  /**
+   * The line's sentences after the first, which are the rest of the same ability's body:
+   * "When ~ enters, you may draw a card. If you do, discard a card." Read in order, and
+   * the ability is as far as they got (`sentencesRead` counts the first one too).
+   */
+  following: readonly string[] = [],
 ): ParsedTrigger | { readonly failure: ParseFailure } => {
   const comma = sentence.indexOf(',');
   if (comma < 0) {
@@ -200,7 +241,7 @@ export const parseTrigger = (
 
   const that = thatPlayerOf(when);
   const rest = parseEffects(
-    [sentence.slice(comma + 1).trim()],
+    [sentence.slice(comma + 1).trim(), ...following],
     that === null ? {} : { thatPlayer: that },
   );
   return rest.ok ? { when, ability: rest.ability } : { failure: rest.failure };

@@ -196,6 +196,56 @@ describe('auras and equipment', () => {
   });
 });
 
+describe('abilities whose text runs past one sentence', () => {
+  const creature = (oracleText: string) => ({
+    ...card('Fling'),
+    name: 'Test Bear',
+    typeLine: 'Creature — Bear',
+    oracleText,
+    power: '2',
+    toughness: '2',
+  });
+
+  it('reads every sentence of a trigger, and claims the line when they all read', () => {
+    const emitted = emitScript(
+      creature('When this creature enters, draw a card. You lose 1 life.'),
+    );
+    expect(emitted.script?.['abilities']).toEqual([
+      expect.objectContaining({
+        kind: 'triggered',
+        covers: [0, 1],
+        effects: [
+          { op: 'draw', player: 'you', count: 1 },
+          { op: 'loseLife', player: 'you', amount: 1 },
+        ],
+      }),
+    ]);
+  });
+
+  it('claims only the sentences it read, so the card stays partial', () => {
+    const bear = creature('When this creature enters, draw a card. Frobnicate the opponent.');
+    const emitted = emitScript(bear);
+    expect(emitted.script?.['abilities']).toEqual([
+      expect.objectContaining({ kind: 'triggered', covers: [0] }),
+    ]);
+    expect(validateScript(emitted.script, bear).status).toBe('partial');
+  });
+
+  it('reads an activated ability’s effect sentence by sentence', () => {
+    const emitted = emitScript(creature('{1}, {T}: Draw a card. You lose 1 life.'));
+    expect(emitted.script?.['abilities']).toEqual([
+      expect.objectContaining({
+        kind: 'activated',
+        covers: [0, 1],
+        effects: [
+          { op: 'draw', player: 'you', count: 1 },
+          { op: 'loseLife', player: 'you', amount: 1 },
+        ],
+      }),
+    ]);
+  });
+});
+
 describe('a reduction of its own cost (CR 601.2f)', () => {
   const withText = (oracleText: string) => ({ ...card('Fling'), name: 'Test Act', oracleText });
 

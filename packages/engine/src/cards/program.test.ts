@@ -2,7 +2,7 @@ import { asOracleId, playerZone } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
 import { parseManaCost } from '../mana/cost.js';
 import { objectsIn } from '../state/update.js';
-import { game } from '../testing/scenario.js';
+import { game, type Scenario } from '../testing/scenario.js';
 import type { CardDefinition } from './definition.js';
 import type { EffectOp } from './ops.js';
 
@@ -80,12 +80,11 @@ const table = (card: CardDefinition, hand: { A?: number; B?: number } = {}) =>
 const filler = (prefix: string, count: number) =>
   Array.from({ length: count }, (_, i) => ({ name: `${prefix}${i}`, power: 1, toughness: 1 }));
 
-const handOf = (scenario: ReturnType<typeof table>, player: 'A' | 'B') =>
+const handOf = (scenario: Scenario, player: 'A' | 'B') =>
   objectsIn(scenario.get(), playerZone(player, 'hand'));
 
 /** Cast it and let both players pass, so it begins to resolve. */
-const castAndResolve = (scenario: ReturnType<typeof table>, targets = {}) =>
-  scenario.cast('card', targets).pass(2);
+const castAndResolve = (scenario: Scenario, targets = {}) => scenario.cast('card', targets).pass(2);
 
 describe('"you may" (CR 608.2d)', () => {
   it('stops for a yes or no from the player, with the spell still on the stack', () => {
@@ -112,6 +111,76 @@ describe('"you may" (CR 608.2d)', () => {
     expect(handOf(scenario, 'A')).toHaveLength(before - 1);
     expect(scenario.lifeOf('A')).toBe(21);
     expect(scenario.zoneOf('card')).toBe(playerZone('A', 'graveyard'));
+  });
+});
+
+describe('"you may pay {N}. If you do, …" (CR 117.12)', () => {
+  /** "You may pay {2}. If you do, draw a card." */
+  const bargain = spell('Bargain', [
+    {
+      op: 'may',
+      player: you,
+      pay: parseManaCost('{2}'),
+      effects: [{ op: 'draw', player: you, count: 1 }],
+    },
+  ]);
+  const land: CardDefinition = {
+    oracleId: asOracleId('pr-land'),
+    name: 'Grey Land',
+    manaCost: parseManaCost(''),
+    types: ['land'],
+    colours: [],
+    abilities: [{ kind: 'mana', id: 'c', modes: [[{ type: 'C', amount: 1 }]] }],
+  };
+  const withLands = (lands: number) =>
+    game({ definitions: [bargain, land], seed: 'program' })
+      .player('A')
+      .hand({ name: 'card', definitionId: bargain.oracleId })
+      .battlefield(
+        ...Array.from({ length: lands }, (_, i) => ({
+          name: `land${i}`,
+          definitionId: land.oracleId,
+        })),
+      )
+      .library(10)
+      .player('B')
+      .library(10)
+      .player('A')
+      .start()
+      .to('precombatMain');
+  const tapped = (scenario: Scenario, lands: number) =>
+    Array.from({ length: lands }, (_, i) => scenario.object(`land${i}`).tapped).filter(Boolean)
+      .length;
+
+  it('asks, and on a yes pays — tapping for it — before what it buys happens', () => {
+    const scenario = castAndResolve(withLands(2) as never) as unknown as ReturnType<
+      typeof withLands
+    >;
+    expect(scenario.get().pendingDecision).toMatchObject({ kind: 'yesNo', player: 'A' });
+    const before = handOf(scenario, 'A').length;
+    scenario.decide({ kind: 'yesNo', answer: true });
+    expect(tapped(scenario, 2)).toBe(2);
+    expect(handOf(scenario, 'A')).toHaveLength(before + 1);
+  });
+
+  it('on a no pays nothing and buys nothing', () => {
+    const scenario = castAndResolve(withLands(2) as never) as unknown as ReturnType<
+      typeof withLands
+    >;
+    const before = handOf(scenario, 'A').length;
+    scenario.decide({ kind: 'yesNo', answer: false });
+    expect(tapped(scenario, 2)).toBe(0);
+    expect(handOf(scenario, 'A')).toHaveLength(before);
+  });
+
+  it('does not ask a player who could not pay, and buys nothing', () => {
+    const scenario = castAndResolve(withLands(1) as never) as unknown as ReturnType<
+      typeof withLands
+    >;
+    const before = handOf(scenario, 'A').length;
+    expect(scenario.get().pendingDecision?.kind).not.toBe('yesNo');
+    expect(scenario.zoneOf('card')).toBe(playerZone('A', 'graveyard'));
+    expect(handOf(scenario, 'A')).toHaveLength(before);
   });
 });
 

@@ -1,6 +1,7 @@
 import type { Colour } from '@mtg/shared';
 import type { GrantableKeyword } from '../layers.js';
 import type { ManaProduction } from '../mana/ability.js';
+import type { ManaCost } from '../mana/cost.js';
 import type {
   CardType,
   Condition,
@@ -202,7 +203,16 @@ export type EffectOp =
    * happen (CR 608.2d). "If you do, …" after it is part of `effects`, since it happens
    * exactly when they do.
    */
-  | { readonly op: 'may'; readonly player: PlayerSelector; readonly effects: readonly EffectOp[] }
+  | {
+      readonly op: 'may';
+      readonly player: PlayerSelector;
+      readonly effects: readonly EffectOp[];
+      /**
+       * "You may pay {2}. If you do, …": the mana a yes costs, paid as the ability
+       * resolves (CR 117.12, 605.3a). A player who could not pay it is not asked.
+       */
+      readonly pay?: ManaCost;
+    }
   | { readonly op: 'forEach'; readonly of: Filter; readonly effects: readonly EffectOp[] }
   | {
       readonly op: 'if';
