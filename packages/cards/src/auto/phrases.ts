@@ -62,6 +62,14 @@ export class Bindings {
   /** Whether any effect has been read yet, which decides what a bare "it" may mean. */
   started = false;
 
+  /**
+   * Whether a bare "it" with nothing before it may be the card itself. Not in the body of
+   * a trigger about another object — "whenever another creature you control enters, put a
+   * +1/+1 counter on it" means the creature that entered, which this vocabulary cannot
+   * name yet, so the sentence stays unread rather than putting the counter on the card.
+   */
+  itMayBeSelf = true;
+
   /** How many targets are declared, so a rule that fails can undo the ones it declared. */
   mark(): number {
     return this.declared.length;
@@ -476,7 +484,7 @@ export const object = (reader: Reader, bindings: Bindings): ObjectPhrase | null 
       // to refer to is the card itself. Only before any effect has been read, because
       // after one it is far more likely to mean whatever that effect produced ("draw a
       // card. If it is a land…"), which this vocabulary cannot say at all.
-      return bindings.started ? null : { kind: 'ref', ref: '~' };
+      return bindings.started || !bindings.itMayBeSelf ? null : { kind: 'ref', ref: '~' };
     },
     () => {
       if (!reader.word('that')) return null;

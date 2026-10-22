@@ -272,3 +272,11 @@ const faceToRead = (card: CardProjection, notes: string[]): Face => {
   }
   return front;
 };
+
+/**
+ * A line without the ability word in front of it: "Landfall — Whenever a land you control
+ * enters, …" is an ordinary trigger, and the word only names it (CR 207.2c). Only before
+ * a trigger word, so a dash elsewhere — "Choose one —", a cost — is left alone.
+ */
+export const withoutAbilityWord = (text: string): string =>
+  text.replace(/^[A-Za-z' ]+ \u2014 (?=(?:when|whenever|at) )/i, '');

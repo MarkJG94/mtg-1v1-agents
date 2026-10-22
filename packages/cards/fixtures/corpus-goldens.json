@@ -6014,8 +6014,7 @@
   "Leyline of Vitality": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"If this card is in your opening hand, you may begin the game with it on the battlefield.\"",
-      "coverage: sentence 2 is not claimed by any ability: \"Whenever a creature you control enters, you may gain 1 life.\""
+      "coverage: sentence 0 is not claimed by any ability: \"If this card is in your opening hand, you may begin the game with it on the battlefield.\""
     ],
     "script": {
       "oracleId": "cbf2b19e-32a3-489f-9979-ba2748c52845",
@@ -6043,6 +6042,33 @@
             "power": 0,
             "toughness": 1
           }
+        },
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-2",
+          "covers": [
+            2
+          ],
+          "when": {
+            "kind": "entersBattlefield",
+            "filter": {
+              "is": "creature",
+              "controller": "you"
+            }
+          },
+          "effects": [
+            {
+              "op": "may",
+              "player": "you",
+              "effects": [
+                {
+                  "op": "gainLife",
+                  "player": "you",
+                  "amount": 1
+                }
+              ]
+            }
+          ]
         }
       ]
     }
@@ -9630,7 +9656,8 @@
             0
           ],
           "when": {
-            "kind": "anotherEntersBattlefield"
+            "kind": "anotherEntersBattlefield",
+            "filter": "creature"
           },
           "effects": [
             {

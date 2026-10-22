@@ -23,13 +23,34 @@ import { noKeywords } from './targeting.js';
 /** What makes an ability trigger. */
 export type TriggerWhen =
   | { readonly kind: 'selfEntersBattlefield' }
+  /**
+   * "Whenever another creature you control enters": a permanent other than the source,
+   * matching `filter` as it is on the battlefield. Without a filter, any permanent.
+   */
   | {
       readonly kind: 'anotherEntersBattlefield';
-      /** "another creature you control enters" is the common printed wording. */
       readonly controlledBy?: 'you' | 'any';
+      readonly filter?: Filter;
     }
+  /**
+   * "Whenever a land you control enters" (Landfall): any permanent matching `filter`,
+   * the source itself included when it matches — a creature with "whenever a creature
+   * you control enters" sees itself enter (CR 603.6a).
+   */
+  | { readonly kind: 'entersBattlefield'; readonly filter?: Filter }
   | { readonly kind: 'selfDies' }
-  | { readonly kind: 'anotherDies'; readonly controlledBy?: 'you' | 'any' }
+  /**
+   * "Whenever another creature you control dies": a permanent other than the source put
+   * into a graveyard from the battlefield (CR 700.4), matching `filter` as it last was
+   * there (CR 603.10a).
+   */
+  | {
+      readonly kind: 'anotherDies';
+      readonly controlledBy?: 'you' | 'any';
+      readonly filter?: Filter;
+    }
+  /** "Whenever a creature you control dies", the source included when it matches. */
+  | { readonly kind: 'dies'; readonly filter?: Filter }
   | { readonly kind: 'selfAttacks' }
   | { readonly kind: 'selfBlocks' }
   /**
@@ -76,8 +97,10 @@ export type StepOwner = 'self' | 'opponent' | 'any';
 export const triggerWhenKinds = [
   'selfEntersBattlefield',
   'anotherEntersBattlefield',
+  'entersBattlefield',
   'selfDies',
   'anotherDies',
+  'dies',
   'selfAttacks',
   'selfBlocks',
   'selfDealsCombatDamageToPlayer',
@@ -165,23 +188,50 @@ export const evaluateCondition = (
 // --- Detection ---
 
 const matchesZoneChange = (
+  /**
+   * The state in which the object that moved is on the battlefield: after it entered,
+   * before it died — so a filter sees it as it is, or as it last was there (CR 603.10a).
+   */
+  state: GameState,
   when: TriggerWhen,
-  watcher: ObjectId,
+  watcher: GameObject,
   moved: ObjectId,
   kind: 'enters' | 'dies',
   /** Whether the watcher and the object that moved were controlled by the same player. */
   sameController: boolean,
 ): boolean => {
-  const self = watcher === moved;
+  const self = watcher.id === moved;
+  const fits = (filter: Filter | undefined) =>
+    filter === undefined ||
+    matchesFilter(
+      state,
+      { source: watcher.id, controller: watcher.controller, targets: {}, x: 0 },
+      filter,
+      { kind: 'object', object: moved },
+    );
   switch (when.kind) {
     case 'selfEntersBattlefield':
       return kind === 'enters' && self;
     case 'anotherEntersBattlefield':
-      return kind === 'enters' && !self && (when.controlledBy !== 'you' || sameController);
+      return (
+        kind === 'enters' &&
+        !self &&
+        (when.controlledBy !== 'you' || sameController) &&
+        fits(when.filter)
+      );
+    case 'entersBattlefield':
+      return kind === 'enters' && fits(when.filter);
     case 'selfDies':
       return kind === 'dies' && self;
     case 'anotherDies':
-      return kind === 'dies' && !self && (when.controlledBy !== 'you' || sameController);
+      return (
+        kind === 'dies' &&
+        !self &&
+        (when.controlledBy !== 'you' || sameController) &&
+        fits(when.filter)
+      );
+    case 'dies':
+      return kind === 'dies' && fits(when.filter);
     default:
       return false;
   }
@@ -222,8 +272,9 @@ export const triggersFromZoneChange = (
       if (id === moved) continue;
       if (
         !matchesZoneChange(
+          state,
           ability.when,
-          id,
+          watcher,
           moved,
           kind,
           watcher.controller === movedSnapshot.controller,
@@ -238,7 +289,7 @@ export const triggersFromZoneChange = (
 
   // The moved object's own triggers use the snapshot, since it may have left.
   for (const ability of movedSnapshot.triggers) {
-    if (!matchesZoneChange(ability.when, moved, moved, kind, true)) continue;
+    if (!matchesZoneChange(state, ability.when, movedSnapshot, moved, kind, true)) continue;
     if (!notYetFired(state, ability, moved)) continue;
     found.push(instanceFor(movedSnapshot, ability));
   }

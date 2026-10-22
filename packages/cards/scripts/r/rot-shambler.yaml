@@ -17,7 +17,7 @@ abilities:
   - kind: triggered
     id: grows
     covers: [0]
-    when: { kind: anotherDies, controlledBy: you }
+    when: { kind: anotherDies, filter: { is: creature, controller: you } }
     effects: [{ op: addCounters, object: "~", counter: "+1/+1", amount: 1 }]
 
 tests:
