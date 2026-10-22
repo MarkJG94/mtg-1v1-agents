@@ -266,6 +266,33 @@ describe('a look at the top of a library', () => {
     );
   });
 
+  it('checks a search’s destination as a look’s, and reads a supertype in its filter', () => {
+    const searching = (fields: Record<string, unknown>) =>
+      loadCardScript({
+        ...bolt,
+        abilities: [{ kind: 'spell', effects: [{ op: 'search', player: 'you', ...fields }] }],
+      });
+    expect(() => searching({ to: { kind: 'exile' } })).toThrow(/to/);
+    expect(() => searching({ to: { kind: 'hand', tapped: true } })).toThrow(/tapped/);
+    expect(
+      searching({ count: 1, filter: { supertype: 'basic', type: 'land' }, to: { kind: 'hand' } })
+        .abilities[0],
+    ).toMatchObject({
+      effects: [
+        {
+          op: 'search',
+          filter: {
+            kind: 'and',
+            filters: [
+              { kind: 'type', type: 'land' },
+              { kind: 'supertype', supertype: 'basic' },
+            ],
+          },
+        },
+      ],
+    });
+  });
+
   it('loads scry and surveil', () => {
     for (const op of ['scry', 'surveil']) {
       expect(() =>

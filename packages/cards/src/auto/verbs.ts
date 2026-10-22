@@ -1,6 +1,6 @@
 import { type GrantableKeyword, grantableKeywords } from '@mtg/engine';
 import { keywordFromPrinted } from '../keyword-names.js';
-import { keywordAction, look } from './look.js';
+import { keywordAction, look, search } from './look.js';
 import {
   type Bindings,
   duration,
@@ -481,6 +481,7 @@ export const verbs: readonly Verb[] = [
   mana,
   token,
   look,
+  search,
   keywordAction,
   shuffle,
   cards,

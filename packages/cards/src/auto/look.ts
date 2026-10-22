@@ -1,4 +1,10 @@
-import { type Bindings, player, quantity, type ScriptFilter } from './phrases.js';
+import {
+  type Bindings,
+  player,
+  quantity,
+  type ScriptFilter,
+  type ScriptQuantity,
+} from './phrases.js';
 import { type ParseFailure, Reader } from './reader.js';
 import type { ScriptEffect } from './verbs.js';
 
@@ -126,7 +132,7 @@ const takeChosen = (reader: Reader, open: ScriptEffect): ScriptEffect | null => 
   const revealed = reader.word('reveal');
   if (!revealed && !reader.word('put')) return null;
   const many = reader.words('any', 'number', 'of');
-  const what = cardFilter(reader, many ? 'cards' : 'card');
+  const what = cardFilter(reader);
   if (what === null) return reader.stopped('a kind of card this cannot read');
   if (!reader.words('from', 'among', 'them')) return null;
   if (revealed) {
@@ -200,43 +206,63 @@ const cardWords: Readonly<Record<string, ScriptFilter>> = {
 };
 
 /**
- * "a creature card", "an instant or sorcery card", "a noncreature, nonland card", "a Human
- * card", "an Elf, Warrior, or Tyvar card", "a creature card with power 3 or less" — a
- * card in a library, by its types. A list with an "or" in it offers any of them, and one
- * of "non-" words joined by commas asks for all; a capitalised word is a subtype, as
- * Oracle text capitalises them (CR 205.3). Supertypes ("legendary") and "historic" are
- * not read. `noun` is "cards" after "any number of".
+ * "a creature card", "an instant or sorcery card", "a noncreature, nonland card", "a basic
+ * Forest, Plains, or Island card", "a legendary creature card", "a Dragon creature card",
+ * "an artifact card with mana value 3 or less" — a card in a library, by its types.
+ *
+ * Words side by side are all said of one card; a list with an "or" in it offers any of
+ * its parts, and one of "non-" words joined by commas asks for all of them. Supertypes
+ * before the list are said of every part ("basic" in "a basic Forest, Plains, or Island
+ * card"). A capitalised word is a subtype, as Oracle text capitalises them (CR 205.3).
+ * "Historic" and "named ~" are not read. "Card" or "cards", either.
  */
-export const cardFilter = (
-  reader: Reader,
-  noun: 'card' | 'cards' = 'card',
-): ScriptFilter | 'any' | null => {
-  if (noun === 'card') reader.anyWord('a', 'an');
-  if (reader.word(noun)) return 'any';
-  const kinds: ScriptFilter[] = [];
-  let anyOr = false;
+export const cardFilter = (reader: Reader): ScriptFilter | 'any' | null => {
+  reader.anyWord('a', 'an');
+  const shared: ScriptFilter[] = [];
   for (;;) {
-    const kind = cardWord(reader);
-    if (kind === null) return null;
-    kinds.push(kind);
+    const word = reader.peek()?.word;
+    if (word === undefined || !(supertypes as readonly string[]).includes(word)) break;
+    reader.next();
+    shared.push({ supertype: word });
+  }
+  const groups: ScriptFilter[] = [];
+  let anyOr = false;
+  while (reader.peek()?.word !== 'card' && reader.peek()?.word !== 'cards') {
+    const words: ScriptFilter[] = [];
+    for (;;) {
+      const word = cardWord(reader);
+      if (word === null) break;
+      words.push(word);
+    }
+    if (words.length === 0) return null;
+    groups.push(words.length === 1 ? (words[0] as ScriptFilter) : { and: words });
     const comma = reader.word(',');
     const or = reader.word('or');
     anyOr ||= or;
     if (!comma && !or) break;
   }
-  if (!reader.word(noun)) return null;
-  const head: ScriptFilter =
-    kinds.length === 1 ? (kinds[0] as ScriptFilter) : { [anyOr ? 'or' : 'and']: kinds };
+  if (reader.anyWord('card', 'cards') === null) return null;
+
+  const parts = [
+    ...shared,
+    ...(groups.length === 0
+      ? []
+      : [groups.length === 1 ? (groups[0] as ScriptFilter) : { [anyOr ? 'or' : 'and']: groups }]),
+  ];
   const most = reader.try(() => {
     if (!reader.word('with')) return null;
-    const what = reader.anyWord('power', 'toughness');
+    const what = reader.words('mana', 'value') ? 'manaValue' : reader.anyWord('power', 'toughness');
     if (what === null) return null;
     const amount = reader.match(/\d+/);
     if (amount === null || !reader.words('or', 'less')) return null;
     return { [`${what}AtMost`]: Number(amount[0]) };
   });
-  return most === null ? head : { and: [head, most] };
+  if (most !== null) parts.push(most);
+  if (parts.length === 0) return 'any';
+  return parts.length === 1 ? (parts[0] as ScriptFilter) : { and: parts };
 };
+
+const supertypes = ['basic', 'legendary', 'snow'];
 
 const cardWord = (reader: Reader): ScriptFilter | null => {
   const token = reader.peek();
@@ -246,7 +272,90 @@ const cardWord = (reader: Reader): ScriptFilter | null => {
     reader.next();
     return kind;
   }
+  if (supertypes.includes(token.word)) {
+    reader.next();
+    return { supertype: token.word };
+  }
   if (!/^[A-Z][a-z]+$/.test(token.text)) return null;
   reader.next();
   return { subtype: token.word };
 };
+
+// --- Searching ---
+
+/**
+ * "Search your library for a basic land card, put it onto the battlefield tapped, then
+ * shuffle." (CR 701.23), the whole sentence: how many ("a", "up to two", "any number
+ * of"), what kind, an optional "reveal it", where they go, and the shuffle — or "then
+ * shuffle and put that card on top", which goes on top once the rest are shuffled. A
+ * search of "their library" is the subject's own: "its controller may search their
+ * library".
+ */
+export const search = (reader: Reader, bindings: Bindings): readonly ScriptEffect[] | null => {
+  const who = reader.try(() => player(reader, bindings)) ?? bindings.subject ?? 'you';
+  if (reader.anyWord('search', 'searches') === null) return null;
+  if (reader.anyWord('your', 'their') === null || !reader.word('library')) {
+    return reader.stopped('a search of somewhere other than the searcher’s own library');
+  }
+  if (!reader.word('for')) return null;
+
+  let count: ScriptQuantity | null = 1;
+  let upTo = false;
+  if (reader.words('up', 'to')) {
+    count = quantity(reader);
+    upTo = true;
+  } else if (reader.words('any', 'number', 'of')) {
+    count = null;
+  } else {
+    count =
+      reader.try(() => {
+        const number = quantity(reader);
+        // "a"/"an" are one, and left for the noun phrase to read again.
+        return number;
+      }) ?? 1;
+  }
+  if (upTo && count === null) return null;
+  const what = cardFilter(reader);
+  if (what === null) return reader.stopped('a kind of card this cannot read');
+
+  reader.word(',');
+  reader.try(() => (reader.word('reveal') && foundPronoun(reader) ? true : null));
+  reader.word(',');
+  const to = reader.first<Readonly<Record<string, unknown>>>(
+    () => {
+      if (!reader.words('then', 'shuffle', 'and', 'put') || !foundPronoun(reader)) return null;
+      if (!reader.words('on', 'top')) return null;
+      reader.try(() => reader.words('of', 'your', 'library'));
+      return { kind: 'libraryTop' };
+    },
+    () => {
+      if (!reader.word('put') || !foundPronoun(reader)) return null;
+      const where = destination(reader);
+      if (where === null) return null;
+      reader.word(',');
+      if (!reader.words('then', 'shuffle')) return null;
+      reader.try(() => reader.anyWord('your', 'their') !== null && reader.word('library'));
+      return where;
+    },
+  );
+  if (to === null)
+    return reader.stopped('a search that does not put what it finds anywhere this can read');
+  return [
+    {
+      op: 'search',
+      player: who,
+      ...(count === null ? {} : { count }),
+      ...(upTo ? { upTo: true } : {}),
+      ...(what === 'any' ? {} : { filter: what }),
+      to,
+    },
+  ];
+};
+
+/** "it", "them", "that card", "those cards": what a search found. */
+const foundPronoun = (reader: Reader): boolean =>
+  reader.anyWord('it', 'them') !== null ||
+  reader.words('that', 'card') ||
+  reader.words('those', 'cards') ||
+  reader.words('the', 'card') ||
+  reader.words('the', 'cards');

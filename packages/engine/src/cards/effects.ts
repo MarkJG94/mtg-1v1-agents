@@ -507,6 +507,7 @@ export const applyOp = (
     case 'may':
     case 'discard':
     case 'lookAtTop':
+    case 'search':
     case 'scry':
     case 'surveil':
       throw new Error(`"${effect.op}" is run by the resolution program, not on its own`);

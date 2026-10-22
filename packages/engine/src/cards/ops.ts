@@ -23,9 +23,9 @@ import type {
  * damage" works with a prevention shield without either knowing about the other.
  *
  * **The ops that ask.** Most ops run to completion without asking anybody anything. The
- * few that need a choice during resolution — `may`, `discard`, `lookAtTop`, `scry`,
- * `surveil` — are run by the resolution program (ADR 0021), which stops for the answer and
- * carries on after it. Search, modes and "unless that player pays" are the next ones on it.
+ * few that need a choice during resolution — `may`, `discard`, `lookAtTop`, `search`,
+ * `scry`, `surveil` — are run by the resolution program (ADR 0021), which stops for the answer and
+ * carries on after it. Modes and "unless that player pays" are the next ones on it.
  */
 
 /** Where a `moveZone` puts something. Relative to the object's owner, as the rules are. */
@@ -41,18 +41,23 @@ export type Destination =
   | { readonly kind: 'libraryTop' }
   | { readonly kind: 'libraryBottom' };
 
-/** Where the cards a `lookAtTop` takes go. */
+/**
+ * Where the cards a `lookAtTop` or a `search` takes go. `libraryTop` is a search's "then
+ * shuffle and put that card on top": on top once the rest are shuffled.
+ */
 export type LookDestination =
   | { readonly kind: 'hand' }
   | { readonly kind: 'graveyard' }
   | { readonly kind: 'libraryBottom' }
+  | { readonly kind: 'libraryTop' }
   | { readonly kind: 'battlefield'; readonly tapped?: boolean };
 
 /**
  * Where the cards a `lookAtTop` does not take go: back on top or on the bottom in an
- * order the player chooses, on the bottom in a random order, or into the graveyard.
+ * order the player chooses, on the bottom in a random order, or into the graveyard. A
+ * search's are wherever they were in the library, which is then shuffled (`shuffle`).
  */
-export type LookRest = 'top' | 'bottom' | 'bottomRandom' | 'graveyard';
+export type LookRest = 'top' | 'bottom' | 'bottomRandom' | 'graveyard' | 'shuffle';
 
 /** How long a continuous effect an op creates lasts. Most are until end of turn. */
 export type OpDuration = 'untilEndOfTurn' | 'permanent' | 'whileSourceOnBattlefield';
@@ -122,6 +127,22 @@ export type EffectOp =
       /** Where the taken cards go. Required with `take`. */
       readonly to?: LookDestination;
       readonly rest: LookRest;
+    }
+  /**
+   * "Search your library for a basic land card, put it onto the battlefield tapped, then
+   * shuffle" (CR 701.23): the player looks through the whole library, takes cards to
+   * `to`, and the library is shuffled. A search for a stated quality — anything with a
+   * `filter` — may find fewer than asked, or none (CR 701.23b); a search for a bare
+   * number of cards must find them while there are any (CR 701.23c), unless `upTo`.
+   */
+  | {
+      readonly op: 'search';
+      readonly player: PlayerSelector;
+      /** How many to find; any number when absent. */
+      readonly count?: Quantity;
+      readonly upTo?: boolean;
+      readonly filter?: Filter;
+      readonly to: LookDestination;
     }
   /**
    * Scry N (CR 701.22a): look at the top N, put any number on the bottom in any order and
@@ -313,6 +334,7 @@ export const opNames = [
   'removeCounters',
   'sacrifice',
   'scry',
+  'search',
   'sequence',
   'setColours',
   'setPowerToughness',

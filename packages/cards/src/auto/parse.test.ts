@@ -610,14 +610,105 @@ describe('the trigger vocabulary 7.1 widened', () => {
 
 describe('cycling (CR 702.29a)', () => {
   it('reads its mana cost', () => {
-    expect(parseCycling('Cycling {2}')).toBe('{2}');
-    expect(parseCycling('Cycling {1}{W}')).toBe('{1}{W}');
+    expect(parseCycling('Cycling {2}')).toEqual({ mana: '{2}' });
+    expect(parseCycling('Cycling {1}{W}')).toEqual({ mana: '{1}{W}' });
   });
 
-  it('refuses a cost that is not mana, and the landcyclings', () => {
+  it('refuses a cost that is not mana', () => {
     expect(parseCycling('Cycling—Pay 2 life.')).toBeNull();
-    expect(parseCycling('Plainscycling {2}')).toBeNull();
     expect(parseCycling('Cycling {E}')).toBeNull();
+    expect(parseCycling('Plainscycling—Pay 2 life.')).toBeNull();
+  });
+
+  it('reads typecycling as what it searches for (CR 702.29e)', () => {
+    expect(parseCycling('Plainscycling {2}')).toEqual({
+      mana: '{2}',
+      search: { subtype: 'plains' },
+    });
+    expect(parseCycling('Wizardcycling {3}')).toEqual({
+      mana: '{3}',
+      search: { subtype: 'wizard' },
+    });
+    expect(parseCycling('Basic landcycling {1}{G}')).toEqual({
+      mana: '{1}{G}',
+      search: { supertype: 'basic', type: 'land' },
+    });
+  });
+});
+
+describe('searching a library (CR 701.23)', () => {
+  const basicLand = { and: [{ supertype: 'basic' }, { type: 'land' }] };
+
+  it('reads where what is found goes, with or without a reveal', () => {
+    expect(
+      effectsOf(
+        'Search your library for a basic land card, put it onto the battlefield tapped, then shuffle.',
+      ),
+    ).toEqual([
+      {
+        op: 'search',
+        player: 'you',
+        count: 1,
+        filter: basicLand,
+        to: { kind: 'battlefield', tapped: true },
+      },
+    ]);
+    expect(
+      effectsOf(
+        'Search your library for a basic land card, reveal it, put it into your hand, then shuffle.',
+      ),
+    ).toMatchObject([{ op: 'search', to: { kind: 'hand' } }]);
+  });
+
+  it('reads "a card" as a bare number, which must be found, and "then shuffle and put that card on top"', () => {
+    expect(
+      effectsOf('Search your library for a card, put that card into your hand, then shuffle.'),
+    ).toEqual([{ op: 'search', player: 'you', count: 1, to: { kind: 'hand' } }]);
+    expect(
+      effectsOf('Search your library for a card, then shuffle and put that card on top.'),
+    ).toEqual([{ op: 'search', player: 'you', count: 1, to: { kind: 'libraryTop' } }]);
+  });
+
+  it('reads "up to two" and "any number of"', () => {
+    expect(
+      effectsOf(
+        'Search your library for up to two basic land cards, put them onto the battlefield tapped, then shuffle.',
+      ),
+    ).toMatchObject([{ count: 2, upTo: true, filter: basicLand }]);
+    const any = effectsOf(
+      'Search your library for any number of Dragon creature cards, put them onto the battlefield, then shuffle.',
+    ) as Record<string, unknown>[];
+    expect(any).toMatchObject([{ filter: { and: [{ subtype: 'dragon' }, { type: 'creature' }] } }]);
+    expect(any[0]).not.toHaveProperty('count');
+  });
+
+  it('says a supertype of every part of the list after it, and reads mana value', () => {
+    expect(
+      effectsOf(
+        'Search your library for a basic Forest, Plains, or Island card, put it onto the battlefield tapped, then shuffle.',
+      ),
+    ).toMatchObject([
+      {
+        filter: {
+          and: [
+            { supertype: 'basic' },
+            { or: [{ subtype: 'forest' }, { subtype: 'plains' }, { subtype: 'island' }] },
+          ],
+        },
+      },
+    ]);
+    expect(
+      effectsOf(
+        'Search your library for an artifact card with mana value 3 or less, put it onto the battlefield, then shuffle.',
+      ),
+    ).toMatchObject([{ filter: { and: [{ type: 'artifact' }, { manaValueAtMost: 3 }] } }]);
+  });
+
+  it('leaves a search unread that does not shuffle, or looks for a card by name', () => {
+    expect(effectsOf('Search your library for a card, put that card into your hand.')).toBeNull();
+    expect(
+      effectsOf('Search your library for a card named ~, put it into your hand, then shuffle.'),
+    ).toBeNull();
   });
 });
 
@@ -790,7 +881,8 @@ describe('looking at the top of a library (CR 701.22a, 701.25a)', () => {
     expect(filterOf('a creature card with power 3 or less')).toEqual({
       and: [{ type: 'creature' }, { powerAtMost: 3 }],
     });
-    expect(filterOf('a legendary card')).toBeUndefined();
+    expect(filterOf('a legendary card')).toEqual({ supertype: 'legendary' });
+    expect(filterOf('a historic card')).toBeUndefined();
   });
 
   it('leaves a look unread, with every sentence it took, when nothing is done with the cards', () => {

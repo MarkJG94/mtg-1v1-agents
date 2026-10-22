@@ -72,6 +72,10 @@ export const opSpecs: Readonly<Record<OpName, OpSpec>> = {
     },
     required: ['player', 'count', 'rest'],
   },
+  search: {
+    args: { player: 'player', count: 'quantity', upTo: 'raw', filter: 'filter', to: 'raw' },
+    required: ['player', 'to'],
+  },
   scry: { args: { player: 'player', count: 'quantity' }, required: ['player', 'count'] },
   surveil: { args: { player: 'player', count: 'quantity' }, required: ['player', 'count'] },
   createToken: {

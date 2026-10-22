@@ -901,12 +901,30 @@ const yoursOf = (what: ScriptFilter): ScriptFilter =>
 
 /**
  * "Cycling {2}" — "{2}, Discard this card: Draw a card", activated from the hand
- * (CR 702.29a). Its mana cost, or null. Only mana: "Cycling—Pay 2 life" and the
- * landcyclings ("Plainscycling {2}", which search rather than draw) are other things.
+ * (CR 702.29a) — and typecycling, the same cost for "search your library for a Plains
+ * card, reveal it, put it into your hand, then shuffle" (CR 702.29e): "Plainscycling
+ * {2}", "Wizardcycling {3}", and "Basic landcycling {1}" for a basic land card. Its mana
+ * cost, and what a typecycling searches for, or null. Only mana: "Cycling—Pay 2 life" is
+ * another thing.
  */
-export const parseCycling = (line: string): string | null => {
+export const parseCycling = (
+  line: string,
+): { readonly mana: string; readonly search?: ScriptFilter } | null => {
   const reader = Reader.of(line);
-  if (!reader.word('cycling')) return null;
+  const search = reader.first<ScriptFilter | 'draw'>(
+    () => (reader.word('cycling') ? 'draw' : null),
+    () => (reader.words('basic', 'landcycling') ? { supertype: 'basic', type: 'land' } : null),
+    () => {
+      const word = reader.peek()?.word ?? '';
+      const type = /^([a-z]+)cycling$/.exec(word)?.[1];
+      if (type === undefined) return null;
+      reader.next();
+      // "Landcycling" alone is a land card's type, not a subtype.
+      return type === 'land' ? { type: 'land' } : { subtype: type };
+    },
+  );
+  if (search === null) return null;
   const symbols = reader.match(/(?:\{[^}]*\})+/);
-  return symbols !== null && reader.done && isManaCost(symbols[0]) ? symbols[0] : null;
+  if (symbols === null || !reader.done || !isManaCost(symbols[0])) return null;
+  return search === 'draw' ? { mana: symbols[0] } : { mana: symbols[0], search };
 };

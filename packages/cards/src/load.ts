@@ -350,18 +350,19 @@ const opFrom = (
     );
   }
 
-  if (name === 'lookAtTop') checkLook(script, converted, path);
+  if (name === 'lookAtTop' || name === 'search') checkLook(script, converted, path);
 
   return converted as unknown as EffectOp;
 };
 
-const lookDestinations = ['hand', 'graveyard', 'libraryBottom', 'battlefield'];
+const lookDestinations = ['hand', 'graveyard', 'libraryBottom', 'libraryTop', 'battlefield'];
 const lookRests = ['top', 'bottom', 'bottomRandom', 'graveyard'];
 
 /**
- * A look's `to` and `rest` are written as data rather than in a vocabulary of their own,
- * so they are checked here: a `rest` the engine has no case for would leave the cards
- * where they were, and a `take` with nowhere to go would take nothing.
+ * A look's or a search's `to`, and a look's `rest`, are written as data rather than in a
+ * vocabulary of their own, so they are checked here: a `rest` the engine has no case for
+ * would leave the cards where they were, and a `take` with nowhere to go would take
+ * nothing. A search has no `rest`: what it does not take is shuffled.
  */
 const checkLook = (
   script: CardScript,
@@ -369,10 +370,11 @@ const checkLook = (
   path: string,
 ): void => {
   const rest = look['rest'];
-  if (typeof rest !== 'string' || !lookRests.includes(rest)) {
+  const search = look['op'] === 'search';
+  if (!search && (typeof rest !== 'string' || !lookRests.includes(rest))) {
     throw new ScriptError(script.name, `${path}.rest`, `expected one of: ${lookRests.join(', ')}`);
   }
-  if ((look['take'] === undefined) !== (look['to'] === undefined)) {
+  if (!search && (look['take'] === undefined) !== (look['to'] === undefined)) {
     throw new ScriptError(script.name, path, 'a look takes cards "to" somewhere, or neither');
   }
   if (look['upTo'] !== undefined && typeof look['upTo'] !== 'boolean') {

@@ -60,6 +60,8 @@ export type Filter =
   | { readonly kind: 'spell' }
   | { readonly kind: 'type'; readonly type: CardType }
   | { readonly kind: 'subtype'; readonly subtype: string }
+  /** "A basic land card", "a legendary creature card" (CR 205.4). */
+  | { readonly kind: 'supertype'; readonly supertype: Supertype }
   | { readonly kind: 'colour'; readonly colour: Colour }
   | { readonly kind: 'controlledBy'; readonly player: PlayerRelation }
   | { readonly kind: 'inZone'; readonly zone: ZoneId }
