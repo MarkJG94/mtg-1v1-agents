@@ -3,7 +3,7 @@ import type { CardKeyword } from '../keyword-names.js';
 import type { OracleLine } from '../oracle-text.js';
 import { parseTypeLine } from '../oracle-text.js';
 import type { CardProjection } from '../scryfall.js';
-import { normaliseCard } from './normalise.js';
+import { normaliseCard, withoutAbilityWord } from './normalise.js';
 
 /**
  * Step 2 of the auto-scripter: what kind of ability each line is (docs/03, ADR 0007).
@@ -110,7 +110,7 @@ export const classifyLine = (line: OracleLine, types: readonly CardType[]): Clas
       : say('activated', 'cost, colon, effect (CR 602.1)', { cost, effect });
   }
 
-  if (/^(when|whenever|at)\b/i.test(text)) {
+  if (/^(when|whenever|at)\b/i.test(withoutAbilityWord(text))) {
     return say('triggered', 'it begins with a trigger word (CR 603.1)');
   }
 

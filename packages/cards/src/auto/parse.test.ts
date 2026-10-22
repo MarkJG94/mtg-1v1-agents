@@ -358,10 +358,48 @@ describe('the parts that are not effects', () => {
     });
   });
 
-  it('keeps "you control" on a trigger that says it', () => {
+  it('keeps the whole noun phrase of an enters or dies trigger, "you control" and all', () => {
     expect(
       parseTrigger('Whenever another creature you control dies, put a +1/+1 counter on ~.'),
-    ).toMatchObject({ when: { kind: 'anotherDies', controlledBy: 'you' } });
+    ).toMatchObject({
+      when: { kind: 'anotherDies', filter: { is: 'creature', controller: 'you' } },
+    });
+    expect(
+      parseTrigger('Whenever another artifact you control enters, you gain 1 life.'),
+    ).toMatchObject({
+      when: { kind: 'anotherEntersBattlefield', filter: { type: 'artifact', controller: 'you' } },
+    });
+  });
+
+  it('reads "a" as well as "another", which includes the card itself (CR 603.6a)', () => {
+    expect(parseTrigger('Whenever a creature you control dies, draw a card.')).toMatchObject({
+      when: { kind: 'dies', filter: { is: 'creature', controller: 'you' } },
+    });
+    expect(
+      parseTrigger('Whenever a creature an opponent controls dies, you gain 1 life.'),
+    ).toMatchObject({ when: { kind: 'dies', filter: { controller: 'opponent' } } });
+  });
+
+  it('reads an ability word in front of a trigger as the label it is (CR 207.2c)', () => {
+    expect(
+      parseTrigger('Landfall — Whenever a land you control enters, you gain 1 life.'),
+    ).toMatchObject({
+      when: { kind: 'entersBattlefield', filter: { type: 'land', controller: 'you' } },
+      ability: { effects: [{ op: 'gainLife', amount: 1 }] },
+    });
+  });
+
+  it('does not read "it" in the body of a trigger about another object as the card itself', () => {
+    for (const when of [
+      'Whenever another creature you control enters',
+      'Whenever a creature you control dies',
+    ]) {
+      expect(parseTrigger(`${when}, put a +1/+1 counter on it.`)).toHaveProperty('failure');
+    }
+    // The card's own trigger still may.
+    expect(parseTrigger('When ~ enters, tap it.')).toMatchObject({
+      ability: { effects: [{ op: 'tap', object: '~' }] },
+    });
   });
 
   /**

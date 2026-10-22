@@ -1,5 +1,6 @@
 import { parseManaCost } from '@mtg/engine';
 import { continueLook, isOpenLook } from './look.js';
+import { withoutAbilityWord } from './normalise.js';
 import { Bindings, duration, filter, player, quantity, type ScriptFilter } from './phrases.js';
 import { type ParseFailure, Reader } from './reader.js';
 import { readKeywords, type ScriptEffect, verbs } from './verbs.js';
@@ -49,9 +50,10 @@ export interface ParsedCost {
 
 export const parseEffects = (
   sentences: readonly string[],
-  options: { readonly thatPlayer?: string } = {},
+  options: { readonly thatPlayer?: string; readonly aboutAnother?: boolean } = {},
 ): ParseResult => {
   const bindings = new Bindings(options.thatPlayer ?? null);
+  bindings.itMayBeSelf = options.aboutAnother !== true;
   const effects: ScriptEffect[] = [];
   let read = 0;
   let failure: ParseFailure | null = null;
@@ -257,12 +259,15 @@ export const parseTrigger = (
    */
   following: readonly string[] = [],
 ): ParsedTrigger | { readonly failure: ParseFailure } => {
-  const comma = sentence.indexOf(',');
+  // "Landfall — Whenever a land you control enters, …": an ability word, which has no
+  // rules meaning of its own (CR 207.2c), in front of an ordinary trigger.
+  const line = withoutAbilityWord(sentence);
+  const comma = line.indexOf(',');
   if (comma < 0) {
     return { failure: { reason: 'a trigger with no comma between when and what', token: null } };
   }
 
-  const reader = Reader.of(sentence.slice(0, comma));
+  const reader = Reader.of(line.slice(0, comma));
   const when = triggerCondition(reader);
   if (when === null || !reader.done) {
     reader.stopped(triggerConditionUnread);
@@ -270,12 +275,15 @@ export const parseTrigger = (
   }
 
   const that = thatPlayerOf(when);
-  const rest = parseEffects(
-    [sentence.slice(comma + 1).trim(), ...following],
-    that === null ? {} : { thatPlayer: that },
-  );
+  const rest = parseEffects([line.slice(comma + 1).trim(), ...following], {
+    ...(that === null ? {} : { thatPlayer: that }),
+    aboutAnother: aboutAnother.includes(String(when['kind'])),
+  });
   return rest.ok ? { when, ability: rest.ability } : { failure: rest.failure };
 };
+
+/** Triggers whose event is about an object that may not be the card itself. */
+const aboutAnother = ['anotherEntersBattlefield', 'anotherDies', 'entersBattlefield', 'dies'];
 
 /**
  * Who "that player" is in the body of a trigger, when the condition names one: the player
@@ -348,17 +356,26 @@ const triggerCondition = (reader: Reader): Readonly<Record<string, unknown>> | n
       (reader.words('a', 'player') || reader.words('an', 'opponent'))
         ? { kind: 'selfDealsCombatDamageToPlayer' }
         : null,
+    // "Whenever another creature you control enters / dies", and without "another" the
+    // same with the card itself included (CR 603.6a, 603.10a). The whole noun phrase is
+    // the trigger's filter: dropping it fired "another artifact you control enters" for
+    // every permanent, and "another creature you control dies" for a sacrificed land.
     () => {
-      if (!reader.words('whenever', 'another')) return null;
+      if (!reader.word('whenever')) return null;
+      const another = reader.word('another');
+      if (!another && reader.anyWord('a', 'an') === null) return null;
       const what = filter(reader);
       if (what === null) return null;
       const word = reader.anyWord('dies', 'enters');
       if (word === null) return null;
-      const controlledBy = controllerOf(what);
-      return {
-        kind: word === 'dies' ? 'anotherDies' : 'anotherEntersBattlefield',
-        ...(controlledBy === null ? {} : { controlledBy }),
-      };
+      const kind = another
+        ? word === 'dies'
+          ? 'anotherDies'
+          : 'anotherEntersBattlefield'
+        : word === 'dies'
+          ? 'dies'
+          : 'entersBattlefield';
+      return { kind, filter: what };
     },
     () => stepTrigger(reader),
   );

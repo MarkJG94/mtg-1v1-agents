@@ -66,6 +66,14 @@ describe('the rules that decide a kind', () => {
     );
   });
 
+  it('reads through an ability word to the trigger behind it (CR 207.2c)', () => {
+    expect(
+      kindOf('Landfall — Whenever a land you control enters, you gain 1 life.', 'creature'),
+    ).toBe('triggered');
+    // A dash that is not an ability word's leaves the line as it was.
+    expect(kindOf('Choose one —', 'sorcery')).not.toBe('triggered');
+  });
+
   it('reads replacement templating as a replacement (CR 614)', () => {
     expect(kindOf('~ enters tapped.', 'land')).toBe('replacement');
     expect(kindOf('As ~ enters, choose a color.', 'enchantment')).toBe('replacement');
