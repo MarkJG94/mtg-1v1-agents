@@ -324,6 +324,22 @@ describe('a look at the top of a library', () => {
     });
   });
 
+  it('loads a mana value as a quantity', () => {
+    expect(
+      loadCardScript({
+        ...bolt,
+        abilities: [
+          {
+            kind: 'spell',
+            effects: [{ op: 'gainLife', player: 'you', amount: { manaValueOf: '~' } }],
+          },
+        ],
+      }).abilities[0],
+    ).toMatchObject({
+      effects: [{ amount: { kind: 'manaValueOf', object: { kind: 'source' } } }],
+    });
+  });
+
   it('loads scry and surveil', () => {
     for (const op of ['scry', 'surveil']) {
       expect(() =>

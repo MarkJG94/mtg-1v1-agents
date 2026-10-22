@@ -179,6 +179,7 @@ const quantityObject = z.object({
   lifeTotal: reference.optional(),
   powerOf: reference.optional(),
   toughnessOf: reference.optional(),
+  manaValueOf: reference.optional(),
   counters: z.object({ on: reference, kind: z.string() }).optional(),
   add: z.lazy(() => z.array(quantitySchema)).optional(),
   sub: z.lazy(() => z.array(quantitySchema)).optional(),
@@ -202,6 +203,9 @@ const quantityFromObject = (value: z.infer<typeof quantityObject>): Quantity => 
   }
   if (value.toughnessOf !== undefined) {
     return { kind: 'toughnessOf', object: objectSelector(value.toughnessOf) };
+  }
+  if (value.manaValueOf !== undefined) {
+    return { kind: 'manaValueOf', object: objectSelector(value.manaValueOf) };
   }
   if (value.counters !== undefined) {
     return {

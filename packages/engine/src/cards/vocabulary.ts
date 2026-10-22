@@ -137,6 +137,8 @@ export type Quantity =
   | { readonly kind: 'lifeTotal'; readonly player: PlayerSelector }
   | { readonly kind: 'powerOf'; readonly object: ObjectSelector }
   | { readonly kind: 'toughnessOf'; readonly object: ObjectSelector }
+  /** "Equal to its mana value" (CR 202.3): of the card's printed cost, a token's being 0. */
+  | { readonly kind: 'manaValueOf'; readonly object: ObjectSelector }
   | { readonly kind: 'countersOn'; readonly object: ObjectSelector; readonly counter: string }
   | { readonly kind: 'add'; readonly left: Quantity; readonly right: Quantity }
   | { readonly kind: 'sub'; readonly left: Quantity; readonly right: Quantity }

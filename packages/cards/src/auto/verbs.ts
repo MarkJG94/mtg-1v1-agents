@@ -4,6 +4,7 @@ import { keywordAction, look, search } from './look.js';
 import {
   type Bindings,
   duration,
+  equalTo,
   type ObjectPhrase,
   object,
   player,
@@ -65,9 +66,14 @@ const damage: Verb = (reader, bindings) => {
   const source = object(reader, bindings);
   if (source === null || source.kind !== 'ref') return null;
   if (!reader.word('deals')) return null;
-  const amount = quantity(reader);
-  if (amount === null) return reader.stopped('"deals" is not followed by an amount');
-  if (!reader.word('damage')) return null;
+  // "deals 3 damage to …", or "deals damage equal to its power to …".
+  const printed = quantity(reader);
+  if (printed !== null && !reader.word('damage')) return null;
+  if (printed === null && !reader.word('damage')) {
+    return reader.stopped('"deals" is not followed by an amount');
+  }
+  const amount = printed ?? equalTo(reader, bindings);
+  if (amount === null) return reader.stopped('damage of an amount this cannot read');
   if (!reader.word('to')) return reader.stopped('damage with nobody to deal it to');
 
   const from = source.ref === '~' ? {} : { from: source.ref };
@@ -142,9 +148,11 @@ const life: Verb = (reader, bindings) => {
   if (who === null) return null;
   const word = reader.anyWord('gain', 'gains', 'lose', 'loses');
   if (word === null) return null;
-  const amount = quantity(reader);
-  if (amount === null) return reader.stopped('life gained or lost without an amount');
+  // "gain 3 life", or "gain life equal to its toughness".
+  const printed = quantity(reader);
   if (!reader.word('life')) return null;
+  const amount = printed ?? equalTo(reader, bindings);
+  if (amount === null) return reader.stopped('life gained or lost without an amount');
   return [{ op: word.startsWith('gain') ? 'gainLife' : 'loseLife', player: who, amount }];
 };
 
@@ -169,9 +177,13 @@ const cards: Verb = (reader, bindings) => {
   const who = reader.try(() => player(reader, bindings)) ?? bindings.subject ?? 'you';
   const word = reader.anyWord('draw', 'draws', 'mill', 'mills', 'discard', 'discards');
   if (word === null) return null;
-  const count = quantity(reader);
+  // "draw two cards", or "draw cards equal to the number of creatures you control".
+  const printed = quantity(reader);
+  if (reader.anyWord('card', 'cards') === null) {
+    return printed === null ? reader.stopped(`"${word}" is not followed by a number`) : null;
+  }
+  const count = printed ?? equalTo(reader, bindings);
   if (count === null) return reader.stopped(`"${word}" is not followed by a number`);
-  if (reader.anyWord('card', 'cards') === null) return null;
 
   if (word.startsWith('draw')) return [{ op: 'draw', player: who, count }];
   if (word.startsWith('mill')) return [{ op: 'mill', player: who, count }];

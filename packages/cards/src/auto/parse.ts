@@ -742,7 +742,10 @@ export const parseCost = (text: string): ParsedCost | null => {
       const rest = parts.filter((part) => part.toUpperCase() !== 'T');
       if (taps.length > 0) cost.tap = true;
       if (rest.length > 0) {
-        cost.mana = `${cost.mana ?? ''}${rest.map((part) => `{${part}}`).join('')}`;
+        const mana = rest.map((part) => `{${part}}`).join('');
+        // Mana only: {Q} is untapping (CR 107.6) and {E} energy, which a mana cost is not.
+        if (!isManaCost(mana)) return null;
+        cost.mana = `${cost.mana ?? ''}${mana}`;
       }
       continue;
     }

@@ -159,6 +159,49 @@ export const quantity = (reader: Reader): ScriptQuantity | null =>
     },
   );
 
+/**
+ * "equal to its power", "equal to ~'s toughness", "equal to that creature's mana value",
+ * "equal to the number of creatures you control", "equal to the number of cards in your
+ * hand" — an amount the card reads off the game as the effect happens.
+ *
+ * "Its" is whatever a bare "it" would be at this point: a target declared earlier in the
+ * ability, the card itself, or — in a trigger about another permanent — that permanent,
+ * as it last was if it has gone (CR 608.2h). The `that`-noun and possessive forms go
+ * through the object phrase, so they resolve the same way.
+ */
+export const equalTo = (reader: Reader, bindings: Bindings): ScriptQuantity | null =>
+  reader.try(() => {
+    if (!reader.words('equal', 'to')) return null;
+    return reader.first<ScriptQuantity>(
+      () => {
+        if (!reader.words('the', 'number', 'of')) return null;
+        if (reader.words('cards', 'in', 'your', 'hand')) return { cardsInHand: 'you' };
+        const what = filter(reader);
+        return what === null || aboutPlayers(what) ? null : { count: what };
+      },
+      () => {
+        const whose = reader.first<string>(
+          () => {
+            if (!reader.word('its')) return null;
+            return bindings.resolve(null) ?? bindings.it;
+          },
+          () => (reader.words('~', "'s") ? '~' : null),
+          () => {
+            if (!reader.word('that')) return null;
+            const what = noun(reader);
+            if (what === null || !reader.word("'s")) return null;
+            return bindings.resolve(nounOf(what)) ?? (bindings.it === '$that' ? '$that' : null);
+          },
+        );
+        if (whose === null) return null;
+        if (reader.word('power')) return { powerOf: whose };
+        if (reader.word('toughness')) return { toughnessOf: whose };
+        if (reader.words('mana', 'value')) return { manaValueOf: whose };
+        return null;
+      },
+    );
+  });
+
 // --- Durations ---
 
 /** "until end of turn", the only duration the vocabulary can say (CR 611.2). */
