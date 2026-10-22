@@ -303,6 +303,8 @@ export class Scenario {
         this.decide({ kind: 'chooseCardsFromLibrary', cards: asked.from.slice(0, asked.min) });
       } else if (asked?.kind === 'orderCards') {
         this.decide({ kind: 'orderCards', order: asked.cards });
+      } else if (asked?.kind === 'chooseTargets') {
+        this.decide({ kind: 'chooseTargets', targets: asked.options[0] ?? [] });
       } else this.pass();
     }
     throw new ScenarioError(`the stack did not empty within ${limit} decisions`);

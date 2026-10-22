@@ -48,6 +48,7 @@ import { isStackEmpty, putTriggerOnStack } from '../stack.js';
 import type { GameState } from '../state/game-state.js';
 import { isGameOver } from '../state/game-state.js';
 import { getObject, objectsIn, updateObjects, updatePlayer, updateState } from '../state/update.js';
+import { answerTriggerTargets, settleTriggerTargets } from '../trigger-targets.js';
 import {
   evaluateCondition,
   fireDelayedTriggers,
@@ -378,6 +379,11 @@ const leaveStep = (state: GameState, emitter: EventEmitter): GameState => {
 const putPendingTriggersOnStack = (state: GameState, emitter: EventEmitter): GameState => {
   if (state.pendingTriggers.length === 0) return state;
 
+  // Targets first (CR 603.3d): a trigger that targets is asked for them, keeps the only
+  // way there is, or leaves the queue when there is none.
+  const settled = settleTriggerTargets(state);
+  if (settled !== null) return settled;
+
   const { active, nonActive } = triggersInApnapOrder(state);
   const group = active.length > 0 ? active : nonActive;
   const first = group[0];
@@ -415,6 +421,8 @@ const stackOneTrigger = (
     source: trigger.source,
     controller: trigger.controller,
     definitionId: trigger.lastKnown.definitionId,
+    ...(trigger.targets === undefined ? {} : { targets: trigger.targets }),
+    ...(trigger.subject === undefined ? {} : { subject: trigger.subject }),
   });
 };
 
@@ -520,6 +528,8 @@ export const applyDecision = (
     response.kind === 'chooseCardsFromLibrary'
   ) {
     next = answerChooseCards(cleared, emitter, decision, response.cards);
+  } else if (decision.kind === 'chooseTargets' && response.kind === 'chooseTargets') {
+    next = answerTriggerTargets(cleared, decision, response.targets);
   } else if (decision.kind === 'orderCards' && response.kind === 'orderCards') {
     next = answerOrderCards(cleared, emitter, decision, response.order);
   } else if (decision.kind === 'declareAttackers' && response.kind === 'declareAttackers') {
@@ -755,6 +765,8 @@ const defaultAnswer = (decision: Decision, options: AutoPlayOptions): DecisionRe
       return { kind: 'chooseCardsFromLibrary', cards: decision.from.slice(0, decision.min) };
     case 'orderCards':
       return { kind: 'orderCards', order: decision.cards };
+    case 'chooseTargets':
+      return { kind: 'chooseTargets', targets: decision.options[0] ?? [] };
     case 'mulligan':
       return { kind: 'mulligan', action: options.mulligan?.(decision) ?? 'keep' };
     case 'bottomCards':

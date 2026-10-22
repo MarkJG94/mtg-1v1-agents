@@ -35,7 +35,10 @@ const colourSchema = z.enum(colours);
 const typeSchema = z.enum(cardTypes as readonly [CardType, ...CardType[]]);
 const keywordSchema = z.enum(grantableKeywords);
 
-/** `$t` names a target the ability declared; `~` is the source; `$each` the loop object. */
+/**
+ * `$t` names a target the ability declared; `~` is the source; `$each` the loop object;
+ * `$that` the permanent that made a triggered ability trigger.
+ */
 const reference = z.string().regex(/^(~|\$[a-zA-Z][\w-]*|you|opponent|each)$/);
 
 // --- Filters ---
@@ -140,6 +143,7 @@ export const filterSchema: z.ZodType<Filter> = z.lazy(() =>
 const objectSelector = (value: string): ObjectSelector => {
   if (value === '~') return { kind: 'source' };
   if (value === '$each') return { kind: 'each' };
+  if (value === '$that') return { kind: 'triggering' };
   return { kind: 'target', id: value.slice(1) };
 };
 
@@ -156,7 +160,7 @@ const targetSelector = (value: string): TargetSelector => {
   if (value === 'you' || value === 'opponent' || value === 'each') {
     return { kind: 'player', player: playerSelector(value) };
   }
-  if (value === '~' || value === '$each') {
+  if (value === '~' || value === '$each' || value === '$that') {
     return { kind: 'object', object: objectSelector(value) };
   }
   return { kind: 'chosen', id: value.slice(1) };

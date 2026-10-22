@@ -389,14 +389,23 @@ describe('the parts that are not effects', () => {
     });
   });
 
-  it('does not read "it" in the body of a trigger about another object as the card itself', () => {
-    for (const when of [
-      'Whenever another creature you control enters',
-      'Whenever a creature you control dies',
-    ]) {
-      expect(parseTrigger(`${when}, put a +1/+1 counter on it.`)).toHaveProperty('failure');
-    }
-    // The card's own trigger still may.
+  it('reads "it" and "that creature" in the body of a trigger about another permanent as that permanent', () => {
+    expect(
+      parseTrigger('Whenever another creature you control enters, put a +1/+1 counter on it.'),
+    ).toMatchObject({ ability: { effects: [{ op: 'addCounters', object: '$that' }] } });
+    expect(
+      parseTrigger('Landfall — Whenever a land you control enters, untap that land.'),
+    ).toMatchObject({ ability: { effects: [{ op: 'untap', object: '$that' }] } });
+    expect(
+      parseTrigger("Whenever a creature you control dies, return it to its owner's hand."),
+    ).toMatchObject({ ability: { effects: [{ op: 'bounce', object: '$that' }] } });
+    // A target declared first is what "it" means after it, as anywhere else.
+    expect(
+      parseTrigger('Whenever another creature you control enters, tap target creature.', [
+        'It gains flying until end of turn.',
+      ]),
+    ).toMatchObject({ ability: { effects: [{ object: '$t' }, { object: '$t' }] } });
+    // The card's own trigger: "it" is the card.
     expect(parseTrigger('When ~ enters, tap it.')).toMatchObject({
       ability: { effects: [{ op: 'tap', object: '~' }] },
     });

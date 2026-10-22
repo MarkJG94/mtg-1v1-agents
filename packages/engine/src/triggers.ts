@@ -1,4 +1,4 @@
-import { type ObjectId, opponentOf, type PlayerId, type Step } from '@mtg/shared';
+import { type EventTarget, type ObjectId, opponentOf, type PlayerId, type Step } from '@mtg/shared';
 import { matchesFilter } from './cards/evaluate.js';
 import type { Filter } from './cards/vocabulary.js';
 import type { GameState } from './state/game-state.js';
@@ -148,6 +148,13 @@ export interface TriggerInstance {
   readonly controller: PlayerId;
   readonly lastKnown: GameObject;
   readonly interveningIf: InterveningCondition;
+  /**
+   * The targets its controller chose for it (CR 603.3d), once they have: a triggered
+   * ability that targets is asked for them before it goes on the stack.
+   */
+  readonly targets?: readonly EventTarget[];
+  /** The permanent whose entering or dying made it trigger: what `$that` names. */
+  readonly subject?: ObjectId;
 }
 
 /** A trigger set up by an effect to fire later, e.g. "at the beginning of the next end step". */
@@ -237,12 +244,17 @@ const matchesZoneChange = (
   }
 };
 
-const instanceFor = (watcher: GameObject, ability: TriggeredAbility): TriggerInstance => ({
+const instanceFor = (
+  watcher: GameObject,
+  ability: TriggeredAbility,
+  subject?: ObjectId,
+): TriggerInstance => ({
   abilityId: ability.id,
   source: watcher.id,
   controller: watcher.controller,
   lastKnown: watcher,
   interveningIf: ability.interveningIf ?? { kind: 'always' },
+  ...(subject === undefined ? {} : { subject }),
 });
 
 const firedKey = (source: ObjectId, abilityId: string): string => `${source}:${abilityId}`;
@@ -283,7 +295,7 @@ export const triggersFromZoneChange = (
         continue;
       }
       if (!notYetFired(state, ability, id)) continue;
-      found.push(instanceFor(watcher, ability));
+      found.push(instanceFor(watcher, ability, moved));
     }
   }
 
@@ -291,7 +303,7 @@ export const triggersFromZoneChange = (
   for (const ability of movedSnapshot.triggers) {
     if (!matchesZoneChange(state, ability.when, movedSnapshot, moved, kind, true)) continue;
     if (!notYetFired(state, ability, moved)) continue;
-    found.push(instanceFor(movedSnapshot, ability));
+    found.push(instanceFor(movedSnapshot, ability, moved));
   }
 
   return found;

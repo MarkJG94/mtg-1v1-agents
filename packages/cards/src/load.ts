@@ -164,6 +164,12 @@ const abilityFrom = (
       const effects = ability.effects.map((effect, index) =>
         opFrom(script, effect, declared, `${path}.effects[${index}]`),
       );
+      checkThat(
+        script,
+        path,
+        ability.kind === 'triggered' ? ability.when.kind : `${ability.kind} ability`,
+        ability.effects,
+      );
 
       if (ability.kind === 'spell') {
         return { kind: 'spell', ...(targets.length > 0 ? { targets } : {}), effects };
@@ -286,6 +292,35 @@ const checkWhose = (script: CardScript, path: string, when: { readonly kind: str
     `a "${when.kind}" trigger needs "whose": "self", "opponent" or "any", and this says ` +
       `${JSON.stringify(whose)} — without it the engine fires on the active player's step ` +
       'whatever the card was meant to say',
+  );
+};
+
+/** Triggers whose event has a permanent in it for `$that` to name. */
+const zoneChangeTriggers = [
+  'selfEntersBattlefield',
+  'anotherEntersBattlefield',
+  'entersBattlefield',
+  'selfDies',
+  'anotherDies',
+  'dies',
+];
+
+/**
+ * `$that` is the permanent that entered or died, so only a trigger on one of those has
+ * one. Anywhere else it names nothing, and every effect pointed at it would quietly do
+ * nothing while the sentence it came from counted as read.
+ */
+const checkThat = (
+  script: CardScript,
+  path: string,
+  when: string,
+  effects: readonly unknown[],
+): void => {
+  if (zoneChangeTriggers.includes(when) || !JSON.stringify(effects).includes('"$that"')) return;
+  throw new ScriptError(
+    script.name,
+    path,
+    `"$that" names the permanent a trigger was about, and a "${when}" has none`,
   );
 };
 
@@ -470,7 +505,8 @@ const checkReference = (
   declared: ReadonlySet<string>,
   path: string,
 ): void => {
-  if (typeof value !== 'string' || !value.startsWith('$') || value === '$each') return;
+  if (typeof value !== 'string' || !value.startsWith('$')) return;
+  if (value === '$each' || value === '$that') return;
   const id = value.slice(1);
   if (!declared.has(id)) {
     throw new ScriptError(script.name, path, `"$${id}" is not a target this ability declares`);

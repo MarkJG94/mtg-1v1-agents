@@ -205,8 +205,23 @@ export interface OrderCardsDecision {
   readonly to: 'libraryTop' | 'libraryBottom';
 }
 
+/**
+ * The targets of a triggered ability, chosen by its controller as it goes on the stack
+ * (CR 603.3d) — one of every legal way, as a cast action carries its targets. Asked only
+ * when there is more than one way; with none the ability is removed from the stack.
+ */
+export interface ChooseTargetsDecision {
+  readonly kind: 'chooseTargets';
+  readonly player: PlayerId;
+  /** The permanent the ability came from, and which of its abilities it is. */
+  readonly source: ObjectId;
+  readonly ability: string;
+  readonly options: readonly (readonly EventTarget[])[];
+}
+
 export type Decision =
   | MulliganDecision
+  | ChooseTargetsDecision
   | ChooseCardsFromLibraryDecision
   | OrderCardsDecision
   | YesNoDecision
@@ -248,7 +263,8 @@ export type DecisionResponse =
   | { readonly kind: 'orderTriggers'; readonly order: readonly string[] }
   | { readonly kind: 'yesNo'; readonly answer: boolean }
   | { readonly kind: 'chooseCardsFromLibrary'; readonly cards: readonly ObjectId[] }
-  | { readonly kind: 'orderCards'; readonly order: readonly ObjectId[] };
+  | { readonly kind: 'orderCards'; readonly order: readonly ObjectId[] }
+  | { readonly kind: 'chooseTargets'; readonly targets: readonly EventTarget[] };
 
 export class UnexpectedDecisionError extends Error {
   constructor(message: string) {

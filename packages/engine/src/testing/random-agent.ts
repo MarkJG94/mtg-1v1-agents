@@ -58,6 +58,9 @@ export const randomDecision = (
     case 'orderCards':
       return { kind: 'orderCards', order: rng.shuffled(decision.cards) };
 
+    case 'chooseTargets':
+      return { kind: 'chooseTargets', targets: rng.pick(decision.options) };
+
     case 'declareAttackers': {
       const attacking = subset(rng, decision.legal);
       return {

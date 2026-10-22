@@ -63,12 +63,12 @@ export class Bindings {
   started = false;
 
   /**
-   * Whether a bare "it" with nothing before it may be the card itself. Not in the body of
-   * a trigger about another object — "whenever another creature you control enters, put a
-   * +1/+1 counter on it" means the creature that entered, which this vocabulary cannot
-   * name yet, so the sentence stays unread rather than putting the counter on the card.
+   * What a bare "it" with nothing before it means: the card itself, or — in the body of a
+   * trigger about another permanent — that permanent (`$that`): "whenever another
+   * creature you control enters, put a +1/+1 counter on it" means the creature that
+   * entered, never the card. "That creature" means it there too.
    */
-  itMayBeSelf = true;
+  it: '~' | '$that' = '~';
 
   /** How many targets are declared, so a rule that fails can undo the ones it declared. */
   mark(): number {
@@ -484,13 +484,13 @@ export const object = (reader: Reader, bindings: Bindings): ObjectPhrase | null 
       // to refer to is the card itself. Only before any effect has been read, because
       // after one it is far more likely to mean whatever that effect produced ("draw a
       // card. If it is a land…"), which this vocabulary cannot say at all.
-      return bindings.started || !bindings.itMayBeSelf ? null : { kind: 'ref', ref: '~' };
+      return bindings.started ? null : { kind: 'ref', ref: bindings.it };
     },
     () => {
       if (!reader.word('that')) return null;
       const what = noun(reader);
       if (what === null) return null;
-      const ref = bindings.resolve(nounOf(what));
+      const ref = bindings.resolve(nounOf(what)) ?? (bindings.it === '$that' ? '$that' : null);
       return ref === null ? null : { kind: 'ref', ref };
     },
   );

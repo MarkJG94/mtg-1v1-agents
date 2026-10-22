@@ -57,6 +57,8 @@ export const randomAgent: PlayAgent = {
         };
       case 'orderCards':
         return { kind: 'orderCards', order: rng.shuffled(decision.cards) };
+      case 'chooseTargets':
+        return { kind: 'chooseTargets', targets: rng.pick(decision.options) };
     }
   },
 };

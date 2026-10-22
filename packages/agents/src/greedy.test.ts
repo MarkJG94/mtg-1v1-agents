@@ -5,6 +5,7 @@ import type {
   DeclareBlockersDecision,
   PlayerView,
   PriorityAction,
+  VisibleObject,
 } from '@mtg/engine/view';
 import type { ObjectId } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
@@ -420,6 +421,24 @@ describe('looking at the top of the library (CR 701.22a, 701.25a)', () => {
         to: 'libraryTop',
       }),
     ).toEqual({ kind: 'orderCards', order: [cheap.id, dear.id] });
+  });
+});
+
+describe('a trigger’s targets (CR 603.3d)', () => {
+  it('aims it at the opponent’s biggest creature, as a spell aimed there is credited', () => {
+    const small = creature(1, 1, { owner: 'B' });
+    const big = creature(5, 5, { owner: 'B', manaValue: 5 });
+    const view = viewOf({ theirs: [small, big] });
+    const target = (object: VisibleObject) => ({ kind: 'object' as const, object: object.id });
+    expect(
+      decide(view, {
+        kind: 'chooseTargets',
+        player: 'A',
+        source: small.id,
+        ability: 'enters',
+        options: [[target(small)], [target(big)]],
+      }),
+    ).toEqual({ kind: 'chooseTargets', targets: [target(big)] });
   });
 });
 

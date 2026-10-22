@@ -67,6 +67,8 @@ export interface StackProperties {
   readonly source?: ObjectId;
   /** The value chosen for {X} as this was cast (CR 601.2b). */
   readonly x?: number;
+  /** A triggered ability's triggering permanent, which its effects call `$that`. */
+  readonly subject?: ObjectId;
 }
 
 /** The object on top of the stack, or undefined when the stack is empty. */
@@ -368,6 +370,8 @@ export interface AbilityOnStack {
   readonly definitionId: OracleId;
   /** Targets chosen as the ability was put on the stack (CR 601.2c, via 602.2b). */
   readonly targets?: readonly EventTarget[];
+  /** For a triggered ability, the permanent that made it trigger, if one did. */
+  readonly subject?: ObjectId;
 }
 
 /**
@@ -398,6 +402,7 @@ const createAbilityOnStack = (
         isAbility: true,
         abilityId: ability.abilityId,
         source: ability.source,
+        ...(ability.subject === undefined ? {} : { subject: ability.subject }),
       },
     }),
     id: created.object.id,

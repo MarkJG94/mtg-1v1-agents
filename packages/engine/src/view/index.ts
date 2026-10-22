@@ -27,6 +27,7 @@ export type {
   ChooseCardsFromLibraryDecision,
   ChooseOptionDecision,
   ChooseReplacementDecision,
+  ChooseTargetsDecision,
   Decision,
   DecisionResponse,
   DeclareAttackersDecision,
