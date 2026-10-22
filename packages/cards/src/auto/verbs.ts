@@ -1,5 +1,6 @@
 import { type GrantableKeyword, grantableKeywords } from '@mtg/engine';
 import { keywordFromPrinted } from '../keyword-names.js';
+import { keywordAction, look } from './look.js';
 import {
   type Bindings,
   duration,
@@ -178,6 +179,14 @@ const cards: Verb = (reader, bindings) => {
   // The player discarding chooses which (CR 701.9b), and resolution waits on them for it
   // (ADR 0021).
   return [{ op: 'discard', player: who, count }];
+};
+
+/** "Shuffle your library", and "you may shuffle" after a look (Ponder's last sentence). */
+const shuffle: Verb = (reader, bindings) => {
+  const who = reader.try(() => player(reader, bindings)) ?? bindings.subject ?? 'you';
+  if (reader.anyWord('shuffle', 'shuffles') === null) return null;
+  reader.try(() => reader.anyWord('your', 'their') !== null && reader.word('library'));
+  return [{ op: 'shuffle', player: who }];
 };
 
 // --- Removal ---
@@ -471,6 +480,9 @@ export const verbs: readonly Verb[] = [
   attach,
   mana,
   token,
+  look,
+  keywordAction,
+  shuffle,
   cards,
   damage,
   fight,

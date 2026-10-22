@@ -350,7 +350,47 @@ const opFrom = (
     );
   }
 
+  if (name === 'lookAtTop') checkLook(script, converted, path);
+
   return converted as unknown as EffectOp;
+};
+
+const lookDestinations = ['hand', 'graveyard', 'libraryBottom', 'battlefield'];
+const lookRests = ['top', 'bottom', 'bottomRandom', 'graveyard'];
+
+/**
+ * A look's `to` and `rest` are written as data rather than in a vocabulary of their own,
+ * so they are checked here: a `rest` the engine has no case for would leave the cards
+ * where they were, and a `take` with nowhere to go would take nothing.
+ */
+const checkLook = (
+  script: CardScript,
+  look: Readonly<Record<string, unknown>>,
+  path: string,
+): void => {
+  const rest = look['rest'];
+  if (typeof rest !== 'string' || !lookRests.includes(rest)) {
+    throw new ScriptError(script.name, `${path}.rest`, `expected one of: ${lookRests.join(', ')}`);
+  }
+  if ((look['take'] === undefined) !== (look['to'] === undefined)) {
+    throw new ScriptError(script.name, path, 'a look takes cards "to" somewhere, or neither');
+  }
+  if (look['upTo'] !== undefined && typeof look['upTo'] !== 'boolean') {
+    throw new ScriptError(script.name, `${path}.upTo`, 'expected true or false');
+  }
+  const to = look['to'] as Readonly<Record<string, unknown>> | undefined;
+  if (to === undefined) return;
+  if (typeof to !== 'object' || to === null || !lookDestinations.includes(String(to['kind']))) {
+    throw new ScriptError(
+      script.name,
+      `${path}.to`,
+      `expected { kind: ${lookDestinations.join(' | ')} }`,
+    );
+  }
+  const extra = Object.keys(to).filter((key) => key !== 'kind' && key !== 'tapped');
+  if (extra.length > 0 || (to['tapped'] !== undefined && to['kind'] !== 'battlefield')) {
+    throw new ScriptError(script.name, `${path}.to`, 'only a battlefield may say "tapped"');
+  }
 };
 
 const aboutPlayers = (filter: Filter): boolean =>

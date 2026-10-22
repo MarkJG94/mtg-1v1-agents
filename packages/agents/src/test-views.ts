@@ -39,7 +39,7 @@ let nextId = 1;
 
 export interface CardSpec {
   readonly owner?: PlayerId;
-  readonly zone?: 'hand' | 'battlefield' | 'graveyard';
+  readonly zone?: 'hand' | 'battlefield' | 'graveyard' | 'library';
   readonly types?: VisibleObject['types'];
   readonly power?: number;
   readonly toughness?: number;
@@ -65,7 +65,9 @@ export const card = (spec: CardSpec = {}): VisibleObject => {
         ? `${owner}:hand`
         : spec.zone === 'graveyard'
           ? `${owner}:graveyard`
-          : 'battlefield',
+          : spec.zone === 'library'
+            ? `${owner}:library`
+            : 'battlefield',
     owner,
     controller: owner,
     name: null,
@@ -101,6 +103,8 @@ export interface ViewSpec {
   readonly mine?: readonly VisibleObject[];
   readonly theirs?: readonly VisibleObject[];
   readonly hand?: readonly VisibleObject[];
+  /** Cards of A's library that A is looking at, which a view shows only while asked. */
+  readonly looking?: readonly VisibleObject[];
   readonly myLife?: number;
   readonly theirLife?: number;
   readonly theirHandSize?: number;
@@ -127,8 +131,14 @@ export const viewOf = (spec: ViewSpec = {}): PlayerView => {
     controller: 'A' as const,
     zone: 'A:hand' as const,
   }));
+  const looking = (spec.looking ?? []).map((o) => ({
+    ...o,
+    owner: 'A' as const,
+    controller: 'A' as const,
+    zone: 'A:library' as const,
+  }));
   const objects = new Map<ObjectId, VisibleObject>();
-  for (const object of [...mine, ...theirs, ...hand]) objects.set(object.id, object);
+  for (const object of [...mine, ...theirs, ...hand, ...looking]) objects.set(object.id, object);
 
   const side = (player: PlayerId, battlefield: readonly VisibleObject[], life: number) => ({
     player,

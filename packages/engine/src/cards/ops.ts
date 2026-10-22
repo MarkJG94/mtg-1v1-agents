@@ -22,11 +22,10 @@ import type {
  * `runBatch`, so replacement effects get their say (ADR 0004) — which is why "deals 3
  * damage" works with a prevention shield without either knowing about the other.
  *
- * **What is deliberately not here yet.** Every op below runs to completion without asking
- * anybody anything. The ops that need a choice *during* resolution — search a library,
- * scry, "you may", modal spells, "unless that player pays" — need the effect pipeline to
- * pause and resume the way a replacement batch does, and that is its own piece of work.
- * They are listed in docs/03 and in the roadmap note for 2.1 rather than half-built here.
+ * **The ops that ask.** Most ops run to completion without asking anybody anything. The
+ * few that need a choice during resolution — `may`, `discard`, `lookAtTop`, `scry`,
+ * `surveil` — are run by the resolution program (ADR 0021), which stops for the answer and
+ * carries on after it. Search, modes and "unless that player pays" are the next ones on it.
  */
 
 /** Where a `moveZone` puts something. Relative to the object's owner, as the rules are. */
@@ -41,6 +40,19 @@ export type Destination =
     }
   | { readonly kind: 'libraryTop' }
   | { readonly kind: 'libraryBottom' };
+
+/** Where the cards a `lookAtTop` takes go. */
+export type LookDestination =
+  | { readonly kind: 'hand' }
+  | { readonly kind: 'graveyard' }
+  | { readonly kind: 'libraryBottom' }
+  | { readonly kind: 'battlefield'; readonly tapped?: boolean };
+
+/**
+ * Where the cards a `lookAtTop` does not take go: back on top or on the bottom in an
+ * order the player chooses, on the bottom in a random order, or into the graveyard.
+ */
+export type LookRest = 'top' | 'bottom' | 'bottomRandom' | 'graveyard';
 
 /** How long a continuous effect an op creates lasts. Most are until end of turn. */
 export type OpDuration = 'untilEndOfTurn' | 'permanent' | 'whileSourceOnBattlefield';
@@ -91,6 +103,36 @@ export type EffectOp =
   | { readonly op: 'sacrifice'; readonly object: ObjectSelector }
   | { readonly op: 'moveZone'; readonly object: ObjectSelector; readonly to: Destination }
   | { readonly op: 'shuffle'; readonly player: PlayerSelector }
+  /**
+   * "Look at the top three cards of your library. Put one of them into your hand and the
+   * rest on the bottom of your library in any order." The player whose library it is
+   * looks and chooses, as the resolution program asks them to (ADR 0021): first which
+   * cards to `take` to `to`, then, if the rest go back in an order of their choosing,
+   * what order. The cards stay in the library while they are looked at (CR 401.2).
+   */
+  | {
+      readonly op: 'lookAtTop';
+      readonly player: PlayerSelector;
+      readonly count: Quantity;
+      /** How many to take out from among them: exactly that many, or at most with `upTo`. */
+      readonly take?: Quantity;
+      readonly upTo?: boolean;
+      /** What a taken card has to be — "a creature card from among them". Any card when absent. */
+      readonly filter?: Filter;
+      /** Where the taken cards go. Required with `take`. */
+      readonly to?: LookDestination;
+      readonly rest: LookRest;
+    }
+  /**
+   * Scry N (CR 701.22a): look at the top N, put any number on the bottom in any order and
+   * the rest on top in any order.
+   */
+  | { readonly op: 'scry'; readonly player: PlayerSelector; readonly count: Quantity }
+  /**
+   * Surveil N (CR 701.25a): look at the top N, put any number into the graveyard and the
+   * rest on top in any order.
+   */
+  | { readonly op: 'surveil'; readonly player: PlayerSelector; readonly count: Quantity }
   | {
       readonly op: 'createToken';
       readonly controller: PlayerSelector;
@@ -259,6 +301,7 @@ export const opNames = [
   'if',
   'loseGame',
   'loseLife',
+  'lookAtTop',
   'may',
   'mill',
   'moveZone',
@@ -269,10 +312,12 @@ export const opNames = [
   'removeAbilities',
   'removeCounters',
   'sacrifice',
+  'scry',
   'sequence',
   'setColours',
   'setPowerToughness',
   'shuffle',
+  'surveil',
   'switchPowerToughness',
   'tap',
   'untap',
