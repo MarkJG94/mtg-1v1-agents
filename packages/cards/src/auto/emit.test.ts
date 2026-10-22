@@ -215,6 +215,32 @@ describe('cycling', () => {
     });
     expect(validateScript(emitted.script, faith).status).toBe('supported');
   });
+
+  it('writes typecycling as the search it is short for (CR 702.29e)', () => {
+    const bounty = {
+      ...card('Fling'),
+      name: 'Test Bounty',
+      typeLine: 'Instant',
+      oracleText: 'You gain 6 life.\nPlainscycling {2}',
+    };
+    const emitted = emitScript(bounty);
+    expect(emitted.script?.['abilities']).toContainEqual(
+      expect.objectContaining({
+        from: 'hand',
+        cost: { mana: '{2}', discardSelf: true },
+        effects: [
+          {
+            op: 'search',
+            player: 'you',
+            count: 1,
+            filter: { subtype: 'plains' },
+            to: { kind: 'hand' },
+          },
+        ],
+      }),
+    );
+    expect(validateScript(emitted.script, bounty).status).toBe('supported');
+  });
 });
 
 describe('abilities whose text runs past one sentence', () => {

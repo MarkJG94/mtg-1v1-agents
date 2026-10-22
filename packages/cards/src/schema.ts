@@ -9,6 +9,7 @@ import {
   opNames,
   type PlayerSelector,
   type Quantity,
+  type Supertype,
   supertypes,
   type TargetSelector,
 } from '@mtg/engine';
@@ -57,6 +58,7 @@ const filterShorthand = z.enum([
 const filterObject = z.object({
   type: typeSchema.optional(),
   subtype: z.string().optional(),
+  supertype: z.enum(supertypes as readonly [Supertype, ...Supertype[]]).optional(),
   colour: colourSchema.optional(),
   controller: z.enum(['you', 'opponent', 'any']).optional(),
   zone: z.string().optional(),
@@ -84,6 +86,9 @@ const filterFromObject = (value: FilterObject): Filter => {
   if (value.is !== undefined) parts.push({ kind: value.is });
   if (value.type !== undefined) parts.push({ kind: 'type', type: value.type });
   if (value.subtype !== undefined) parts.push({ kind: 'subtype', subtype: value.subtype });
+  if (value.supertype !== undefined) {
+    parts.push({ kind: 'supertype', supertype: value.supertype });
+  }
   if (value.colour !== undefined) parts.push({ kind: 'colour', colour: value.colour });
   if (value.controller !== undefined) {
     parts.push({ kind: 'controlledBy', player: value.controller });

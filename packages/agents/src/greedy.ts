@@ -242,7 +242,8 @@ const wanted = (
 const unwanted = 1;
 
 /**
- * Into the hand or onto the battlefield, the cards it wants most, as many as it may. To
+ * Into the hand, onto the battlefield or onto the top of the library after a search's
+ * shuffle, the cards it wants most, as many as it may. To
  * the bottom or the graveyard — scry and surveil — the ones it does not want, and only as
  * many of the others as it must.
  */
@@ -253,7 +254,7 @@ const cardsToTake = (
 ): readonly ObjectId[] => {
   const scores = wanted(view, decision.looking, weights);
   const score = (card: ObjectId) => scores.get(card) ?? 0;
-  if (decision.to === 'hand' || decision.to === 'battlefield') {
+  if (decision.to === 'hand' || decision.to === 'battlefield' || decision.to === 'libraryTop') {
     return [...decision.from].sort((a, b) => score(b) - score(a)).slice(0, decision.max);
   }
   const worstFirst = [...decision.from].sort((a, b) => score(a) - score(b));

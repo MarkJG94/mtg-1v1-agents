@@ -19,6 +19,7 @@ import {
   answerTake,
   asLook,
   beginLook,
+  beginSearch,
   continueLook,
   type Looking,
   lookers,
@@ -242,6 +243,14 @@ const step = (
 
     case 'lookAtTop':
       return look(state, context, op);
+
+    case 'search': {
+      // One player searches: "its controller may search their library" names one.
+      const [player] = resolvePlayers(state, context, op.player);
+      return player === undefined
+        ? state
+        : withLooking(state, beginSearch(state, context, player as PlayerId, op));
+    }
 
     default:
       return applyOp(state, emitter, context, op);

@@ -246,6 +246,7 @@
                         "removeCounters",
                         "sacrifice",
                         "scry",
+                        "search",
                         "sequence",
                         "setColours",
                         "setPowerToughness",
@@ -386,6 +387,7 @@
                         "removeCounters",
                         "sacrifice",
                         "scry",
+                        "search",
                         "sequence",
                         "setColours",
                         "setPowerToughness",
@@ -525,6 +527,7 @@
                         "removeCounters",
                         "sacrifice",
                         "scry",
+                        "search",
                         "sequence",
                         "setColours",
                         "setPowerToughness",
@@ -770,6 +773,7 @@
                         "removeCounters",
                         "sacrifice",
                         "scry",
+                        "search",
                         "sequence",
                         "setColours",
                         "setPowerToughness",
@@ -1389,6 +1393,15 @@
             },
             "subtype": {
               "type": "string"
+            },
+            "supertype": {
+              "type": "string",
+              "enum": [
+                "basic",
+                "legendary",
+                "snow",
+                "world"
+              ]
             },
             "colour": {
               "type": "string",

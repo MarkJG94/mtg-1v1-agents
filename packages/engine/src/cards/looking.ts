@@ -41,6 +41,8 @@ export interface Looking {
     readonly to: LookDestination;
   } | null;
   readonly rest: LookRest;
+  /** Cards a search put on top, to stay there once the rest are shuffled. */
+  readonly onTop?: readonly ObjectId[];
 }
 
 type LookOp = Extract<EffectOp, { op: 'lookAtTop' }>;
@@ -85,6 +87,36 @@ export const beginLook = (
   return { player, cards, take, rest: op.rest };
 };
 
+/**
+ * Begin a search (CR 701.23): every card in the library is looked at, the ones the filter
+ * allows may be taken, and the rest are shuffled — so even an empty library, or one with
+ * nothing to find, is still shuffled.
+ */
+export const beginSearch = (
+  state: GameState,
+  context: EffectContext,
+  player: PlayerId,
+  op: Extract<EffectOp, { op: 'search' }>,
+): Looking => {
+  const cards = objectsIn(state, playerZone(player, 'library'));
+  const { filter } = op;
+  const from =
+    filter === undefined
+      ? cards
+      : cards.filter((object) => matchesFilter(state, context, filter, { kind: 'object', object }));
+  const wanted =
+    op.count === undefined ? from.length : Math.max(0, evaluateQuantity(state, context, op.count));
+  const max = Math.min(from.length, wanted);
+  // A stated quality may go unfound (CR 701.23b); "a card" must be found (CR 701.23c).
+  const optional = op.upTo === true || filter !== undefined || op.count === undefined;
+  return {
+    player,
+    cards,
+    take: max > 0 ? { from, min: optional ? 0 : max, max, to: op.to } : null,
+    rest: 'shuffle',
+  };
+};
+
 /** The players a look is for, in turn: "each player scries 1" is each of them (CR 101.4). */
 export const lookers = (
   state: GameState,
@@ -126,6 +158,7 @@ export const continueLook = (
   const still = new Set(objectsIn(state, library));
   const rest = looking.cards.filter((card) => still.has(card));
   const done = setLooking(state, null);
+  if (looking.rest === 'shuffle') return shuffleUnder(done, looking.player, looking.onTop ?? []);
   if (rest.length === 0) return done;
 
   switch (looking.rest) {
@@ -226,6 +259,8 @@ const takeCards = (
     ...looking,
     cards: looking.cards.filter((card) => !taken.has(card)),
     take: null,
+    // A card put on top stays there through a shuffle that ends a search.
+    ...(to?.kind === 'libraryTop' ? { onTop: chosen } : {}),
   });
   if (chosen.length === 0 || to === undefined) return next;
 
@@ -233,6 +268,8 @@ const takeCards = (
   switch (to.kind) {
     case 'libraryBottom':
       return placeOnLibrary(next, looking.player, chosen, 'bottom');
+    case 'libraryTop':
+      return placeOnLibrary(next, looking.player, chosen, 'top');
     case 'battlefield':
       return runBatch(
         next,
@@ -266,6 +303,23 @@ const takeCards = (
         ),
       );
   }
+};
+
+/**
+ * Shuffle a library (CR 701.24a), all but the cards given, which go on top of it in that
+ * order: "shuffle and put that card on top".
+ */
+const shuffleUnder = (
+  state: GameState,
+  player: PlayerId,
+  onTop: readonly ObjectId[],
+): GameState => {
+  const zone = playerZone(player, 'library');
+  const kept = new Set(onTop);
+  const rng = rngFromState(state.rng);
+  const shuffled = rng.shuffled(objectsIn(state, zone).filter((card) => !kept.has(card)));
+  const top = onTop.filter((card) => objectsIn(state, zone).includes(card));
+  return updateState(setZone(state, zone, [...top, ...shuffled]), { rng: rng.save() });
 };
 
 /**

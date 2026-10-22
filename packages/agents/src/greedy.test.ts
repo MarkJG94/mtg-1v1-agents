@@ -388,6 +388,23 @@ describe('looking at the top of the library (CR 701.22a, 701.25a)', () => {
     ).toEqual({ kind: 'chooseCardsFromLibrary', cards: [top.id] });
   });
 
+  it('searches out the card it wants most, even when it is to go on top after the shuffle', () => {
+    const dear = card({ zone: 'library', manaValue: 7 });
+    const cheap = card({ zone: 'library', manaValue: 2 });
+    const view = viewOf({ mine: [land(), land(), land()], looking: [dear, cheap] });
+    const both = [dear.id, cheap.id];
+    expect(
+      looked(view, {
+        looking: both,
+        from: both,
+        min: 1,
+        max: 1,
+        to: 'libraryTop',
+        rest: 'shuffle',
+      }),
+    ).toEqual({ kind: 'chooseCardsFromLibrary', cards: [cheap.id] });
+  });
+
   it('puts back on top the card it wants most first', () => {
     const dear = card({ zone: 'library', manaValue: 5 });
     const cheap = card({ zone: 'library', manaValue: 1 });

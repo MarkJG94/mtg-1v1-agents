@@ -191,7 +191,8 @@ const printedNumbers = (card: CardProjection): Readonly<Record<string, number>> 
  * claims the sentence and the rest claim nothing, so it is still claimed exactly once.
  */
 const abilitiesFor = (line: ClassifiedLine): readonly Record<string, unknown>[] | null => {
-  // Cycling is the activated ability it is short for, used from the hand (CR 702.29a).
+  // Cycling is the activated ability it is short for, used from the hand (CR 702.29a);
+  // typecycling searches instead of drawing (CR 702.29e).
   const cycling = parseCycling(line.line.text);
   if (cycling !== null) {
     return [
@@ -200,8 +201,18 @@ const abilitiesFor = (line: ClassifiedLine): readonly Record<string, unknown>[] 
         id: `auto-cycling-${line.line.sentences[0]?.index ?? 0}`,
         from: 'hand',
         covers: covered(line),
-        cost: { mana: cycling, discardSelf: true },
-        effects: [{ op: 'draw', player: 'you', count: 1 }],
+        cost: { mana: cycling.mana, discardSelf: true },
+        effects: [
+          cycling.search === undefined
+            ? { op: 'draw', player: 'you', count: 1 }
+            : {
+                op: 'search',
+                player: 'you',
+                count: 1,
+                filter: cycling.search,
+                to: { kind: 'hand' },
+              },
+        ],
       },
     ];
   }
@@ -343,7 +354,7 @@ const body = (ability: ParsedAbility): Readonly<Record<string, unknown>> => ({
  * what makes a cached "unsupported" from an older parser be re-earned rather than believed
  * — which is the whole reason the row stores a version at all.
  */
-export const AUTO_SCRIPTER_VERSION = 10;
+export const AUTO_SCRIPTER_VERSION = 11;
 
 export const autoScripter = {
   version: AUTO_SCRIPTER_VERSION,

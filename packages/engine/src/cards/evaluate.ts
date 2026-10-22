@@ -206,6 +206,8 @@ export const matchesFilter = (
       return filter.type === 'creature'
         ? traits.isCreature
         : (definition?.types.includes(filter.type) ?? false);
+    case 'supertype':
+      return definition?.supertypes?.includes(filter.supertype) ?? false;
     case 'subtype':
       return definition?.subtypes?.includes(filter.subtype) ?? false;
     case 'colour':

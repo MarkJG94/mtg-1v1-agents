@@ -33,17 +33,24 @@ const land: CardDefinition = {
   abilities: [{ kind: 'mana', id: 'c', modes: [[{ type: 'C', amount: 1 }]] }],
 };
 
+const basic: CardDefinition = {
+  ...land,
+  oracleId: asOracleId('look-basic'),
+  name: 'Basic Grey Land',
+  supertypes: ['basic'],
+};
+
 const you = { kind: 'you' } as const;
 
 const scry = (count: number): EffectOp => ({ op: 'scry', player: you, count });
 const surveil = (count: number): EffectOp => ({ op: 'surveil', player: you, count });
 
 /**
- * A's library, top first: `top` names the cards ("l" a land, anything else a creature
- * card), then filler under them.
+ * A's library, top first: `top` names the cards ("l" a land, "b" a basic land, anything
+ * else a creature card), then filler under them.
  */
 const table = (card: CardDefinition, top: readonly string[] = ['c1', 'c2', 'c3', 'c4']) =>
-  game({ definitions: [card, land], seed: 'looking', recordEvents: true })
+  game({ definitions: [card, land, basic], seed: 'looking', recordEvents: true })
     .player('A')
     .hand({ name: 'card', definitionId: card.oracleId })
     .library(
@@ -51,7 +58,9 @@ const table = (card: CardDefinition, top: readonly string[] = ['c1', 'c2', 'c3',
       ...top.map((name) =>
         name.startsWith('l')
           ? { name, definitionId: land.oracleId }
-          : { name, power: 2, toughness: 2 },
+          : name.startsWith('b')
+            ? { name, definitionId: basic.oracleId }
+            : { name, power: 2, toughness: 2 },
       ),
       ...Array.from({ length: 4 }, (_, i) => ({ name: `under${i}`, power: 1, toughness: 1 })),
     )
@@ -367,5 +376,124 @@ describe('each player (CR 101.4)', () => {
     expect(asked(scenario)).toMatchObject({ kind: 'chooseCardsFromLibrary', player: 'B' });
     scenario.decide({ kind: 'chooseCardsFromLibrary', cards: [] });
     expect(scenario.zoneOf('card')).toBe(playerZone('A', 'graveyard'));
+  });
+});
+
+describe('searching a library (CR 701.23)', () => {
+  const search = (fields: Partial<Extract<EffectOp, { op: 'search' }>>): EffectOp => ({
+    op: 'search',
+    player: you,
+    to: { kind: 'hand' },
+    ...fields,
+  });
+  const basicLand = { kind: 'supertype', supertype: 'basic' } as const;
+
+  it('looks at the whole library, offering only what the filter allows, which may go unfound', () => {
+    const scenario = castAndResolve(
+      table(spell('Path', [search({ count: 1, filter: basicLand })]), ['c1', 'l1', 'b1', 'c2']),
+    );
+    expect(asked(scenario)).toMatchObject({
+      kind: 'chooseCardsFromLibrary',
+      looking: libraryOf(scenario),
+      from: refs(scenario, 'b1'),
+      min: 0,
+      max: 1,
+      to: 'hand',
+      rest: 'shuffle',
+    });
+    expect(libraryOf(scenario)).toHaveLength(8);
+  });
+
+  it('a bare number of cards must be found while there are any (CR 701.23c)', () => {
+    const scenario = castAndResolve(table(spell('Tutor', [search({ count: 1 })])));
+    expect(asked(scenario)).toMatchObject({ min: 1, max: 1 });
+    expect(() => scenario.decide({ kind: 'chooseCardsFromLibrary', cards: [] })).toThrow();
+  });
+
+  it('puts the card found where it says, then shuffles the rest', () => {
+    const scenario = castAndResolve(
+      table(
+        spell('Ramp', [
+          search({ count: 1, filter: basicLand, to: { kind: 'battlefield', tapped: true } }),
+        ]),
+        ['c1', 'c2', 'c3', 'b1'],
+      ),
+    );
+    const before = libraryOf(scenario).filter((card) => card !== scenario.ref('b1'));
+    scenario.decide({ kind: 'chooseCardsFromLibrary', cards: refs(scenario, 'b1') });
+    expect(scenario.zoneOf('b1')).toBe('battlefield');
+    expect(scenario.get().objects.get(scenario.ref('b1'))?.tapped).toBe(true);
+    expect(new Set(libraryOf(scenario))).toEqual(new Set(before));
+    expect(scenario.zoneOf('card')).toBe(playerZone('A', 'graveyard'));
+  });
+
+  it('shuffles even when nothing is found', () => {
+    const orders = new Set<string>();
+    for (const seed of ['1', '2', '3', '4']) {
+      const card = spell('Miss', [search({ count: 1, filter: basicLand })]);
+      const scenario = game({ definitions: [card, land, basic], seed })
+        .player('A')
+        .hand({ name: 'card', definitionId: card.oracleId })
+        .library(
+          0,
+          ...['c1', 'c2', 'c3', 'c4', 'c5'].map((name) => ({ name, power: 1, toughness: 1 })),
+        )
+        .player('B')
+        .library(10)
+        .player('A')
+        .start()
+        .to('precombatMain');
+      castAndResolve(scenario);
+      expect(asked(scenario)?.kind).toBe('priority');
+      orders.add(JSON.stringify(libraryOf(scenario)));
+    }
+    expect(orders.size).toBeGreaterThan(1);
+  });
+
+  it('"up to two", or any number: as many as it may, and none is an answer', () => {
+    const two = castAndResolve(
+      table(spell('Two', [search({ count: 2, upTo: true, filter: basicLand })]), [
+        'b1',
+        'b2',
+        'b3',
+      ]),
+    );
+    expect(asked(two)).toMatchObject({ min: 0, max: 2 });
+    const any = castAndResolve(
+      table(spell('Any', [search({ filter: basicLand })]), ['b1', 'b2', 'b3']),
+    );
+    expect(asked(any)).toMatchObject({ min: 0, max: 3 });
+  });
+
+  it('"then shuffle and put that card on top" leaves it on top after the shuffle', () => {
+    for (const seed of ['1', '2', '3']) {
+      const card = spell('Seal', [search({ count: 1, to: { kind: 'libraryTop' } })]);
+      const scenario = game({ definitions: [card, land, basic], seed })
+        .player('A')
+        .hand({ name: 'card', definitionId: card.oracleId })
+        .library(
+          0,
+          ...['c1', 'c2', 'c3', 'c4', 'c5'].map((name) => ({ name, power: 1, toughness: 1 })),
+        )
+        .player('B')
+        .library(10)
+        .player('A')
+        .start()
+        .to('precombatMain');
+      castAndResolve(scenario).decide({
+        kind: 'chooseCardsFromLibrary',
+        cards: refs(scenario, 'c4'),
+      });
+      expect(libraryOf(scenario)[0]).toBe(scenario.ref('c4'));
+      expect(libraryOf(scenario)).toHaveLength(5);
+    }
+  });
+
+  it('shows the searcher their whole library while they choose, and the opponent none of it', () => {
+    const scenario = castAndResolve(table(spell('Tutor', [search({ count: 1 })])));
+    for (const card of libraryOf(scenario)) {
+      expect(viewFor(scenario.get(), 'A').objects.has(card)).toBe(true);
+      expect(viewFor(scenario.get(), 'B').objects.has(card)).toBe(false);
+    }
   });
 });

@@ -1368,10 +1368,8 @@
     }
   },
   "Borderland Ranger": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"When this creature enters, you may search your library for a basic land card, reveal it, put it into your hand, then shuffle.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "ffe25048-0bd4-49b5-aecb-2b1b57fb8d8b",
       "name": "Borderland Ranger",
@@ -1390,7 +1388,44 @@
       "power": 2,
       "toughness": 2,
       "text": "When this creature enters, you may search your library for a basic land card, reveal it, put it into your hand, then shuffle.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-0",
+          "covers": [
+            0
+          ],
+          "when": {
+            "kind": "selfEntersBattlefield"
+          },
+          "effects": [
+            {
+              "op": "may",
+              "player": "you",
+              "effects": [
+                {
+                  "op": "search",
+                  "player": "you",
+                  "count": 1,
+                  "filter": {
+                    "and": [
+                      {
+                        "supertype": "basic"
+                      },
+                      {
+                        "type": "land"
+                      }
+                    ]
+                  },
+                  "to": {
+                    "kind": "hand"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   "Bountiful Harvest": {
@@ -2638,10 +2673,8 @@
     }
   },
   "Diabolic Tutor": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Search your library for a card, put that card into your hand, then shuffle.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "14589b6b-1814-46f9-a364-83cc15dacac2",
       "name": "Diabolic Tutor",
@@ -2653,7 +2686,24 @@
         "B"
       ],
       "text": "Search your library for a card, put that card into your hand, then shuffle.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "spell",
+          "covers": [
+            0
+          ],
+          "effects": [
+            {
+              "op": "search",
+              "player": "you",
+              "count": 1,
+              "to": {
+                "kind": "hand"
+              }
+            }
+          ]
+        }
+      ]
     }
   },
   "Diminish": {
@@ -3614,10 +3664,8 @@
     }
   },
   "Fabricate": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Search your library for an artifact card, reveal it, put it into your hand, then shuffle.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "422e1869-134f-463d-9fa1-86b66a998b3e",
       "name": "Fabricate",
@@ -3629,7 +3677,27 @@
         "U"
       ],
       "text": "Search your library for an artifact card, reveal it, put it into your hand, then shuffle.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "spell",
+          "covers": [
+            0
+          ],
+          "effects": [
+            {
+              "op": "search",
+              "player": "you",
+              "count": 1,
+              "filter": {
+                "type": "artifact"
+              },
+              "to": {
+                "kind": "hand"
+              }
+            }
+          ]
+        }
+      ]
     }
   },
   "Fauna Shaman": {
@@ -6107,7 +6175,6 @@
   "Liliana Vess": {
     "status": "partial",
     "reasons": [
-      "coverage: sentence 1 is not claimed by any ability: \"−2: Search your library for a card, then shuffle and put that card on top.\"",
       "coverage: sentence 2 is not claimed by any ability: \"−8: Put all creature cards from all graveyards onto the battlefield under your control.\""
     ],
     "script": {
@@ -6147,6 +6214,24 @@
               "op": "discard",
               "player": "$t",
               "count": 1
+            }
+          ]
+        },
+        {
+          "kind": "loyalty",
+          "id": "auto-loyalty-1",
+          "covers": [
+            1
+          ],
+          "cost": -2,
+          "effects": [
+            {
+              "op": "search",
+              "player": "you",
+              "count": 1,
+              "to": {
+                "kind": "libraryTop"
+              }
             }
           ]
         }
@@ -8349,10 +8434,8 @@
     }
   },
   "Rampant Growth": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "8539f295-5d58-4436-a73a-b9277c4c7795",
       "name": "Rampant Growth",
@@ -8364,7 +8447,35 @@
         "G"
       ],
       "text": "Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "spell",
+          "covers": [
+            0
+          ],
+          "effects": [
+            {
+              "op": "search",
+              "player": "you",
+              "count": 1,
+              "filter": {
+                "and": [
+                  {
+                    "supertype": "basic"
+                  },
+                  {
+                    "type": "land"
+                  }
+                ]
+              },
+              "to": {
+                "kind": "battlefield",
+                "tapped": true
+              }
+            }
+          ]
+        }
+      ]
     }
   },
   "Razorfoot Griffin": {
@@ -10102,10 +10213,8 @@
     }
   },
   "Sylvan Ranger": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"When this creature enters, you may search your library for a basic land card, reveal it, put it into your hand, then shuffle.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "29a90fda-541e-4923-b3ed-e2b35d02c74b",
       "name": "Sylvan Ranger",
@@ -10124,7 +10233,44 @@
       "power": 1,
       "toughness": 1,
       "text": "When this creature enters, you may search your library for a basic land card, reveal it, put it into your hand, then shuffle.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "triggered",
+          "id": "auto-triggered-0",
+          "covers": [
+            0
+          ],
+          "when": {
+            "kind": "selfEntersBattlefield"
+          },
+          "effects": [
+            {
+              "op": "may",
+              "player": "you",
+              "effects": [
+                {
+                  "op": "search",
+                  "player": "you",
+                  "count": 1,
+                  "filter": {
+                    "and": [
+                      {
+                        "supertype": "basic"
+                      },
+                      {
+                        "type": "land"
+                      }
+                    ]
+                  },
+                  "to": {
+                    "kind": "hand"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   "Telepathy": {
@@ -10237,10 +10383,8 @@
     }
   },
   "Terramorphic Expanse": {
-    "status": "partial",
-    "reasons": [
-      "coverage: sentence 0 is not claimed by any ability: \"{T}, Sacrifice this land: Search your library for a basic land card, put it onto the battlefield tapped, then shuffle.\""
-    ],
+    "status": "supported",
+    "reasons": [],
     "script": {
       "oracleId": "1bd3e453-aa21-4ee6-95c2-d6d920ee8e7a",
       "name": "Terramorphic Expanse",
@@ -10250,7 +10394,40 @@
       ],
       "colours": [],
       "text": "{T}, Sacrifice this land: Search your library for a basic land card, put it onto the battlefield tapped, then shuffle.",
-      "abilities": []
+      "abilities": [
+        {
+          "kind": "activated",
+          "id": "auto-activated-0",
+          "covers": [
+            0
+          ],
+          "cost": {
+            "tap": true,
+            "sacrificeSelf": true
+          },
+          "effects": [
+            {
+              "op": "search",
+              "player": "you",
+              "count": 1,
+              "filter": {
+                "and": [
+                  {
+                    "supertype": "basic"
+                  },
+                  {
+                    "type": "land"
+                  }
+                ]
+              },
+              "to": {
+                "kind": "battlefield",
+                "tapped": true
+              }
+            }
+          ]
+        }
+      ]
     }
   },
   "Thunder Strike": {
