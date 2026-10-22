@@ -41,6 +41,8 @@ export interface EffectContext {
   readonly x: number;
   /** The object an enclosing `forEach` is currently on. */
   readonly each?: ObjectId;
+  /** The permanent that made the resolving triggered ability trigger, if one did. */
+  readonly triggering?: ObjectId;
 }
 
 export const opponentOf = (player: PlayerId): PlayerId =>
@@ -99,6 +101,10 @@ export const resolveObjects = (
       return state.objects.has(selector.object) ? [selector.object] : [];
     case 'each':
       return context.each !== undefined && state.objects.has(context.each) ? [context.each] : [];
+    case 'triggering':
+      return context.triggering !== undefined && state.objects.has(context.triggering)
+        ? [context.triggering]
+        : [];
     case 'target': {
       const chosen = context.targets[selector.id] ?? [];
       return chosen.flatMap((target) =>

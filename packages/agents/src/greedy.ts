@@ -1,5 +1,6 @@
 import type {
   ChooseCardsFromLibraryDecision,
+  ChooseTargetsDecision,
   Decision,
   DecisionResponse,
   DeclareAttackersDecision,
@@ -12,7 +13,7 @@ import type {
   VisibleObject,
 } from '@mtg/engine/view';
 import { objectsSeenIn } from '@mtg/engine/view';
-import type { ObjectId } from '@mtg/shared';
+import type { EventTarget, ObjectId } from '@mtg/shared';
 import { afterAction, isPermanentCard } from './after-action.js';
 import { type Block, withoutLoneMenaceBlocks } from './blocks.js';
 import { creatureValue, evaluate } from './evaluate.js';
@@ -86,6 +87,10 @@ export const greedyAgent = (
         return { kind: 'chooseCardsFromLibrary', cards: cardsToTake(view, decision, weights) };
       case 'orderCards':
         return { kind: 'orderCards', order: cardsInOrder(view, decision, weights) };
+      // A trigger's targets, scored as a spell aimed at them would be: the opponent's
+      // biggest threat for something harmful, as the prior already prices it.
+      case 'chooseTargets':
+        return { kind: 'chooseTargets', targets: bestTargets(view, decision, weights) };
     }
   },
 });
@@ -140,6 +145,24 @@ export const prior = (view: PlayerView, action: PriorityAction, weights: Weights
     return isPermanentCard(card) ? 0 : weights.spellUntargeted * card.manaValue;
   }
   return targetedCredit(view, action.targets, card.manaValue, weights, 0);
+};
+
+/** The way of targeting a trigger that the prior credits most; the first on a tie. */
+const bestTargets = (
+  view: PlayerView,
+  decision: ChooseTargetsDecision,
+  weights: Weights,
+): readonly EventTarget[] => {
+  let best = decision.options[0] ?? [];
+  let bestCredit = Number.NEGATIVE_INFINITY;
+  for (const option of decision.options) {
+    const credit = targetedCredit(view, option, 1, weights, 0);
+    if (credit > bestCredit) {
+      best = option;
+      bestCredit = credit;
+    }
+  }
+  return best;
 };
 
 /** Credit for aiming something of `size` at these targets, or `untargeted` with none. */

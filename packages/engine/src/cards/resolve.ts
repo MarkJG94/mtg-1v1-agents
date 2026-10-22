@@ -65,6 +65,7 @@ export const resolveTop = (state: GameState, emitter: EventEmitter): GameState =
       ),
     ),
     x: object.stack?.x ?? 0,
+    ...(object.stack?.subject === undefined ? {} : { triggering: object.stack.subject }),
   };
 
   return beginResolution(state, emitter, id, context, effectsOf(ability));

@@ -53,7 +53,7 @@ export const parseEffects = (
   options: { readonly thatPlayer?: string; readonly aboutAnother?: boolean } = {},
 ): ParseResult => {
   const bindings = new Bindings(options.thatPlayer ?? null);
-  bindings.itMayBeSelf = options.aboutAnother !== true;
+  if (options.aboutAnother === true) bindings.it = '$that';
   const effects: ScriptEffect[] = [];
   let read = 0;
   let failure: ParseFailure | null = null;

@@ -1,9 +1,10 @@
-import { asOracleId } from '@mtg/shared';
+import { asOracleId, playerZone } from '@mtg/shared';
 import { describe, expect, it } from 'vitest';
 import { parseManaCost } from '../mana/cost.js';
 import { game } from '../testing/scenario.js';
 import type { TriggerWhen } from '../triggers.js';
 import type { CardDefinition } from './definition.js';
+import { resolveObjects } from './evaluate.js';
 import type { Filter } from './vocabulary.js';
 
 /**
@@ -209,5 +210,62 @@ describe('dying (CR 700.4), seen as the permanent last was (CR 603.10a)', () => 
   it('with no filter, any permanent: the old behaviour for a script that names none', () => {
     const card = watcher({ kind: 'anotherDies' });
     expect(table(card).kill('myLand').resolve().lifeOf('A')).toBe(21);
+  });
+});
+
+describe('the permanent that made it trigger: `$that` ("it", "that creature")', () => {
+  const counterOnIt = (when: TriggerWhen): CardDefinition => ({
+    ...watcher(when),
+    abilities: [
+      {
+        kind: 'triggered',
+        id: 'watch',
+        when,
+        effects: [
+          { op: 'addCounters', object: { kind: 'triggering' }, counter: '+1/+1', amount: 1 },
+        ],
+      },
+    ],
+  });
+
+  it('is the creature that entered, not the card whose trigger it is', () => {
+    const card = counterOnIt({ kind: 'anotherEntersBattlefield', filter: creatureYouControl });
+    const scenario = table(card).cast('bear').resolve();
+    expect(scenario.object('bear').counters['+1/+1']).toBe(1);
+    expect(scenario.object('watcher').counters['+1/+1']).toBeUndefined();
+  });
+
+  it('is the creature that died, wherever it went (ADR 0020)', () => {
+    const card: CardDefinition = {
+      ...watcher({ kind: 'anotherDies', filter: creatureYouControl }),
+      abilities: [
+        {
+          kind: 'triggered',
+          id: 'watch',
+          when: { kind: 'anotherDies', filter: creatureYouControl },
+          effects: [{ op: 'bounce', object: { kind: 'triggering' } }],
+        },
+      ],
+    };
+    const scenario = table(card).kill('myBear').resolve();
+    expect(scenario.zoneOf('myBear')).toBe(playerZone('A', 'hand'));
+  });
+
+  it('names nothing where no permanent made anything trigger', () => {
+    const scenario = table(watcher({ kind: 'selfDies' }));
+    const context = {
+      source: scenario.ref('watcher'),
+      controller: 'A' as const,
+      targets: {},
+      x: 0,
+    };
+    expect(resolveObjects(scenario.get(), context, { kind: 'triggering' })).toEqual([]);
+    expect(
+      resolveObjects(
+        scenario.get(),
+        { ...context, triggering: scenario.ref('myBear') },
+        { kind: 'triggering' },
+      ),
+    ).toEqual([scenario.ref('myBear')]);
   });
 });

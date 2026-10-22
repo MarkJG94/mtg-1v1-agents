@@ -384,6 +384,26 @@ const withAdditionalCost = (
  * (CR 601.2c): "destroy target creature" with no creature on the board is not castable,
  * and offering it with an empty list would be offering an illegal cast.
  */
+/**
+ * Every way of choosing targets for these specs from `source`, for `player`, up to the
+ * same cap as a cast: what a triggered ability is offered as it goes on the stack
+ * (CR 603.3d).
+ */
+export const targetingsFor = (
+  state: GameState,
+  player: PlayerId,
+  source: ObjectId,
+  targets: readonly TargetSpec[],
+  colours: CardInfo['colours'],
+): readonly (readonly EventTarget[])[] =>
+  targetChoices(state, player, source, {
+    isLand: false,
+    manaCost: emptyManaCost,
+    sorcerySpeed: false,
+    colours,
+    targets,
+  });
+
 const targetChoices = (
   state: GameState,
   player: PlayerId,
@@ -431,7 +451,7 @@ const targetChoices = (
   return combinations;
 };
 
-const sameTarget = (left: EventTarget, right: EventTarget): boolean =>
+export const sameTarget = (left: EventTarget, right: EventTarget): boolean =>
   left.kind === 'player' && right.kind === 'player'
     ? left.player === right.player
     : left.kind === 'object' && right.kind === 'object' && left.object === right.object;

@@ -98,6 +98,12 @@ export type ObjectSelector =
   | { readonly kind: 'target'; readonly id: string }
   /** The object the enclosing `forEach` is currently on. */
   | { readonly kind: 'each' }
+  /**
+   * The permanent whose entering or dying made a triggered ability trigger: "it" and
+   * "that creature" in "whenever another creature you control enters, put a +1/+1
+   * counter on it". `$that` in a script.
+   */
+  | { readonly kind: 'triggering' }
   /** A specific object, which only an effect built by the engine itself uses. */
   | { readonly kind: 'object'; readonly object: ObjectId };
 

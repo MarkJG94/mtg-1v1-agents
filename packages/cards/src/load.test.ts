@@ -229,6 +229,37 @@ describe('a payment in a "may"', () => {
   });
 });
 
+describe('the permanent that made a trigger trigger (`$that`)', () => {
+  const triggered = (when: Record<string, unknown>) =>
+    loadCardScript({
+      ...bolt,
+      abilities: [
+        {
+          kind: 'triggered',
+          id: 'grow',
+          when,
+          effects: [{ op: 'addCounters', object: '$that', counter: '+1/+1', amount: 1 }],
+        },
+      ],
+    });
+
+  it('loads in a trigger on a permanent entering or dying', () => {
+    expect(
+      triggered({ kind: 'anotherEntersBattlefield', filter: { is: 'creature' } }).abilities[0],
+    ).toMatchObject({ effects: [{ object: { kind: 'triggering' } }] });
+  });
+
+  it('is refused anywhere it would name nothing', () => {
+    expect(() => triggered({ kind: 'lifeGained', player: 'you' })).toThrow(/\$that/);
+    expect(() =>
+      loadCardScript({
+        ...bolt,
+        abilities: [{ kind: 'spell', effects: [{ op: 'destroy', object: '$that' }] }],
+      }),
+    ).toThrow(/\$that/);
+  });
+});
+
 describe('a look at the top of a library', () => {
   const looking = (look: Record<string, unknown>) =>
     loadCardScript({
