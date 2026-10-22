@@ -537,6 +537,9 @@ describe('the parts that are not effects', () => {
     expect(parseCost('{1}, {T}')).toEqual({ mana: '{1}', tap: true });
     expect(parseCost('Sacrifice ~')).toEqual({ sacrificeSelf: true });
     expect(parseCost('Discard a card')).toBeNull();
+    // The untap symbol is not mana, and neither is energy.
+    expect(parseCost('{2}{R}, {Q}')).toBeNull();
+    expect(parseCost('{E}{E}, {T}')).toBeNull();
   });
 
   /**
@@ -812,6 +815,50 @@ describe('"you may pay {N}. If you do, …" (CR 117.12)', () => {
     expect(
       parseTrigger('When ~ enters, you may pay {E}{E}.', ['If you do, draw a card.']),
     ).toHaveProperty('failure');
+  });
+});
+
+describe('amounts "equal to" something in the game', () => {
+  it('reads the number of things, and of cards in hand', () => {
+    expect(effectsOf('Draw cards equal to the number of creatures you control.')).toEqual([
+      {
+        op: 'draw',
+        player: 'you',
+        count: { count: { is: 'creature', controller: 'you' } },
+      },
+    ]);
+    expect(effectsOf('You gain life equal to the number of cards in your hand.')).toEqual([
+      { op: 'gainLife', player: 'you', amount: { cardsInHand: 'you' } },
+    ]);
+  });
+
+  it('reads "its power" as whatever "it" is: the card, a target, or the permanent a trigger is about', () => {
+    expect(
+      parseTrigger('When ~ dies, it deals damage equal to its power to any target.'),
+    ).toMatchObject({ ability: { effects: [{ op: 'damage', amount: { powerOf: '~' } }] } });
+    expect(
+      effectsOf(
+        "Target creature you control deals damage equal to its power to target creature you don't control.",
+      ),
+    ).toMatchObject([{ op: 'damage', to: '$u', from: '$t', amount: { powerOf: '$t' } }]);
+    expect(
+      parseTrigger(
+        'Whenever another creature you control dies, you gain life equal to its toughness.',
+      ),
+    ).toMatchObject({ ability: { effects: [{ amount: { toughnessOf: '$that' } }] } });
+    expect(
+      parseTrigger(
+        "Whenever a creature you control dies, each opponent loses life equal to that creature's power.",
+      ),
+    ).toMatchObject({ ability: { effects: [{ amount: { powerOf: '$that' } }] } });
+  });
+
+  it('reads mana value, and leaves a number of something it cannot count unread', () => {
+    expect(parseTrigger('When ~ enters, you gain life equal to its mana value.')).toMatchObject({
+      ability: { effects: [{ amount: { manaValueOf: '~' } }] },
+    });
+    expect(effectsOf('You gain life equal to the number of players.')).toBeNull();
+    expect(effectsOf('You gain life equal to the result.')).toBeNull();
   });
 });
 

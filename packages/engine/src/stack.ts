@@ -7,6 +7,7 @@ import {
   playerZone,
   type ZoneId,
 } from '@mtg/shared';
+import type { LastKnownStats } from './cards/evaluate.js';
 import type { EventEmitter } from './events/emitter.js';
 import { runEvent } from './events/perform.js';
 import { withPriority } from './priority.js';
@@ -69,6 +70,8 @@ export interface StackProperties {
   readonly x?: number;
   /** A triggered ability's triggering permanent, which its effects call `$that`. */
   readonly subject?: ObjectId;
+  /** Its power and toughness as it triggered, for once it has left (CR 608.2h). */
+  readonly subjectLastKnown?: LastKnownStats;
 }
 
 /** The object on top of the stack, or undefined when the stack is empty. */
@@ -372,6 +375,7 @@ export interface AbilityOnStack {
   readonly targets?: readonly EventTarget[];
   /** For a triggered ability, the permanent that made it trigger, if one did. */
   readonly subject?: ObjectId;
+  readonly subjectLastKnown?: LastKnownStats;
 }
 
 /**
@@ -403,6 +407,9 @@ const createAbilityOnStack = (
         abilityId: ability.abilityId,
         source: ability.source,
         ...(ability.subject === undefined ? {} : { subject: ability.subject }),
+        ...(ability.subjectLastKnown === undefined
+          ? {}
+          : { subjectLastKnown: ability.subjectLastKnown }),
       },
     }),
     id: created.object.id,

@@ -43,6 +43,18 @@ export interface EffectContext {
   readonly each?: ObjectId;
   /** The permanent that made the resolving triggered ability trigger, if one did. */
   readonly triggering?: ObjectId;
+  /**
+   * That permanent's power and toughness as it last was on the battlefield, for when it
+   * has left: "whenever a creature you control dies, you gain life equal to its
+   * toughness" uses its toughness as it died, counters and all (CR 608.2h).
+   */
+  readonly triggeringLastKnown?: LastKnownStats;
+}
+
+/** What a permanent's power and toughness were as it last existed on the battlefield. */
+export interface LastKnownStats {
+  readonly power: number | null;
+  readonly toughness: number | null;
 }
 
 export const opponentOf = (player: PlayerId): PlayerId =>
@@ -288,6 +300,18 @@ export const objectsMatching = (
 
 // --- Quantities and conditions ---
 
+/**
+ * An object's power and toughness for an "equal to": as it is, or — for the permanent a
+ * trigger is about, once it has left the battlefield — as it last was there (CR 608.2h).
+ */
+const statsOf = (state: GameState, context: EffectContext, object: ObjectId): LastKnownStats => {
+  const gone = state.objects.get(object)?.zone !== 'battlefield';
+  if (gone && object === context.triggering && context.triggeringLastKnown !== undefined) {
+    return context.triggeringLastKnown;
+  }
+  return characteristicsOf(state, object);
+};
+
 export const evaluateQuantity = (
   state: GameState,
   context: EffectContext,
@@ -312,14 +336,22 @@ export const evaluateQuantity = (
       );
     case 'powerOf':
       return resolveObjects(state, context, quantity.object).reduce(
-        (total, object) => total + (characteristicsOf(state, object).power ?? 0),
+        (total, object) => total + (statsOf(state, context, object).power ?? 0),
         0,
       );
     case 'toughnessOf':
       return resolveObjects(state, context, quantity.object).reduce(
-        (total, object) => total + (characteristicsOf(state, object).toughness ?? 0),
+        (total, object) => total + (statsOf(state, context, object).toughness ?? 0),
         0,
       );
+    case 'manaValueOf':
+      return resolveObjects(state, context, quantity.object).reduce((total, object) => {
+        const found = state.objects.get(object);
+        const definition = definitionFor(state, object);
+        return found?.token === true || definition === undefined
+          ? total
+          : total + manaValue(definition.manaCost);
+      }, 0);
     case 'countersOn':
       return resolveObjects(state, context, quantity.object).reduce(
         (total, object) => total + (state.objects.get(object)?.counters[quantity.counter] ?? 0),

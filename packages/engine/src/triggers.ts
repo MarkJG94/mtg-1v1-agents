@@ -1,6 +1,7 @@
 import { type EventTarget, type ObjectId, opponentOf, type PlayerId, type Step } from '@mtg/shared';
-import { matchesFilter } from './cards/evaluate.js';
+import { type LastKnownStats, matchesFilter } from './cards/evaluate.js';
 import type { Filter } from './cards/vocabulary.js';
+import { characteristicsOf } from './characteristics.js';
 import type { GameState } from './state/game-state.js';
 import type { GameObject } from './state/object.js';
 import { getObject, objectsIn, updateState } from './state/update.js';
@@ -155,6 +156,8 @@ export interface TriggerInstance {
   readonly targets?: readonly EventTarget[];
   /** The permanent whose entering or dying made it trigger: what `$that` names. */
   readonly subject?: ObjectId;
+  /** That permanent's power and toughness as it was when it triggered (CR 608.2h). */
+  readonly subjectLastKnown?: LastKnownStats;
 }
 
 /** A trigger set up by an effect to fire later, e.g. "at the beginning of the next end step". */
@@ -247,14 +250,14 @@ const matchesZoneChange = (
 const instanceFor = (
   watcher: GameObject,
   ability: TriggeredAbility,
-  subject?: ObjectId,
+  subject?: { readonly id: ObjectId; readonly lastKnown: LastKnownStats },
 ): TriggerInstance => ({
   abilityId: ability.id,
   source: watcher.id,
   controller: watcher.controller,
   lastKnown: watcher,
   interveningIf: ability.interveningIf ?? { kind: 'always' },
-  ...(subject === undefined ? {} : { subject }),
+  ...(subject === undefined ? {} : { subject: subject.id, subjectLastKnown: subject.lastKnown }),
 });
 
 const firedKey = (source: ObjectId, abilityId: string): string => `${source}:${abilityId}`;
@@ -276,6 +279,16 @@ export const triggersFromZoneChange = (
   kind: 'enters' | 'dies',
 ): readonly TriggerInstance[] => {
   const found: TriggerInstance[] = [];
+  // As the moved permanent is in `state` — just entered, or about to die — worked out
+  // only for a trigger that fires, since most zone changes fire none.
+  let known: LastKnownStats | undefined;
+  const subject = () => {
+    if (known === undefined) {
+      const { power, toughness } = characteristicsOf(state, moved);
+      known = { power, toughness };
+    }
+    return { id: moved, lastKnown: known };
+  };
 
   // Watchers still on the battlefield see "another creature" events.
   for (const id of objectsIn(state, 'battlefield')) {
@@ -295,7 +308,7 @@ export const triggersFromZoneChange = (
         continue;
       }
       if (!notYetFired(state, ability, id)) continue;
-      found.push(instanceFor(watcher, ability, moved));
+      found.push(instanceFor(watcher, ability, subject()));
     }
   }
 
@@ -303,7 +316,7 @@ export const triggersFromZoneChange = (
   for (const ability of movedSnapshot.triggers) {
     if (!matchesZoneChange(state, ability.when, movedSnapshot, moved, kind, true)) continue;
     if (!notYetFired(state, ability, moved)) continue;
-    found.push(instanceFor(movedSnapshot, ability, moved));
+    found.push(instanceFor(movedSnapshot, ability, subject()));
   }
 
   return found;

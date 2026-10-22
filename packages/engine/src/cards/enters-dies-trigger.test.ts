@@ -4,7 +4,7 @@ import { parseManaCost } from '../mana/cost.js';
 import { game } from '../testing/scenario.js';
 import type { TriggerWhen } from '../triggers.js';
 import type { CardDefinition } from './definition.js';
-import { resolveObjects } from './evaluate.js';
+import { evaluateQuantity, resolveObjects } from './evaluate.js';
 import type { Filter } from './vocabulary.js';
 
 /**
@@ -267,5 +267,90 @@ describe('the permanent that made it trigger: `$that` ("it", "that creature")', 
         { kind: 'triggering' },
       ),
     ).toEqual([scenario.ref('myBear')]);
+  });
+});
+
+describe('"equal to its toughness" of a creature that died: as it last was (CR 608.2h)', () => {
+  const gainItsToughness = (when: TriggerWhen): CardDefinition => ({
+    ...watcher(when),
+    abilities: [
+      {
+        kind: 'triggered',
+        id: 'watch',
+        when,
+        effects: [
+          {
+            op: 'gainLife',
+            player: { kind: 'you' },
+            amount: { kind: 'toughnessOf', object: { kind: 'triggering' } },
+          },
+        ],
+      },
+    ],
+  });
+
+  it('counts the counters it had on the battlefield, which the card in the graveyard has not', () => {
+    const card = gainItsToughness({ kind: 'anotherDies', filter: creatureYouControl });
+    const scenario = game({ definitions: [card, bear], seed: 'enters-dies' })
+      .player('A')
+      .battlefield(
+        { name: 'watcher', definitionId: card.oracleId },
+        // A 2/2 grown to 5/5 by counters, which it loses on leaving (CR 400.7).
+        { name: 'grown', definitionId: bear.oracleId, counters: { '+1/+1': 3 } },
+      )
+      .library(10)
+      .player('B')
+      .library(10)
+      .player('A')
+      .start()
+      .to('precombatMain');
+    scenario.kill('grown').resolve();
+    expect(scenario.object('grown').counters['+1/+1']).toBeUndefined();
+    expect(scenario.lifeOf('A')).toBe(25);
+  });
+
+  it('reads one still on the battlefield as it is now, not as it was when it triggered', () => {
+    const card = gainItsToughness({ kind: 'anotherEntersBattlefield', filter: creatureYouControl });
+    const scenario = table(card).cast('bear').pass(2);
+    // The trigger is on the stack; the Bear grows before it resolves.
+    expect(scenario.get().zones.stack).toHaveLength(1);
+    scenario
+      .effect({
+        source: scenario.ref('bear'),
+        affects: { kind: 'object', object: scenario.ref('bear') },
+        change: { kind: 'modifyPowerToughness', power: 3, toughness: 3 },
+        duration: { kind: 'untilEndOfTurn' },
+      })
+      .resolve();
+    expect(scenario.lifeOf('A')).toBe(25);
+  });
+
+  it('reads the card as it is when it is still on the battlefield', () => {
+    const card = gainItsToughness({ kind: 'anotherEntersBattlefield', filter: creatureYouControl });
+    expect(table(card).cast('bear').resolve().lifeOf('A')).toBe(22);
+  });
+
+  it('a mana value is the card’s printed cost, and a token’s is 0 (CR 202.3)', () => {
+    const dear = {
+      ...bear,
+      oracleId: asOracleId('ed-dear-bear'),
+      manaCost: parseManaCost('{3}{G}'),
+    };
+    const scenario = game({ definitions: [dear], seed: 'enters-dies' })
+      .player('A')
+      .battlefield(
+        { name: 'dear', definitionId: dear.oracleId },
+        { name: 'token', definitionId: dear.oracleId, token: true },
+      )
+      .player('B')
+      .start();
+    const context = { source: scenario.ref('dear'), controller: 'A' as const, targets: {}, x: 0 };
+    const manaValueOf = (name: string) =>
+      evaluateQuantity(scenario.get(), context, {
+        kind: 'manaValueOf',
+        object: { kind: 'object', object: scenario.ref(name) },
+      });
+    expect(manaValueOf('dear')).toBe(4);
+    expect(manaValueOf('token')).toBe(0);
   });
 });

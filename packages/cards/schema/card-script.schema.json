@@ -1549,6 +1549,10 @@
               "type": "string",
               "pattern": "^(~|\\$[a-zA-Z][\\w-]*|you|opponent|each)$"
             },
+            "manaValueOf": {
+              "type": "string",
+              "pattern": "^(~|\\$[a-zA-Z][\\w-]*|you|opponent|each)$"
+            },
             "counters": {
               "type": "object",
               "properties": {

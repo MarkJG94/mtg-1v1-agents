@@ -423,6 +423,9 @@ const stackOneTrigger = (
     definitionId: trigger.lastKnown.definitionId,
     ...(trigger.targets === undefined ? {} : { targets: trigger.targets }),
     ...(trigger.subject === undefined ? {} : { subject: trigger.subject }),
+    ...(trigger.subjectLastKnown === undefined
+      ? {}
+      : { subjectLastKnown: trigger.subjectLastKnown }),
   });
 };
 
